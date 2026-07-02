@@ -1,0 +1,190 @@
+// Prisma schema for BlissTribe
+// 对齐 docs/DATABASE.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id              BigInt   @id @default(autoincrement())
+  phoneCiphertext Bytes
+  phoneHash       String   @unique
+  phoneMasked     String
+  nickname        String
+  avatar          String   @default("")
+  gender          Int      @default(0) // 0保密 1男 2女
+  birthday        DateTime?
+  passwordHash    String?
+  status          Int      @default(1) // 0禁用 1正常 2待完善
+  lastLoginAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  wechatAccount WechatAccount?
+  sessions      UserSession[]
+  agreements    UserAgreement[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// 微信账号表
+model WechatAccount {
+  id            BigInt   @id @default(autoincrement())
+  userId        BigInt   @unique
+  wxOpenIdHash  String   @unique
+  wxUnionId     String?
+  wxNickname    String?
+  wxAvatar      String?
+  wxGender      Int      @default(0)
+  wxCountry     String?
+  wxProvince    String?
+  wxCity        String?
+  status        Int      @default(1) // 0解绑 1绑定
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([wxUnionId])
+}
+
+// 用户会话表
+model UserSession {
+  id                BigInt   @id @default(autoincrement())
+  userId            BigInt
+  jti               String   @unique
+  refreshTokenHash  String
+  expiresAt         DateTime
+  refreshExpiresAt  DateTime
+  ipAddress         String?
+  userAgent         String?
+  platform          String?
+  status            Int      @default(1) // 0失效 1有效
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// 用户注册临时表
+model UserRegisterTemp {
+  id              BigInt   @id @default(autoincrement())
+  tempToken       String   @unique
+  wxOpenIdHash    String?
+  wxUnionId       String?
+  wxNickname      String?
+  wxAvatar        String?
+  wxGender        Int      @default(0)
+  phoneCiphertext Bytes?
+  phoneHash       String?
+  phoneMasked     String?
+  status          Int      @default(1)
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+// 用户协议记录表
+model UserAgreement {
+  id               BigInt   @id @default(autoincrement())
+  userId           BigInt
+  agreementType    String // user / privacy
+  agreementVersion String
+  agreedAt         DateTime
+  ipAddress        String?
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([agreedAt])
+}
+
+// 协议版本表
+model Agreement {
+  id          BigInt   @id @default(autoincrement())
+  type        String // user / privacy
+  version     String
+  title       String
+  content     String
+  isCurrent   Boolean  @default(false)
+  effectiveAt DateTime
+  createdAt   DateTime @default(now())
+
+  @@unique([type, version])
+  @@index([type, isCurrent])
+}
+
+// 管理员表（后台独立账号体系）
+model Admin {
+  id           BigInt   @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  nickname     String
+  avatar       String   @default("")
+  status       Int      @default(1) // 0禁用 1正常
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  adminRoles AdminRole[]
+}
+
+// 角色
+model Role {
+  id        BigInt   @id @default(autoincrement())
+  code      String   @unique // super_admin / admin / operator
+  name      String
+  status    Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  admins      AdminRole[]
+  permissions RolePermission[]
+}
+
+// 管理员-角色关联
+model AdminRole {
+  adminId BigInt
+  roleId  BigInt
+  assignedAt DateTime @default(now())
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  role  Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([adminId, roleId])
+}
+
+// 权限
+model Permission {
+  id        BigInt   @id @default(autoincrement())
+  code      String   @unique // user:read / user:write / agreement:publish
+  name      String
+  createdAt DateTime @default(now())
+
+  roles RolePermission[]
+}
+
+// 角色-权限关联
+model RolePermission {
+  roleId       BigInt
+  permissionId BigInt
+  assignedAt   DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}

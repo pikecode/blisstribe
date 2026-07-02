@@ -1,0 +1,28 @@
+{
+  "name": "blisstribe",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BlissTribe 小程序 + 后台管理 + API monorepo",
+  "scripts": {
+    "dev:miniapp": "pnpm --filter @blisstribe/miniapp dev:mp-weixin",
+    "dev:mp": "pnpm dev:miniapp",
+    "build:miniapp": "pnpm --filter @blisstribe/miniapp build:mp-weixin",
+    "dev:api": "pnpm --filter @blisstribe/api dev",
+    "build:api": "pnpm --filter @blisstribe/api build",
+    "dev:admin": "pnpm --filter @blisstribe/admin dev",
+    "build:admin": "pnpm --filter @blisstribe/admin build",
+    "dev": "concurrently -n api,admin -c green,blue \"pnpm dev:api\" \"pnpm dev:admin\"",
+    "start": "concurrently -n api,admin -c green,blue \"pnpm --filter @blisstribe/api start\" \"pnpm --filter @blisstribe/admin preview\"",
+    "type-check": "pnpm -r type-check",
+    "db:generate": "pnpm --filter @blisstribe/api prisma:generate",
+    "db:migrate": "pnpm --filter @blisstribe/api prisma:migrate",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "typescript": "^5.4.0",
+    "wait-on": "^9.0.10"
+  },
+  "packageManager": "pnpm@10.22.0"
+}
