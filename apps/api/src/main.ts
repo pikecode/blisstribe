@@ -1,17 +1,28 @@
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { NestExpressApplication } from '@nestjs/platform-express'
+import { join } from 'path'
+import { existsSync, mkdirSync } from 'fs'
 import { AppModule } from './app.module'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule)
   const configService = app.get(ConfigService)
   const logger = new Logger('Bootstrap')
 
   // 全局前缀
   app.setGlobalPrefix('api/v1')
+
+  // 静态文件服务：上传目录
+  const uploadDir = configService.get<string>('UPLOAD_DIR', './uploads')
+  const absoluteUploadDir = join(process.cwd(), uploadDir)
+  if (!existsSync(absoluteUploadDir)) {
+    mkdirSync(absoluteUploadDir, { recursive: true })
+  }
+  app.useStaticAssets(absoluteUploadDir, { prefix: '/uploads/' })
 
   // 跨域
   app.enableCors({

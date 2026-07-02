@@ -18,7 +18,7 @@ export const fileApi = {
         filePath,
         name: 'file',
         header: {
-          Authorization: authStore.token,
+          Authorization: `Bearer ${authStore.token}`,
         },
         success: (res) => {
           try {
