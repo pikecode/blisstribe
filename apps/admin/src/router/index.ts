@@ -37,6 +37,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/agreement/index.vue'),
         meta: { title: '协议版本管理', icon: 'Document' },
       },
+      {
+        path: 'invitations',
+        name: 'Invitations',
+        component: () => import('@/views/invitation/index.vue'),
+        meta: { title: '邀请管理', icon: 'Share' },
+      },
+      {
+        path: 'banners',
+        name: 'Banners',
+        component: () => import('@/views/banner/index.vue'),
+        meta: { title: 'Banner管理', icon: 'Picture' },
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

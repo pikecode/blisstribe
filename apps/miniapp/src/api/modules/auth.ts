@@ -45,6 +45,15 @@ export interface RegisterParams {
   gender: number
   birthday?: string
   agreement: boolean
+  realName?: string
+  wechatId?: string
+  email?: string
+  age?: number
+  favoriteColor?: string
+  occupation?: string
+  tags?: string[]
+  identity?: string
+  inviteCode?: string
 }
 
 export interface RegisterResult {

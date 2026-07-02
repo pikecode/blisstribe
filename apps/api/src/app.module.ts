@@ -9,6 +9,10 @@ import { StatsModule } from './stats/stats.module'
 import { PrismaModule } from './common/prisma.module'
 import { RedisModule } from './common/redis.module'
 
+import { InvitationModule } from './invitation/invitation.module'
+import { BannerModule } from './banner/banner.module'
+import { MiniappModule } from './miniapp/miniapp.module'
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -20,6 +24,9 @@ import { RedisModule } from './common/redis.module'
     AgreementModule,
     UploadModule,
     StatsModule,
+    InvitationModule,
+    BannerModule,
+    MiniappModule,
   ],
 })
 export class AppModule {}

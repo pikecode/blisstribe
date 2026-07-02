@@ -49,6 +49,8 @@ const authStore = useAuthStore()
 const menuItems = [
   { path: '/dashboard', title: '数据看板', icon: 'DataLine' },
   { path: '/users', title: '用户管理', icon: 'User' },
+  { path: '/invitations', title: '邀请管理', icon: 'Share' },
+  { path: '/banners', title: 'Banner管理', icon: 'Picture' },
   { path: '/admins', title: '管理员与权限', icon: 'Lock' },
   { path: '/agreements', title: '协议版本管理', icon: 'Document' },
 ]

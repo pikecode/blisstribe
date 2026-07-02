@@ -21,6 +21,18 @@ model User {
   gender          Int      @default(0) // 0保密 1男 2女
   birthday        DateTime?
   passwordHash    String?
+  inviteCode      String?  @unique // 个人邀请码
+  invitedBy       BigInt?  // 邀请人ID
+  realName        String?  // 真实姓名
+  wechatId        String?  // 微信号
+  email           String?  // 邮箱
+  age             Int?     // 年龄
+  favoriteColor   String?  // 喜欢的颜色
+  occupation      String?  // 职业
+  tags            String[] // 用户自我标签
+  identity        String?  // 注册身份: C/B/S
+  level           String   @default("normal") // 注册级别
+  douyinPayCode   String?  // 收款码(抖音)
   status          Int      @default(1) // 0禁用 1正常 2待完善
   lastLoginAt     DateTime?
   createdAt       DateTime @default(now())
@@ -30,9 +42,15 @@ model User {
   wechatAccount WechatAccount?
   sessions      UserSession[]
   agreements    UserAgreement[]
+  sentInvitations     MemberInvitation[] @relation("Inviter")
+  receivedInvitations MemberInvitation[] @relation("Invitee")
+  inviterUser   User?    @relation("UserInvitedBy", fields: [invitedBy], references: [id])
+  invitees      User[]   @relation("UserInvitedBy")
 
   @@index([status])
   @@index([createdAt])
+  @@index([inviteCode])
+  @@index([invitedBy])
 }
 
 // 微信账号表
@@ -125,6 +143,41 @@ model Agreement {
 
   @@unique([type, version])
   @@index([type, isCurrent])
+}
+
+// 会员邀请记录表
+model MemberInvitation {
+  id          BigInt   @id @default(autoincrement())
+  inviterId   BigInt   // 邀请人
+  inviteeId   BigInt?  // 被邀请人（注册后填充）
+  inviteCode  String   // 使用的邀请码
+  status      Int      @default(0) // 0待注册 1已注册 2已入会
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  inviter User  @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee User? @relation("Invitee", fields: [inviteeId], references: [id], onDelete: SetNull)
+
+  @@index([inviterId])
+  @@index([inviteeId])
+  @@index([inviteCode])
+  @@index([status])
+}
+
+// Banner 轮播图表
+model Banner {
+  id          BigInt   @id @default(autoincrement())
+  title       String
+  description String   @default("")
+  imageUrl    String   @default("")
+  gradient    String   @default("")
+  linkUrl     String   @default("")
+  sort        Int      @default(0)
+  status      Int      @default(1) // 0下线 1上线
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, sort])
 }
 
 // 管理员表（后台独立账号体系）

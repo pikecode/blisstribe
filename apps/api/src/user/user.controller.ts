@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Put, UseGuards } from '@nestjs/common'
 import { UserService } from './user.service'
 import { UpdateUserDto, SetPasswordDto } from './dto'
 import { JwtAuthGuard } from '../common/guards/jwt.guard'
@@ -22,11 +22,9 @@ export class UserController {
     return this.userService.updateInfo(user.userId, dto)
   }
 
-  @Put('password')
-  async setPassword(
-    @CurrentUser() user: { userId: string },
-    @Body() dto: SetPasswordDto
-  ) {
-    return this.userService.setPassword(user.userId, dto)
+  @Delete('account')
+  async deactivateAccount(@CurrentUser() user: { userId: string }) {
+    await this.userService.deactivateAccount(user.userId)
+    return { success: true }
   }
 }

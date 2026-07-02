@@ -6,6 +6,8 @@ import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { JwtStrategy } from './jwt.strategy'
 
+import { InvitationModule } from '../invitation/invitation.module'
+
 @Module({
   imports: [
     PassportModule,
@@ -17,6 +19,7 @@ import { JwtStrategy } from './jwt.strategy'
         signOptions: { expiresIn: config.get<string>('ACCESS_TOKEN_EXPIRES', '2h') },
       }),
     }),
+    InvitationModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

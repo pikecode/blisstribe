@@ -46,6 +46,41 @@ export class RegisterDto {
   @IsString()
   birthday?: string
 
+  @IsOptional()
+  @IsString()
+  realName?: string
+
+  @IsOptional()
+  @IsString()
+  wechatId?: string
+
+  @IsOptional()
+  @IsString()
+  email?: string
+
+  @IsOptional()
+  @IsNumber()
+  age?: number
+
+  @IsOptional()
+  @IsString()
+  favoriteColor?: string
+
+  @IsOptional()
+  @IsString()
+  occupation?: string
+
+  @IsOptional()
+  tags?: string[]
+
+  @IsOptional()
+  @IsString()
+  identity?: string
+
+  @IsOptional()
+  @IsString()
+  inviteCode?: string
+
   @IsBoolean()
   agreement!: boolean
 }

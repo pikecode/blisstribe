@@ -23,8 +23,8 @@ export function useAuth() {
       userStore.setUserInfo(result.userInfo)
       redirectToHome()
     } else if (result.isNewUser && result.tempToken) {
-      // 新用户：保存 tempToken，跳转注册页
       authStore.setTempToken(result.tempToken)
+      // 导航由调用方（AuthPopup / auth.vue）负责，composable 只存 tempToken
     }
 
     return result

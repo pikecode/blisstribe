@@ -7,6 +7,7 @@ import { RedisService } from '../common/redis.service'
 import { BusinessException } from '../common/interceptors/response.interceptor'
 import { ErrorCode, type User } from '@blisstribe/shared'
 import type { WechatLoginDto, WechatPhoneDto, RegisterDto } from './dto'
+import { InvitationService } from '../invitation/invitation.service'
 import { randomUUID, createHmac } from 'crypto'
 
 @Injectable()
@@ -17,7 +18,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly jwt: JwtService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly invitationService: InvitationService,
   ) {}
 
   // 微信登录：code 换 openid，判断新老用户
@@ -118,6 +120,7 @@ export class AuthService {
     }
 
     // 创建用户 + 微信账号
+    const inviteCode = this.invitationService.generateInviteCode()
     const user = await this.prisma.user.create({
       data: {
         phoneCiphertext: temp.phoneCiphertext ?? Buffer.alloc(0),
@@ -127,7 +130,16 @@ export class AuthService {
         avatar: dto.avatar,
         gender: dto.gender,
         birthday: dto.birthday ? new Date(dto.birthday) : null,
+        realName: dto.realName,
+        wechatId: dto.wechatId,
+        email: dto.email,
+        age: dto.age,
+        favoriteColor: dto.favoriteColor,
+        occupation: dto.occupation,
+        tags: dto.tags ?? [],
+        identity: dto.identity,
         status: 1,
+        inviteCode,
         wechatAccount: {
           create: {
             wxOpenIdHash: temp.wxOpenIdHash ?? '',
@@ -237,7 +249,7 @@ export class AuthService {
       },
     })
 
-    return { token: `Bearer ${access}`, refreshToken: refresh }
+    return { token: access, refreshToken: refresh }
   }
 
   // 调用微信 code2session
@@ -300,7 +312,18 @@ export class AuthService {
     avatar: string
     gender: number
     birthday?: Date | null
+    realName?: string | null
+    wechatId?: string | null
+    email?: string | null
+    age?: number | null
+    favoriteColor?: string | null
+    occupation?: string | null
+    tags: string[]
+    identity?: string | null
+    level: string
+    douyinPayCode?: string | null
     status: number
+    inviteCode?: string | null
     createdAt: Date
     updatedAt: Date
   }): User {
@@ -311,7 +334,18 @@ export class AuthService {
       avatar: user.avatar,
       gender: user.gender as 0 | 1 | 2,
       birthday: user.birthday ? user.birthday.toISOString().slice(0, 10) : undefined,
+      realName: user.realName ?? undefined,
+      wechatId: user.wechatId ?? undefined,
+      email: user.email ?? undefined,
+      age: user.age ?? undefined,
+      favoriteColor: user.favoriteColor ?? undefined,
+      occupation: user.occupation ?? undefined,
+      tags: user.tags,
+      identity: (user.identity ?? undefined) as User['identity'],
+      level: (user.level || 'normal') as User['level'],
+      douyinPayCode: user.douyinPayCode ?? undefined,
       status: user.status === 1 ? 'active' : user.status === 0 ? 'disabled' : 'pending',
+      inviteCode: user.inviteCode ?? undefined,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     }

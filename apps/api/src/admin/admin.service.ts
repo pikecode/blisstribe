@@ -92,6 +92,7 @@ export class AdminService {
         avatar: dto.avatar ?? '',
         gender: dto.gender ?? 0,
         status: 1,
+        inviteCode: this.generateInviteCode(),
       },
     })
     return this.toUserVO(user)
@@ -136,6 +137,15 @@ export class AdminService {
   private maskPhone(phone: string): string {
     if (phone.length < 7) return phone
     return phone.slice(0, 3) + '****' + phone.slice(-4)
+  }
+
+  private generateInviteCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let code = ''
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return code
   }
 
   // ===== 管理员管理 =====
@@ -259,6 +269,8 @@ export class AdminService {
     avatar: string
     gender: number
     birthday?: Date | null
+    tags: string[]
+    level: string
     status: number
     createdAt: Date
     updatedAt: Date
@@ -270,6 +282,8 @@ export class AdminService {
       avatar: user.avatar,
       gender: user.gender as 0 | 1 | 2,
       birthday: user.birthday ? user.birthday.toISOString().slice(0, 10) : undefined,
+      tags: user.tags,
+      level: (user.level || 'normal') as User['level'],
       status: user.status === 1 ? 'active' : user.status === 0 ? 'disabled' : 'pending',
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),

@@ -33,7 +33,7 @@ export function request<T>(options: RequestOptions): Promise<T> {
       data: options.data as never,
       header: {
         'Content-Type': 'application/json',
-        Authorization: authStore.token,
+        Authorization: `Bearer ${authStore.token.replace(/^Bearer\s+/i, '')}`,
         ...options.header,
       },
       success: (res) => {

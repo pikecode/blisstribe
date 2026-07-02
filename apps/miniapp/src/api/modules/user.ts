@@ -27,6 +27,10 @@ export const userApi = {
     return request<void>({ url: '/user/password', method: 'PUT', data: params })
   },
 
+  deactivateAccount(): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>({ url: '/user/account', method: 'DELETE' })
+  },
+
   uploadAvatar(filePath: string): Promise<{ url: string }> {
     return fileApi.uploadAvatar(filePath)
   },
