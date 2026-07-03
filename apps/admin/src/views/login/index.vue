@@ -33,7 +33,6 @@
             {{ loading ? '登录中...' : '登 录' }}
           </el-button>
         </el-form>
-        <p class="login-page__hint">默认账号：admin / admin123</p>
       </div>
     </div>
   </div>
