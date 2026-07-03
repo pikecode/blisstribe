@@ -56,7 +56,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { userApi } from '@/api/user'
 import type { User } from '@blisstribe/shared'
 
@@ -89,6 +89,11 @@ const handleSearch = (): void => {
 
 const toggleStatus = async (row: User): Promise<void> => {
   const newStatus = row.status === 'active' ? 0 : 1
+  await ElMessageBox.confirm(
+    `确定${newStatus === 1 ? '启用' : '禁用'}用户「${row.nickname}」？`,
+    '提示',
+    { type: 'warning' }
+  )
   await userApi.updateStatus(String(row.id), newStatus)
   ElMessage.success(newStatus === 1 ? '已启用' : '已禁用')
   loadList()
