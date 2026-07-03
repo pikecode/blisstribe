@@ -33,3 +33,4 @@ apps/admin/.env
 .spec-workflow/
 apps/api/.omc/
 .gstack/
+.playwright-mcp/
