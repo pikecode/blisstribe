@@ -24,7 +24,7 @@
     <div class="layout__body">
       <header class="layout__header">
         <div class="layout__breadcrumb">
-          <span class="layout__page-title">{{ route.meta.title || '管理后台' }}</span>
+          <h1 class="layout__page-title">{{ route.meta.title || '管理后台' }}</h1>
         </div>
         <div class="layout__header-right">
           <el-dropdown>
@@ -181,6 +181,7 @@ const handleLogout = () => {
   font-size: 16px;
   font-weight: 600;
   color: #1a1a1a;
+  margin: 0;
 }
 
 .layout__header-right {
