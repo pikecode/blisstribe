@@ -2,16 +2,24 @@
   <div class="dashboard">
     <!-- 顶部统计卡片 -->
     <el-row :gutter="16" class="dashboard__stats">
-      <el-col :span="6" v-for="card in statCards" :key="card.label">
-        <div class="stat-card" :style="{ '--accent': card.color }">
-          <div class="stat-card__icon">
-            <el-icon><component :is="card.icon" /></el-icon>
+      <el-col :span="9">
+        <div class="stat-card stat-card--primary" :style="{ '--accent': statCards[0].color }">
+          <div class="stat-card__bar" />
+          <div class="stat-card__meta">
+            <div class="stat-card__value">{{ statCards[0].value.toLocaleString('zh-CN') }}</div>
+            <div class="stat-card__label">{{ statCards[0].label }}</div>
           </div>
-          <div class="stat-card__body">
-            <div class="stat-card__value">{{ card.value }}</div>
+          <el-icon class="stat-card__glyph"><component :is="statCards[0].icon" /></el-icon>
+        </div>
+      </el-col>
+      <el-col :span="5" v-for="card in statCards.slice(1)" :key="card.label">
+        <div class="stat-card" :style="{ '--accent': card.color }">
+          <div class="stat-card__bar" />
+          <div class="stat-card__meta">
+            <div class="stat-card__value">{{ card.value.toLocaleString('zh-CN') }}</div>
             <div class="stat-card__label">{{ card.label }}</div>
           </div>
-          <div class="stat-card__bg" />
+          <el-icon class="stat-card__glyph"><component :is="card.icon" /></el-icon>
         </div>
       </el-col>
     </el-row>
@@ -19,8 +27,10 @@
     <!-- 折线图 -->
     <div class="dashboard__chart-card">
       <div class="dashboard__chart-header">
-        <span class="dashboard__chart-title">近 30 天注册趋势</span>
-        <span class="dashboard__chart-sub">用户增长曲线</span>
+        <div>
+          <div class="dashboard__chart-title">注册趋势</div>
+          <div class="dashboard__chart-sub">近 30 天用户增长曲线</div>
+        </div>
       </div>
       <div ref="chartRef" class="dashboard__chart-canvas" />
     </div>
@@ -88,71 +98,99 @@ onUnmounted(() => {
   &__chart-card {
     background: #fff;
     border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    padding: 28px 24px 20px;
+    border: 1px solid #ede9e4;
   }
 
   &__chart-header {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
     margin-bottom: 20px;
   }
 
-  &__chart-title { font-size: 15px; font-weight: 600; color: #1a1a1a; }
-  &__chart-sub   { font-size: 13px; color: #9ca3af; }
+  &__chart-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1c1917;
+    letter-spacing: 0.01em;
+  }
+
+  &__chart-sub {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #a8a29e;
+    margin-top: 2px;
+  }
+
   &__chart-canvas { height: 340px; }
 }
 
 .stat-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  background: #fffdf9;
+  border-radius: 10px;
+  padding: 20px 20px 20px 24px;
+  border: 1px solid #ede9e4;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   position: relative;
   overflow: hidden;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  height: 100%;
 
-  &:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  &:hover {
+    box-shadow: 0 4px 20px rgba(217, 119, 6, 0.1);
+    border-color: color-mix(in srgb, var(--accent) 40%, #ede9e4);
+  }
 
-  &__icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    color: var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    flex-shrink: 0;
+  &__bar {
+    position: absolute;
+    left: 0;
+    top: 12px;
+    bottom: 12px;
+    width: 3px;
+    background: var(--accent);
+    border-radius: 0 2px 2px 0;
+  }
+
+  &__meta {
+    flex: 1;
+    min-width: 0;
   }
 
   &__value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #1a1a1a;
+    font-size: 32px;
+    font-weight: 800;
+    color: #1c1917;
     line-height: 1;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    font-variant-numeric: tabular-nums;
   }
 
   &__label {
-    font-size: 13px;
-    color: #6b7280;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #a8a29e;
   }
 
-  &__bg {
-    position: absolute;
-    right: -10px;
-    bottom: -10px;
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--accent) 6%, transparent);
-    pointer-events: none;
+  &__glyph {
+    font-size: 36px;
+    color: var(--accent);
+    opacity: 0.12;
+    flex-shrink: 0;
+    transition: opacity 0.2s;
+  }
+
+  &:hover &__glyph { opacity: 0.22; }
+
+  &--primary &__value {
+    font-size: 40px;
+  }
+
+  &--primary &__glyph {
+    font-size: 48px;
   }
 }
 </style>

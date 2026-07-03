@@ -9,6 +9,15 @@
   --el-color-primary-light-8: #f7e4cd;
   --el-color-primary-light-9: #fbf1e6;
   --el-color-primary-dark-2: #ae5f05;
+
+  // EP table — editorial warm style
+  --el-table-border-color: #ede9e4;
+  --el-table-header-bg-color: #faf8f5;
+  --el-table-header-text-color: #78716c;
+  --el-table-row-hover-bg-color: #fffbf5;
+  --el-table-stripe-color: transparent;
+  --el-table-bg-color: #ffffff;
+  --el-table-tr-bg-color: #ffffff;
 }
 
 html,
@@ -34,4 +43,13 @@ body {
 a {
   color: $color-primary;
   text-decoration: none;
+}
+
+// EP table headers — editorial uppercase style
+.el-table th.el-table__cell .cell {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #a8a29e;
 }
