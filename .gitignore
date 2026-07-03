@@ -32,3 +32,4 @@ apps/admin/.env
 .omc/
 .spec-workflow/
 apps/api/.omc/
+.gstack/
