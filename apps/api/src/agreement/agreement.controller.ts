@@ -30,6 +30,16 @@ export class AgreementController {
     return this.agreementService.create(body)
   }
 
+  // 后台：编辑版本内容
+  @UseGuards(AdminJwtGuard)
+  @Put(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() body: { title?: string; content?: string; effectiveAt?: string }
+  ) {
+    return this.agreementService.update(id, body)
+  }
+
   // 后台：切换当前版本
   @UseGuards(AdminJwtGuard)
   @Put(':id/current')

@@ -1,137 +1,196 @@
 <template>
   <div class="agreement-mgr">
     <el-card>
-      <div class="agreement-mgr__toolbar">
-        <el-select v-model="filterType" placeholder="协议类型" clearable style="width: 160px">
-          <el-option label="用户协议" value="user" />
-          <el-option label="隐私政策" value="privacy" />
-        </el-select>
-        <el-button type="primary" @click="openCreate">发布新版本</el-button>
-      </div>
+      <template #header>
+        <div class="card-header">
+          <div class="card-header__left">
+            <el-select v-model="filterType" placeholder="全部类型" clearable style="width: 140px">
+              <el-option label="用户协议" value="user" />
+              <el-option label="隐私政策" value="privacy" />
+            </el-select>
+          </div>
+          <el-button type="primary" @click="openCreate">发布新版本</el-button>
+        </div>
+      </template>
 
-      <el-table :data="list" v-loading="loading" stripe>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column label="类型">
-          <template #default="{ row }">{{ typeText(row.type) }}</template>
-        </el-table-column>
-        <el-table-column prop="version" label="版本" width="100" />
-        <el-table-column prop="title" label="标题" />
-        <el-table-column label="当前版本" width="100">
+      <el-table :data="list" v-loading="loading" border>
+        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column label="类型" width="120">
           <template #default="{ row }">
-            <el-tag v-if="row.isCurrent" type="success">当前</el-tag>
+            <el-tag :type="row.type === 'user' ? 'primary' : 'warning'" size="small">
+              {{ row.type === 'user' ? '用户协议' : '隐私政策' }}
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="effectiveAt" label="生效时间">
+        <el-table-column prop="version" label="版本" width="90" />
+        <el-table-column prop="title" label="标题" show-overflow-tooltip />
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag v-if="row.isCurrent" type="success" size="small">当前</el-tag>
+            <el-tag v-else type="info" size="small">历史</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="生效时间" width="180">
           <template #default="{ row }">{{ formatDate(row.effectiveAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="120">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button
-              size="small"
-              type="primary"
-              :disabled="row.isCurrent"
-              @click="setCurrent(row)"
-            >
+            <el-button size="small" @click="openView(row)">查看</el-button>
+            <el-button size="small" type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button size="small" type="success" :disabled="row.isCurrent" @click="setCurrent(row)">
               设为当前
             </el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <el-pagination
+        v-model:current-page="page" v-model:page-size="pageSize"
+        :total="total" layout="total, prev, pager, next"
+        style="margin-top: 16px; justify-content: flex-end"
+        @current-change="loadList" @size-change="loadList"
+      />
     </el-card>
 
-    <el-dialog v-model="dialogVisible" title="发布新版本" width="600px">
-      <el-form :model="form" label-width="80px">
+    <!-- 新建弹窗 -->
+    <el-dialog v-model="createVisible" title="发布新版本" width="680px">
+      <el-form :model="createForm" label-width="80px">
         <el-form-item label="类型">
-          <el-select v-model="form.type">
+          <el-select v-model="createForm.type">
             <el-option label="用户协议" value="user" />
             <el-option label="隐私政策" value="privacy" />
           </el-select>
         </el-form-item>
         <el-form-item label="版本号">
-          <el-input v-model="form.version" placeholder="如 1.0" />
+          <el-input v-model="createForm.version" placeholder="如 2.0" style="width: 200px" />
         </el-form-item>
         <el-form-item label="标题">
-          <el-input v-model="form.title" />
+          <el-input v-model="createForm.title" />
         </el-form-item>
         <el-form-item label="内容">
-          <el-input v-model="form.content" type="textarea" :rows="8" />
+          <el-input v-model="createForm.content" type="textarea" :rows="10" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="creating" @click="handleCreate">发布</el-button>
+        <el-button @click="createVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="handleCreate">发布</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 编辑弹窗 -->
+    <el-dialog v-model="editVisible" title="编辑协议内容" width="680px">
+      <el-form :model="editForm" label-width="80px">
+        <el-form-item label="标题">
+          <el-input v-model="editForm.title" />
+        </el-form-item>
+        <el-form-item label="内容">
+          <el-input v-model="editForm.content" type="textarea" :rows="12" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="handleEdit">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 查看弹窗 -->
+    <el-dialog v-model="viewVisible" :title="viewTitle" width="700px">
+      <div class="content-preview">{{ viewContent }}</div>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { agreementApi } from '@/api'
 
 interface AgreementItem {
-  id: number
-  type: string
-  version: string
-  title: string
-  isCurrent: boolean
-  effectiveAt: string
+  id: number; type: string; version: string; title: string
+  isCurrent: boolean; effectiveAt: string; content?: string
 }
 
 const list = ref<AgreementItem[]>([])
 const loading = ref(false)
-const filterType = ref<string>('')
+const saving = ref(false)
+const filterType = ref('')
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+const createVisible = ref(false)
+const editVisible = ref(false)
+const viewVisible = ref(false)
+const viewTitle = ref('')
+const viewContent = ref('')
+const editingId = ref(0)
+const createForm = reactive({ type: 'user', version: '', title: '', content: '' })
+const editForm = reactive({ title: '', content: '' })
 
-const dialogVisible = ref(false)
-const creating = ref(false)
-const form = reactive({ type: 'user', version: '', title: '', content: '' })
-
-const loadList = async (): Promise<void> => {
+const loadList = async () => {
   loading.value = true
   try {
-    const data = await agreementApi.list({ type: filterType.value || undefined })
-    list.value = data.list
-  } finally {
-    loading.value = false
-  }
+    const res = await agreementApi.list({ page: page.value, pageSize: pageSize.value, type: filterType.value || undefined })
+    list.value = res.list
+    total.value = res.total
+  } finally { loading.value = false }
 }
 
-const openCreate = (): void => {
-  Object.assign(form, { type: 'user', version: '', title: '', content: '' })
-  dialogVisible.value = true
+watch(filterType, () => { page.value = 1; loadList() })
+
+const openCreate = () => {
+  Object.assign(createForm, { type: 'user', version: '', title: '', content: '' })
+  createVisible.value = true
 }
 
-const handleCreate = async (): Promise<void> => {
-  creating.value = true
+const handleCreate = async () => {
+  saving.value = true
   try {
-    await agreementApi.create({ ...form })
+    await agreementApi.create({ ...createForm })
     ElMessage.success('发布成功')
-    dialogVisible.value = false
+    createVisible.value = false
     loadList()
-  } finally {
-    creating.value = false
-  }
+  } finally { saving.value = false }
 }
 
-const setCurrent = async (row: AgreementItem): Promise<void> => {
+const openEdit = (row: AgreementItem) => {
+  editingId.value = row.id
+  editForm.title = row.title
+  editForm.content = row.content || ''
+  editVisible.value = true
+}
+
+const handleEdit = async () => {
+  saving.value = true
+  try {
+    await agreementApi.update(editingId.value, { title: editForm.title, content: editForm.content })
+    ElMessage.success('保存成功')
+    editVisible.value = false
+    loadList()
+  } finally { saving.value = false }
+}
+
+const openView = (row: AgreementItem) => {
+  viewTitle.value = `${row.title}（v${row.version}）`
+  viewContent.value = row.content || '暂无内容'
+  viewVisible.value = true
+}
+
+const setCurrent = async (row: AgreementItem) => {
   await agreementApi.setCurrent(String(row.id))
   ElMessage.success('已设为当前版本')
   loadList()
 }
 
-const typeText = (t: string): string => (t === 'user' ? '用户协议' : '隐私政策')
-const formatDate = (iso: string): string => new Date(iso).toLocaleString('zh-CN')
+const formatDate = (iso: string) => new Date(iso).toLocaleString('zh-CN', { hour12: false })
 
 onMounted(loadList)
 </script>
 
-<style lang="scss" scoped>
-.agreement-mgr {
-  &__toolbar {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 16px;
-  }
+<style scoped>
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.content-preview {
+  white-space: pre-wrap; font-size: 14px; line-height: 1.8;
+  max-height: 500px; overflow-y: auto; color: #333;
+  background: #fafafa; padding: 12px; border-radius: 4px;
 }
 </style>

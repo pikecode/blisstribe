@@ -28,6 +28,9 @@ export const agreementApi = {
   create(data: { type: string; version: string; title: string; content: string }) {
     return request.post('/agreements', data)
   },
+  update(id: number, data: { title?: string; content?: string; effectiveAt?: string }) {
+    return request.put(`/agreements/${id}`, data)
+  },
   setCurrent(id: string) {
     return request.put(`/agreements/${id}/current`)
   },

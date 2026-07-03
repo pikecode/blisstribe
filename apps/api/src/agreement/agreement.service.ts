@@ -39,6 +39,7 @@ export class AgreementService {
         type: a.type,
         version: a.version,
         title: a.title,
+        content: a.content,
         isCurrent: a.isCurrent,
         effectiveAt: a.effectiveAt.toISOString(),
       })),
@@ -59,6 +60,18 @@ export class AgreementService {
         effectiveAt: new Date(),
       },
     })
+  }
+
+  async update(id: string, body: { title?: string; content?: string; effectiveAt?: string }) {
+    const a = await this.prisma.agreement.update({
+      where: { id: BigInt(id) },
+      data: {
+        ...(body.title !== undefined && { title: body.title }),
+        ...(body.content !== undefined && { content: body.content }),
+        ...(body.effectiveAt !== undefined && { effectiveAt: new Date(body.effectiveAt) }),
+      },
+    })
+    return { id: Number(a.id), title: a.title, content: a.content }
   }
 
   async setCurrent(id: string) {

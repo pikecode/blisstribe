@@ -11,7 +11,7 @@
 #   ./start.sh api admin # 启动 API + Admin
 #
 
-set -e
+set -euo pipefail
 
 # 颜色定义
 GREEN='\033[0;32m'
