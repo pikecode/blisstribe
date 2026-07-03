@@ -1,7 +1,7 @@
 <template>
   <div class="admin-mgr">
     <el-card>
-      <div class="admin-mgr__toolbar">
+      <div class="page-toolbar">
         <el-input
           v-model="keyword"
           placeholder="搜索用户名"
@@ -10,8 +10,8 @@
           @keyup.enter="handleSearch"
         />
         <el-button type="primary" @click="handleSearch">搜索</el-button>
-        <div class="admin-mgr__toolbar-right">
-          <el-button @click="loadRoles">刷新角色</el-button>
+        <div class="page-toolbar__right">
+          <el-button text @click="loadRoles">刷新角色</el-button>
           <el-button type="primary" @click="openCreate">新增管理员</el-button>
         </div>
       </div>
@@ -40,11 +40,12 @@
         </el-table-column>
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button size="small" @click="openRoles(row)">分配角色</el-button>
-            <el-button size="small" type="warning" @click="openReset(row)">重置密码</el-button>
+            <el-button size="small" text @click="openEdit(row)">编辑</el-button>
+            <el-button size="small" text @click="openRoles(row)">分配角色</el-button>
+            <el-button size="small" text type="warning" @click="openReset(row)">重置密码</el-button>
             <el-button
               size="small"
+              plain
               :type="row.status === 1 ? 'danger' : 'success'"
               @click="toggleStatus(row)"
             >

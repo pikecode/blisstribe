@@ -58,7 +58,7 @@
         :total="total"
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next"
-        style="margin-top: 20px; justify-content: center"
+        class="page-pager"
         @current-change="fetchData"
         @size-change="fetchData"
       />

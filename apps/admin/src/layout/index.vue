@@ -230,6 +230,9 @@ const handleLogout = () => {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
 }
 </style>
 

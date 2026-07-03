@@ -1,7 +1,7 @@
 <template>
   <div class="user-mgr">
     <el-card>
-      <div class="user-mgr__toolbar">
+      <div class="page-toolbar">
         <el-input
           v-model="keyword"
           placeholder="搜索昵称"

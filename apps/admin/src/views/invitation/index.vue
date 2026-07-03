@@ -49,7 +49,7 @@
       <template #header>
         <span>邀请记录</span>
       </template>
-      <div class="invitation-mgr__toolbar">
+      <div class="page-toolbar">
         <el-input
           v-model="keyword"
           placeholder="搜索邀请人/被邀请人"
@@ -160,6 +160,8 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+@use '@/styles/variables.scss' as *;
+
 .invitation-mgr {
   &__stats {
     margin-bottom: 16px;
@@ -172,7 +174,7 @@ onMounted(() => {
     &-label {
       display: block;
       font-size: 14px;
-      color: #666;
+      color: $color-text-secondary;
       margin-bottom: 8px;
     }
 
@@ -180,7 +182,7 @@ onMounted(() => {
       display: block;
       font-size: 32px;
       font-weight: bold;
-      color: #07c160;
+      color: $color-primary;
     }
   }
 

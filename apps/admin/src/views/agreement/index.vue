@@ -26,7 +26,7 @@
         <el-table-column prop="title" label="标题" show-overflow-tooltip />
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
-            <el-tag v-if="row.isCurrent" type="success" size="small">当前</el-tag>
+            <el-tag v-if="row.isCurrent" type="warning" size="small">当前</el-tag>
             <el-tag v-else type="info" size="small">历史</el-tag>
           </template>
         </el-table-column>
@@ -47,7 +47,7 @@
       <el-pagination
         v-model:current-page="page" v-model:page-size="pageSize"
         :total="total" layout="total, prev, pager, next"
-        style="margin-top: 16px; justify-content: flex-end"
+        class="page-pager"
         @current-change="loadList" @size-change="loadList"
       />
     </el-card>
