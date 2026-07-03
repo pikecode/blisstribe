@@ -76,11 +76,13 @@ const handleLogout = () => {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '@/styles/variables.scss' as *;
+
 .layout {
   display: flex;
   height: 100vh;
-  background: #faf9f7;
+  background: $color-bg;
 }
 
 /* ── 侧边栏 ── */
@@ -88,7 +90,7 @@ const handleLogout = () => {
   width: 220px;
   flex-shrink: 0;
   background: #fff;
-  border-right: 1px solid #f0f0f0;
+  border-right: 1px solid $color-border;
   display: flex;
   flex-direction: column;
 }
@@ -99,7 +101,7 @@ const handleLogout = () => {
   align-items: center;
   gap: 10px;
   padding: 0 20px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid $color-border;
 }
 
 .layout__brand-icon {
@@ -118,7 +120,7 @@ const handleLogout = () => {
 .layout__brand-name {
   font-size: 16px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: $color-text;
 }
 
 .layout__nav {
@@ -137,21 +139,23 @@ const handleLogout = () => {
   padding: 10px 14px;
   min-height: 44px;
   border-radius: 8px;
-  color: #595959;
+  color: $color-text-secondary;
   font-size: 14px;
   text-decoration: none;
   transition: all 0.15s;
 }
 
 .layout__nav-item:hover {
-  background: #f5f5f5;
-  color: #1a1a1a;
+  background: #fef9f0;
+  color: $color-text;
 }
 
 .layout__nav-item.active {
   background: #fff7ed;
-  color: #d97706;
+  color: $color-primary;
   font-weight: 600;
+  box-shadow: inset 3px 0 0 $color-primary;
+  padding-left: 11px;
 }
 
 .layout__nav-icon {
@@ -170,7 +174,7 @@ const handleLogout = () => {
 .layout__header {
   height: 60px;
   background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid $color-border;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -181,7 +185,7 @@ const handleLogout = () => {
 .layout__page-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: $color-text;
   margin: 0;
 }
 
@@ -201,7 +205,7 @@ const handleLogout = () => {
 }
 
 .layout__user:hover {
-  background: #f5f5f5;
+  background: #fef9f0;
 }
 
 .layout__user-avatar {

@@ -110,7 +110,10 @@ onMounted(loadList)
   &__toolbar {
     display: flex;
     gap: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 0;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #ede9e4;
+    align-items: center;
   }
 
   &__pager {

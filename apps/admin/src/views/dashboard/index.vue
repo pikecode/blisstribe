@@ -47,7 +47,7 @@ let chart: echarts.ECharts | null = null
 
 const statCards = ref([
   { label: '总用户数', value: 0, icon: 'User', color: '#d97706' },
-  { label: '活跃用户', value: 0, icon: 'CircleCheck', color: '#07c160' },
+  { label: '活跃用户', value: 0, icon: 'CircleCheck', color: '#16a34a' },
   { label: '今日新增', value: 0, icon: 'TrendCharts', color: '#f59e0b' },
   { label: '已禁用', value: 0, icon: 'Remove', color: '#ef4444' },
 ])
@@ -65,10 +65,10 @@ const loadTrend = async () => {
   if (!chartRef.value) return
   chart = echarts.init(chartRef.value)
   chart.setOption({
-    tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: '#e5e7eb', textStyle: { color: '#374151' } },
+    tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: '#e7e5e4', textStyle: { color: '#1c1917' } },
     grid: { top: 20, right: 20, bottom: 30, left: 50 },
-    xAxis: { type: 'category', data: data.map(d => d.date), axisLine: { lineStyle: { color: '#e5e7eb' } }, axisLabel: { color: '#9ca3af', fontSize: 12 } },
-    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#f3f4f6', type: 'dashed' } }, axisLabel: { color: '#9ca3af', fontSize: 12 } },
+    xAxis: { type: 'category', data: data.map(d => d.date), axisLine: { lineStyle: { color: '#e7e5e4' } }, axisLabel: { color: '#a8a29e', fontSize: 12 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#f0ece6', type: 'dashed' } }, axisLabel: { color: '#a8a29e', fontSize: 12 } },
     series: [{
       data: data.map(d => d.count), type: 'line', smooth: true,
       symbol: 'circle', symbolSize: 6,

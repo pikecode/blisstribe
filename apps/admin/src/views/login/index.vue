@@ -156,7 +156,7 @@ const handleLogin = async (): Promise<void> => {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f5f7fa;
+    background: #faf9f7;
   }
 
   &__form-box {
