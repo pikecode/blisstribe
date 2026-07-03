@@ -1,5 +1,16 @@
 @use './variables.scss' as *;
 
+// Override Element Plus default blue with amber brand token
+:root {
+  --el-color-primary: #d97706;
+  --el-color-primary-light-3: #e4a051;
+  --el-color-primary-light-5: #ecbb83;
+  --el-color-primary-light-7: #f4d6b4;
+  --el-color-primary-light-8: #f7e4cd;
+  --el-color-primary-light-9: #fbf1e6;
+  --el-color-primary-dark-2: #ae5f05;
+}
+
 html,
 body,
 #app {
