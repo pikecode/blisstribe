@@ -36,7 +36,7 @@ const chartRef = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
 
 const statCards = ref([
-  { label: '总用户数', value: 0, icon: 'User', color: '#5b5bd6' },
+  { label: '总用户数', value: 0, icon: 'User', color: '#d97706' },
   { label: '活跃用户', value: 0, icon: 'CircleCheck', color: '#07c160' },
   { label: '今日新增', value: 0, icon: 'TrendCharts', color: '#f59e0b' },
   { label: '已禁用', value: 0, icon: 'Remove', color: '#ef4444' },
@@ -62,9 +62,9 @@ const loadTrend = async () => {
     series: [{
       data: data.map(d => d.count), type: 'line', smooth: true,
       symbol: 'circle', symbolSize: 6,
-      lineStyle: { color: '#5b5bd6', width: 2 },
-      itemStyle: { color: '#5b5bd6' },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(91,91,214,0.15)' }, { offset: 1, color: 'rgba(91,91,214,0)' }]) },
+      lineStyle: { color: '#d97706', width: 2 },
+      itemStyle: { color: '#d97706' },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(217,119,6,0.15)' }, { offset: 1, color: 'rgba(217,119,6,0)' }]) },
     }],
   })
 }
