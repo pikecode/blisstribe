@@ -90,7 +90,7 @@ const handleLogin = async (): Promise<void> => {
   &__brand {
     width: 420px;
     flex-shrink: 0;
-    background: linear-gradient(150deg, #3a3a9f 0%, #5b5bd6 50%, #7c7ce8 100%);
+    background: linear-gradient(150deg, #92400e 0%, #c2410c 40%, #d97706 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -179,9 +179,9 @@ const handleLogin = async (): Promise<void> => {
     height: 44px;
     font-size: 15px;
     border-radius: 8px;
-    background: #5b5bd6;
-    border-color: #5b5bd6;
-    &:hover { background: #4a4ac5; border-color: #4a4ac5; }
+    background: #d97706;
+    border-color: #d97706;
+    &:hover { background: #b45309; border-color: #b45309; }
   }
 
   &__hint {

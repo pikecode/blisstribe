@@ -80,7 +80,7 @@ const handleLogout = () => {
 .layout {
   display: flex;
   height: 100vh;
-  background: #f0f2f5;
+  background: #faf9f7;
 }
 
 /* ── 侧边栏 ── */
@@ -105,7 +105,7 @@ const handleLogout = () => {
 .layout__brand-icon {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #d97706 0%, #fbbf24 100%);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -149,9 +149,9 @@ const handleLogout = () => {
 }
 
 .layout__nav-item.active {
-  background: #f0f0ff;
-  color: #5b5bd6;
-  font-weight: 500;
+  background: #fff7ed;
+  color: #d97706;
+  font-weight: 600;
 }
 
 .layout__nav-icon {
@@ -208,7 +208,7 @@ const handleLogout = () => {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #d97706 0%, #fbbf24 100%);
   color: #fff;
   display: flex;
   align-items: center;
