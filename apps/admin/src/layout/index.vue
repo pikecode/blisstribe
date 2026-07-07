@@ -1,7 +1,40 @@
 <template>
   <div class="layout">
-    <!-- 侧边栏 -->
-    <aside class="layout__sidebar">
+    <!-- 汉堡按钮（仅移动端） -->
+    <button v-if="isMobile" class="layout__hamburger" @click="drawerVisible = true">
+      <el-icon><Menu /></el-icon>
+    </button>
+
+    <!-- 侧边栏：移动端用drawer，桌面端固定 -->
+    <el-drawer
+      v-if="isMobile"
+      v-model="drawerVisible"
+      direction="ltr"
+      :size="280"
+      :with-header="false"
+    >
+      <aside class="layout__sidebar layout__sidebar--drawer">
+        <div class="layout__brand">
+          <span class="layout__brand-icon">B</span>
+          <span class="layout__brand-name">BlissTribe</span>
+        </div>
+        <nav class="layout__nav">
+          <router-link
+            v-for="item in menuItems"
+            :key="item.path"
+            :to="item.path"
+            class="layout__nav-item"
+            :class="{ active: route.path.startsWith(item.path) }"
+            @click="drawerVisible = false"
+          >
+            <el-icon class="layout__nav-icon"><component :is="item.icon" /></el-icon>
+            <span>{{ item.title }}</span>
+          </router-link>
+        </nav>
+      </aside>
+    </el-drawer>
+
+    <aside v-else class="layout__sidebar">
       <div class="layout__brand">
         <span class="layout__brand-icon">B</span>
         <span class="layout__brand-name">BlissTribe</span>
@@ -54,12 +87,22 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+
+// 移动端检测
+const windowWidth = ref(window.innerWidth)
+const isMobile = computed(() => windowWidth.value < 768)
+const drawerVisible = ref(false)
+
+const updateWidth = () => { windowWidth.value = window.innerWidth }
+onMounted(() => window.addEventListener('resize', updateWidth))
+onUnmounted(() => window.removeEventListener('resize', updateWidth))
 
 const menuItems = [
   { path: '/dashboard', title: '数据看板', icon: 'DataLine' },
@@ -233,6 +276,52 @@ const handleLogout = () => {
   max-width: 1280px;
   width: 100%;
   margin: 0 auto;
+}
+
+/* ── 汉堡按钮（移动端） ── */
+.layout__hamburger {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 2001;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(28, 25, 23, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: $color-text;
+  font-size: 18px;
+}
+
+/* drawer内侧边栏填满高度 */
+.layout__sidebar--drawer {
+  height: 100%;
+  width: 280px;
+  overflow-y: auto;
+}
+
+/* ── 移动端布局 ── */
+@media (max-width: 767px) {
+  .layout__header {
+    padding: 0 16px 0 60px; // 给汉堡按钮留位
+  }
+
+  .layout__main {
+    padding: 16px;
+  }
+
+  .layout__page-title {
+    font-size: 14px;
+  }
+
+  .layout__user-name {
+    display: none; // 移动端只显示头像
+  }
 }
 </style>
 

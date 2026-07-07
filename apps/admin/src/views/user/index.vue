@@ -12,7 +12,8 @@
         <el-button type="primary" @click="handleSearch">搜索</el-button>
       </div>
 
-      <el-table :data="list" v-loading="loading" stripe>
+      <!-- 桌面端表格 -->
+      <el-table v-if="!isMobile" :data="list" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="nickname" label="昵称" />
         <el-table-column prop="phone" label="手机号" />
@@ -42,6 +43,39 @@
         </el-table-column>
       </el-table>
 
+      <!-- 移动端卡片列表 -->
+      <div v-else v-loading="loading" class="user-cards">
+        <div v-for="row in list" :key="row.id" class="user-card">
+          <div class="user-card__header">
+            <span class="user-card__name">{{ row.nickname }}</span>
+            <el-tag size="small" :type="row.status === 'active' ? 'success' : 'danger'">
+              {{ row.status === 'active' ? '正常' : '禁用' }}
+            </el-tag>
+          </div>
+          <div class="user-card__row">
+            <span class="user-card__label">手机号</span>
+            <span>{{ row.phone }}</span>
+          </div>
+          <div class="user-card__row">
+            <span class="user-card__label">性别</span>
+            <span>{{ genderText(row.gender) }}</span>
+          </div>
+          <div class="user-card__row">
+            <span class="user-card__label">注册</span>
+            <span>{{ formatDate(row.createdAt) }}</span>
+          </div>
+          <div class="user-card__footer">
+            <el-button
+              size="small"
+              :type="row.status === 'active' ? 'danger' : 'success'"
+              @click="toggleStatus(row)"
+            >
+              {{ row.status === 'active' ? '禁用' : '启用' }}
+            </el-button>
+          </div>
+        </div>
+      </div>
+
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
@@ -55,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { userApi } from '@/api/user'
 import type { User } from '@blisstribe/shared'
@@ -66,6 +100,14 @@ const keyword = ref('')
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+
+// 移动端检测
+const windowWidth = ref(window.innerWidth)
+const isMobile = computed(() => windowWidth.value < 768)
+
+const updateWidth = () => { windowWidth.value = window.innerWidth }
+onMounted(() => window.addEventListener('resize', updateWidth))
+onUnmounted(() => window.removeEventListener('resize', updateWidth))
 
 const loadList = async (): Promise<void> => {
   loading.value = true
@@ -106,18 +148,58 @@ onMounted(loadList)
 </script>
 
 <style lang="scss" scoped>
-.user-mgr {
-  &__toolbar {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 0;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #ede9e4;
-    align-items: center;
-  }
+@use '@/styles/variables.scss' as *;
 
+.user-mgr {
   &__pager {
     margin-top: 16px;
+    justify-content: flex-end;
+  }
+}
+
+.user-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 60px;
+}
+
+.user-card {
+  background: #fff;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__name {
+    font-size: 15px;
+    font-weight: 600;
+    color: $color-text;
+  }
+
+  &__row {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    color: $color-text-secondary;
+  }
+
+  &__label {
+    color: $color-text-tertiary;
+    min-width: 40px;
+  }
+
+  &__footer {
+    margin-top: 4px;
+    display: flex;
     justify-content: flex-end;
   }
 }

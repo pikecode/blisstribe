@@ -29,11 +29,13 @@ service.interceptors.response.use(
       // 返回业务数据，覆盖 AxiosResponse 包装
       return body.data as unknown as AxiosResponse
     }
-    // 401：跳登录
+    // 401：跳登录（登录页本身不跳）
     if (body.code === 401001 || body.code === 401002 || body.code === 401003) {
       const authStore = useAuthStore()
       authStore.clear()
-      router.replace('/login')
+      if (router.currentRoute.value.path !== '/login') {
+        router.replace('/login')
+      }
     }
     ElMessage.error(body.message || '请求失败')
     return Promise.reject(new Error(body.message))

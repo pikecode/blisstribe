@@ -33,7 +33,7 @@ export class AdminService {
       throw new BusinessException(ErrorCode.USER_NOT_FOUND)
     }
     const valid = await bcrypt.compare(dto.password, admin.passwordHash)
-    if (!valid) throw new BusinessException(ErrorCode.NOT_LOGIN)
+    if (!valid) throw new BusinessException(ErrorCode.PASSWORD_WRONG)
 
     await this.prisma.admin.update({
       where: { id: admin.id },

@@ -103,3 +103,21 @@ a {
   padding: 16px 24px !important;
   border-top: 1px solid $color-border !important;
 }
+
+// 移动端dialog全宽
+@media (max-width: 767px) {
+  .el-dialog {
+    width: 92% !important;
+    margin: 5vh auto !important;
+  }
+
+  .page-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .page-toolbar__right {
+    width: 100%;
+    margin-left: 0;
+  }
+}
