@@ -41,6 +41,16 @@ service.interceptors.response.use(
     return Promise.reject(new Error(body.message))
   },
   (error) => {
+    const body = error.response?.data
+    if (body?.code === 401001 || body?.code === 401002 || body?.code === 401003) {
+      const authStore = useAuthStore()
+      authStore.clear()
+      if (router.currentRoute.value.path !== '/login') {
+        router.replace('/login')
+      }
+      ElMessage.error(body.message || '未登录')
+      return Promise.reject(new Error(body.message))
+    }
     ElMessage.error(error.message || '网络错误')
     return Promise.reject(error)
   }
