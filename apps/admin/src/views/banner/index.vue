@@ -65,7 +65,7 @@
     </el-card>
 
     <!-- 新增/编辑弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑Banner' : '新增Banner'" width="560px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑Banner' : '新增Banner'" width="560px" @closed="handleDialogClose">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="标题" prop="title">
           <el-input v-model="form.title" placeholder="请输入标题" />
@@ -124,6 +124,7 @@ import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type UploadRawFile } from 'element-plus'
 import { bannerApi, type Banner } from '@/api/banner'
 import { useAuthStore } from '@/stores/auth'
+import request from '@/utils/request'
 
 const authStore = useAuthStore()
 
@@ -183,8 +184,14 @@ function beforeUpload(file: UploadRawFile) {
   return true
 }
 
+const sessionUploadedUrl = ref('')
+
 function handleUploadSuccess(res: { code: number; data: { url: string } }) {
   if (res.code === 200) {
+    if (sessionUploadedUrl.value) {
+      request.delete(`/upload/file?url=${encodeURIComponent(sessionUploadedUrl.value)}`).catch(() => {})
+    }
+    sessionUploadedUrl.value = res.data.url
     form.value.imageUrl = res.data.url
     ElMessage.success('上传成功')
   } else {
@@ -207,8 +214,16 @@ function openDialog(row?: Banner) {
   form.value = row
     ? { title: row.title, description: row.description, gradient: row.gradient, imageUrl: row.imageUrl, linkUrl: row.linkUrl, sort: row.sort }
     : defaultForm()
+  sessionUploadedUrl.value = ''
   dialogVisible.value = true
   formRef.value?.clearValidate()
+}
+
+function handleDialogClose() {
+  if (sessionUploadedUrl.value) {
+    request.delete(`/upload/file?url=${encodeURIComponent(sessionUploadedUrl.value)}`).catch(() => {})
+    sessionUploadedUrl.value = ''
+  }
 }
 
 async function handleSubmit() {
@@ -222,6 +237,7 @@ async function handleSubmit() {
       await bannerApi.create(form.value)
       ElMessage.success('创建成功')
     }
+    sessionUploadedUrl.value = ''
     dialogVisible.value = false
     fetchData()
   } finally {

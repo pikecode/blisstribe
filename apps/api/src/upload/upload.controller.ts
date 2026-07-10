@@ -1,6 +1,8 @@
 import {
   Controller,
   Post,
+  Delete,
+  Query,
   UseInterceptors,
   UploadedFile,
   UseGuards,
@@ -49,5 +51,12 @@ export class UploadController {
   async uploadBanner(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('请上传文件')
     return this.uploadService.saveBanner(file)
+  }
+
+  @UseGuards(AdminJwtGuard)
+  @Delete('file')
+  deleteFile(@Query('url') url: string) {
+    if (!url) throw new BadRequestException('url required')
+    this.uploadService.deleteFile(url)
   }
 }
