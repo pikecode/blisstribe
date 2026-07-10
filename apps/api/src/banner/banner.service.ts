@@ -1,33 +1,16 @@
 import { Injectable } from '@nestjs/common'
-import { existsSync, unlinkSync } from 'fs'
-import { join, basename } from 'path'
-import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../common/prisma.service'
+import { UploadService } from '../upload/upload.service'
 import { BusinessException } from '../common/interceptors/response.interceptor'
 import { ErrorCode } from '@blisstribe/shared'
 import type { CreateBannerDto, UpdateBannerDto } from './dto'
 
 @Injectable()
 export class BannerService {
-  private readonly uploadDir: string
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {
-    this.uploadDir = this.config.get<string>('UPLOAD_DIR', './uploads')
-  }
-
-  private deleteLocalFile(imageUrl: string) {
-    if (!imageUrl) return
-    try {
-      const filename = basename(new URL(imageUrl).pathname)
-      const filepath = join(this.uploadDir, filename)
-      if (existsSync(filepath)) unlinkSync(filepath)
-    } catch {
-      // URL解析失败或文件已不存在，忽略
-    }
-  }
+    private readonly uploadService: UploadService,
+  ) {}
 
   async listPublic() {
     const rows = await this.prisma.banner.findMany({
@@ -74,7 +57,7 @@ export class BannerService {
     const banner = await this.prisma.banner.findUnique({ where: { id: BigInt(id) } })
     if (!banner) throw new BusinessException(ErrorCode.PARAMS_INVALID, 'Banner不存在')
     if (dto.imageUrl !== undefined && dto.imageUrl !== banner.imageUrl) {
-      this.deleteLocalFile(banner.imageUrl)
+      this.uploadService.deleteFile(banner.imageUrl)
     }
     const updated = await this.prisma.banner.update({
       where: { id: BigInt(id) },
@@ -95,7 +78,7 @@ export class BannerService {
     const banner = await this.prisma.banner.findUnique({ where: { id: BigInt(id) } })
     if (!banner) throw new BusinessException(ErrorCode.PARAMS_INVALID, 'Banner不存在')
     await this.prisma.banner.delete({ where: { id: BigInt(id) } })
-    this.deleteLocalFile(banner.imageUrl)
+    this.uploadService.deleteFile(banner.imageUrl)
   }
 
   private toVO(b: { id: bigint; title: string; description: string; imageUrl: string; gradient: string; linkUrl: string; sort: number; status: number; createdAt: Date }) {

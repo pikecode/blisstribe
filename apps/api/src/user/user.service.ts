@@ -1,13 +1,17 @@
 import { Injectable } from '@nestjs/common'
 import * as bcrypt from 'bcryptjs'
 import { PrismaService } from '../common/prisma.service'
+import { UploadService } from '../upload/upload.service'
 import { BusinessException } from '../common/interceptors/response.interceptor'
 import { ErrorCode, type User } from '@blisstribe/shared'
 import type { UpdateUserDto, SetPasswordDto } from './dto'
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   async getInfo(userId: string): Promise<User> {
     const user = await this.findUserOrThrow(userId)
@@ -15,6 +19,7 @@ export class UserService {
   }
 
   async updateInfo(userId: string, dto: UpdateUserDto): Promise<User> {
+    const current = await this.findUserOrThrow(userId)
     const user = await this.prisma.user.update({
       where: { id: BigInt(userId) },
       data: {
@@ -33,6 +38,9 @@ export class UserService {
         ...(dto.douyinPayCode !== undefined && { douyinPayCode: dto.douyinPayCode }),
       },
     })
+    if (dto.avatar !== undefined && dto.avatar !== current.avatar) {
+      this.uploadService.deleteFile(current.avatar)
+    }
     return this.toUserVO(user)
   }
 

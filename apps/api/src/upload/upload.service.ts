@@ -1,43 +1,72 @@
 import { Injectable, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
-import { join, extname } from 'path'
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs'
+import { join, basename } from 'path'
 import { randomUUID } from 'crypto'
+import sharp from 'sharp'
 
 @Injectable()
 export class UploadService {
   private readonly uploadDir: string
+  readonly baseUrl: string
 
   constructor(private readonly config: ConfigService) {
     this.uploadDir = this.config.get<string>('UPLOAD_DIR', './uploads')
+    const base = this.config.get<string>('PUBLIC_BASE_URL')
+    if (!base) throw new Error('PUBLIC_BASE_URL env var is required')
+    this.baseUrl = base
     if (!existsSync(this.uploadDir)) {
       mkdirSync(this.uploadDir, { recursive: true })
     }
   }
 
-  async saveBanner(file: Express.Multer.File): Promise<{ url: string }> {
-    const ext = extname(file.originalname) || '.jpg'
-    const filename = `banner_${randomUUID()}${ext}`
-    const filepath = join(this.uploadDir, filename)
-    writeFileSync(filepath, file.buffer)
-    const baseUrl = this.config.get<string>('PUBLIC_BASE_URL', 'http://localhost:4000')
-    return { url: `${baseUrl}/uploads/${filename}` }
+  async saveAvatar(file: Express.Multer.File): Promise<{ url: string; width: number; height: number; size: number }> {
+    this.validateMagicBytes(file.buffer, file.mimetype)
+    const image = sharp(file.buffer)
+    const metadata = await image.metadata()
+    const compressed = await image
+      .resize({ width: 400, height: 400, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toBuffer()
+    const filename = `avatar_${randomUUID()}.webp`
+    writeFileSync(join(this.uploadDir, filename), compressed)
+    return {
+      url: `${this.baseUrl}/uploads/${filename}`,
+      width: metadata.width ?? 0,
+      height: metadata.height ?? 0,
+      size: compressed.length,
+    }
   }
 
-  async saveAvatar(file: Express.Multer.File): Promise<{ url: string; width: number; height: number; size: number }> {
-    const ext = extname(file.originalname) || '.jpg'
-    const filename = `avatar_${randomUUID()}${ext}`
-    const filepath = join(this.uploadDir, filename)
-    writeFileSync(filepath, file.buffer)
+  async saveBanner(file: Express.Multer.File): Promise<{ url: string }> {
+    this.validateMagicBytes(file.buffer, file.mimetype)
+    const compressed = await sharp(file.buffer)
+      .resize({ width: 1920, withoutEnlargement: true })
+      .webp({ quality: 85 })
+      .toBuffer()
+    const filename = `banner_${randomUUID()}.webp`
+    writeFileSync(join(this.uploadDir, filename), compressed)
+    return { url: `${this.baseUrl}/uploads/${filename}` }
+  }
 
-    // 生产环境应上传到 OSS/COS 并返回 CDN URL
-    // 这里返回本地静态服务 URL
-    const baseUrl = this.config.get<string>('PUBLIC_BASE_URL', 'http://localhost:4000')
-    return {
-      url: `${baseUrl}/uploads/${filename}`,
-      width: 0, // TODO: 用 sharp 解析图片尺寸
-      height: 0,
-      size: file.size,
+  deleteFile(imageUrl: string) {
+    if (!imageUrl) return
+    try {
+      const filename = basename(new URL(imageUrl).pathname)
+      const filepath = join(this.uploadDir, filename)
+      if (existsSync(filepath)) unlinkSync(filepath)
+    } catch {
+      // URL 解析失败或文件已不存在，忽略
     }
+  }
+
+  private validateMagicBytes(buffer: Buffer, mimetype: string) {
+    const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+    const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47
+    const isWebp = buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP'
+    const valid = (mimetype === 'image/jpeg' && isJpeg)
+      || (mimetype === 'image/png' && isPng)
+      || (mimetype === 'image/webp' && isWebp)
+    if (!valid) throw new BadRequestException('文件内容与声明的格式不符')
   }
 }

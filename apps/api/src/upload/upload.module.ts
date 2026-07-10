@@ -7,5 +7,6 @@ import { AdminModule } from '../admin/admin.module'
   imports: [AdminModule],
   controllers: [UploadController],
   providers: [UploadService],
+  exports: [UploadService],
 })
 export class UploadModule {}
