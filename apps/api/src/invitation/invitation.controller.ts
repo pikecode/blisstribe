@@ -5,11 +5,17 @@ import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { AdminJwtGuard } from '../common/guards/admin-jwt.guard'
 
 @Controller('invitation')
-@UseGuards(JwtAuthGuard)
 export class InvitationController {
   constructor(private readonly invitationService: InvitationService) {}
 
+  // 解析 Partner 邀请码，注册前可调用
+  @Post('resolve')
+  async resolve(@Body('code') code: string) {
+    return this.invitationService.resolvePartnerInvitation(code)
+  }
+
   // 获取我的邀请码
+  @UseGuards(JwtAuthGuard)
   @Get('my-code')
   async getMyCode(@CurrentUser() user: { userId: string }) {
     const code = await this.invitationService.getMyCode(BigInt(user.userId))
@@ -17,6 +23,7 @@ export class InvitationController {
   }
 
   // 使用邀请码
+  @UseGuards(JwtAuthGuard)
   @Post('use-code')
   async useCode(
     @CurrentUser() user: { userId: string },
@@ -27,6 +34,7 @@ export class InvitationController {
   }
 
   // 获取我的邀请记录
+  @UseGuards(JwtAuthGuard)
   @Get('my-invitations')
   async getMyInvitations(@CurrentUser() user: { userId: string }) {
     return this.invitationService.getMyInvitations(BigInt(user.userId))

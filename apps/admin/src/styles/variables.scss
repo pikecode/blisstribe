@@ -1,24 +1,28 @@
-// 主题变量 — Warm Community palette
-$color-primary: #d97706;
-$color-primary-light: #f59e0b;
-$color-primary-dark: #b45309;
-$color-danger: #dc2626;
-$color-warning: #f59e0b;
-$color-success: #16a34a;
-$color-info: #0ea5e9;
+// 主题变量：运营后台使用克制中性色，品牌色只做关键操作强调。
+$color-primary: #c26a11;
+$color-primary-light: #e08a2b;
+$color-primary-dark: #8f4d0f;
+$color-danger: #d92d20;
+$color-warning: #d97706;
+$color-success: #039855;
+$color-info: #1570ef;
 
-$color-text: #1c1917;
-$color-text-secondary: #78716c;
-$color-text-tertiary: #a8a29e;
+$color-text: #171412;
+$color-text-secondary: #5f5a54;
+$color-text-tertiary: #8f8981;
 
-$color-bg: #faf9f7;
+$color-bg: #f6f4f1;
 $color-bg-white: #ffffff;
 
-$color-border: #e7e5e4;
+$color-border: #e4dfd8;
+$color-border-strong: #d6cec3;
+$color-surface-soft: #fbfaf8;
+$color-sidebar: #211b16;
+$color-sidebar-muted: #a9a09a;
 
 $radius-sm: 4px;
 $radius-md: 8px;
-$radius-lg: 16px;
+$radius-lg: 12px;
 
 $font-size-xs: 12px;
 $font-size-sm: 14px;

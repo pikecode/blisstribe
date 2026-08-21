@@ -11,9 +11,10 @@
   },
   "dependencies": {
     "@blisstribe/shared": "workspace:*",
+    "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.6.7",
-    "element-plus": "^2.6.0",
     "echarts": "^5.5.0",
+    "element-plus": "^2.6.0",
     "pinia": "^3.0.4",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0"

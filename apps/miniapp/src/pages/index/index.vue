@@ -51,10 +51,11 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
 import { bannerApi, type Banner } from '@/api/modules/banner'
+import { storage } from '@/utils/storage'
 import AuthPopup from '@/components/business/AuthPopup.vue'
 
 const authStore = useAuthStore()
@@ -82,6 +83,11 @@ const goAuth = () => uni.navigateTo({ url: '/pages/auth/auth' })
 const goProfile = () => uni.switchTab({ url: '/pages/profile/index' })
 const goInvite = () => uni.navigateTo({ url: '/pages/invite/invite' })
 const goAgreement = () => uni.navigateTo({ url: '/pages/agreement/user-agreement' })
+
+onLoad((options) => {
+  const code = options?.inviteCode || options?.code
+  if (code) storage.set('pendingInviteCode', String(code).toUpperCase(), { expireSeconds: 24 * 3600 })
+})
 
 onShow(loadBanners)
 </script>

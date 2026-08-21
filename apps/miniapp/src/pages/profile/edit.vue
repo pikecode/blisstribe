@@ -15,11 +15,11 @@
       <view class="edit__card">
         <view class="edit__row">
           <text class="edit__label">昵称</text>
-          <input class="edit__input" :value="form.nickname" placeholder="请输入昵称" :maxlength="20" @input="form.nickname = $event.detail.value" />
+          <input class="edit__input" :value="form.nickname" placeholder="请输入昵称" :maxlength="20" @input="onNicknameInput" />
         </view>
         <view class="edit__row">
           <text class="edit__label">真实姓名</text>
-          <input class="edit__input" :value="form.realName" placeholder="选填" @input="form.realName = $event.detail.value" />
+          <input class="edit__input" :value="form.realName" placeholder="选填" @input="onRealNameInput" />
         </view>
         <view class="edit__row edit__row--readonly">
           <text class="edit__label">手机号</text>
@@ -35,13 +35,13 @@
         </view>
         <view class="edit__row">
           <text class="edit__label">生日</text>
-          <picker mode="date" :value="form.birthday" :end="today" @change="e => form.birthday = e.detail.value">
+          <picker mode="date" :value="form.birthday" :end="today" @change="onBirthdayChange">
             <text :class="['edit__value', { placeholder: !form.birthday }]">{{ form.birthday || '请选择' }}</text>
           </picker>
         </view>
         <view class="edit__row">
           <text class="edit__label">年龄</text>
-          <input class="edit__input" :value="form.age ? String(form.age) : ''" placeholder="选填" type="number" :maxlength="3" @input="form.age = Number($event.detail.value) || undefined" />
+          <input class="edit__input" :value="form.age ? String(form.age) : ''" placeholder="选填" type="number" :maxlength="3" @input="onAgeInput" />
         </view>
       </view>
     </view>
@@ -52,11 +52,11 @@
       <view class="edit__card">
         <view class="edit__row">
           <text class="edit__label">微信号</text>
-          <input class="edit__input" :value="form.wechatId" placeholder="选填" @input="form.wechatId = $event.detail.value" />
+          <input class="edit__input" :value="form.wechatId" placeholder="选填" @input="onWechatIdInput" />
         </view>
         <view class="edit__row">
           <text class="edit__label">邮箱</text>
-          <input class="edit__input" :value="form.email" placeholder="选填" type="email" @input="form.email = $event.detail.value" />
+          <input class="edit__input" :value="form.email" placeholder="选填" type="email" @input="onEmailInput" />
         </view>
         <view class="edit__row">
           <text class="edit__label">抖音收款码</text>
@@ -77,7 +77,7 @@
       <view class="edit__card">
         <view class="edit__row">
           <text class="edit__label">职业</text>
-          <input class="edit__input" :value="form.occupation" placeholder="选填" @input="form.occupation = $event.detail.value" />
+          <input class="edit__input" :value="form.occupation" placeholder="选填" @input="onOccupationInput" />
         </view>
         <view class="edit__row edit__row--column">
           <text class="edit__label">喜欢的颜色</text>
@@ -130,6 +130,8 @@ import { useUserStore } from '@/stores/modules/user'
 import { userApi } from '@/api/modules/user'
 import type { Gender } from '@blisstribe/shared'
 
+type UniValueEvent = { detail?: { value?: string | number } }
+
 const userStore = useUserStore()
 const today = new Date().toISOString().slice(0, 10)
 const saving = ref(false)
@@ -178,6 +180,39 @@ function toggleTag(tag: string) {
   const idx = form.tags.indexOf(tag)
   if (idx >= 0) form.tags.splice(idx, 1)
   else if (form.tags.length < 5) form.tags.push(tag)
+}
+
+function getEventValue(e: unknown): string {
+  const detail = (e as UniValueEvent).detail
+  return detail?.value === undefined ? '' : String(detail.value)
+}
+
+function onNicknameInput(e: InputEvent) {
+  form.nickname = getEventValue(e)
+}
+
+function onRealNameInput(e: InputEvent) {
+  form.realName = getEventValue(e)
+}
+
+function onBirthdayChange(e: unknown) {
+  form.birthday = getEventValue(e)
+}
+
+function onAgeInput(e: InputEvent) {
+  form.age = Number(getEventValue(e)) || undefined
+}
+
+function onWechatIdInput(e: InputEvent) {
+  form.wechatId = getEventValue(e)
+}
+
+function onEmailInput(e: InputEvent) {
+  form.email = getEventValue(e)
+}
+
+function onOccupationInput(e: InputEvent) {
+  form.occupation = getEventValue(e)
 }
 
 onShow(async () => {

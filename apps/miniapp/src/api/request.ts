@@ -13,7 +13,8 @@ export interface RequestOptions {
   skipAuthRefresh?: boolean
 }
 
-const TOKEN_EXPIRED_CODES = new Set([401001, 401002])
+const TOKEN_EXPIRED_CODES = new Set([401002])
+const AUTH_REQUIRED_CODES = new Set([401001, 401003])
 
 let isRefreshing = false
 let refreshPromise: Promise<void> | null = null
@@ -44,11 +45,7 @@ export function request<T>(options: RequestOptions): Promise<T> {
           return
         }
 
-        if (
-          TOKEN_EXPIRED_CODES.has(envelope.code) &&
-          !options.skipAuthRefresh &&
-          authStore.refreshToken
-        ) {
+        if (TOKEN_EXPIRED_CODES.has(envelope.code) && !options.skipAuthRefresh && authStore.refreshToken) {
           refreshToken()
             .then(() => {
               request<T>(options).then(resolve).catch(reject)
@@ -58,6 +55,14 @@ export function request<T>(options: RequestOptions): Promise<T> {
               uni.redirectTo({ url: '/pages/auth/auth' })
               reject(new Error('登录已过期'))
             })
+          return
+        }
+
+        if (AUTH_REQUIRED_CODES.has(envelope.code) && !options.skipAuthRefresh) {
+          authStore.clearToken()
+          uni.showToast({ title: '请先登录', icon: 'none' })
+          uni.redirectTo({ url: '/pages/auth/auth' })
+          reject(new Error('请先登录'))
           return
         }
 

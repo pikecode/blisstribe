@@ -30,6 +30,10 @@
         <text>邀请好友</text>
         <text>›</text>
       </view>
+      <view class="profile__link" @tap="goPartner">
+        <text>B 端工作台</text>
+        <text>›</text>
+      </view>
     </view>
 
     <view v-if="isLogin" class="profile__action">
@@ -63,6 +67,10 @@ const goEdit = (): void => {
 
 const goInvite = (): void => {
   uni.navigateTo({ url: '/pages/invite/invite' })
+}
+
+const goPartner = (): void => {
+  uni.navigateTo({ url: '/pages/partner/dashboard' })
 }
 
 const handleLogout = async (): Promise<void> => {

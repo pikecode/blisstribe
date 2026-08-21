@@ -5,7 +5,13 @@
       <text class="invite__subtitle">分享邀请码，与好友一起加入心悦部落</text>
     </view>
 
-    <view class="invite__card">
+    <view v-if="!isLogin" class="invite__login-card">
+      <text class="invite__login-title">登录后查看邀请码</text>
+      <text class="invite__login-desc">完成登录即可生成专属邀请码，查看邀请记录并生成分享海报。</text>
+      <view class="invite__login-btn" @tap="showAuthPopup = true">去登录</view>
+    </view>
+
+    <view v-else class="invite__card">
       <text class="invite__card-label">我的邀请码</text>
       <view class="invite__code-box">
         <text class="invite__code">{{ inviteCode }}</text>
@@ -16,15 +22,15 @@
       <text class="invite__card-tip">好友入会时填写此邀请码，双方均可获得奖励</text>
     </view>
 
-    <view class="invite__share">
+    <view v-if="isLogin" class="invite__share">
       <text class="invite__share-title">分享方式</text>
       <view class="invite__share-btns">
         <button class="invite__share-btn invite__share-btn--wechat" open-type="share">
-          <text>📤</text>
+          <image src="/static/icons/share-wechat.svg" class="invite__share-icon" mode="aspectFit" />
           <text>微信好友</text>
         </button>
         <view class="invite__share-btn invite__share-btn--poster" @tap="generatePoster">
-          <text>🖼️</text>
+          <image src="/static/icons/poster.svg" class="invite__share-icon" mode="aspectFit" />
           <text>生成海报</text>
         </view>
       </view>
@@ -43,42 +49,66 @@
   </view>
 
   <!-- 隐藏 canvas，用于绘制海报 -->
-  <canvas canvas-id="posterCanvas" style="position: fixed; top: -9999rpx; left: -9999rpx; width: 750rpx; height: 1200rpx;" />
+  <canvas
+    canvas-id="posterCanvas"
+    style="position: fixed; top: -9999px; left: -9999px; width: 375px; height: 600px;"
+  />
 
   <!-- 海报预览弹窗 -->
   <view v-if="posterVisible" class="poster-modal" @tap="closePoster">
     <view class="poster-modal__box" @tap.stop>
-      <image :src="posterUrl" class="poster-modal__img" mode="aspectFit" />
+      <image :src="posterUrl" class="poster-modal__img" mode="widthFix" />
       <view class="poster-modal__tip">长按图片保存到相册</view>
       <view class="poster-modal__close" @tap="closePoster">关闭</view>
     </view>
   </view>
+
+  <AuthPopup :visible="showAuthPopup" @close="showAuthPopup = false" />
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { invitationApi } from '@/api/modules/invitation'
+import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
 import { APP_CONFIG } from '@/config'
+import AuthPopup from '@/components/business/AuthPopup.vue'
 
+const authStore = useAuthStore()
 const userStore = useUserStore()
+const isLogin = computed(() => authStore.isLogin)
 const inviteCode = ref('')
 const invitees = ref<Array<{ id: number; nickname: string; avatar: string; createdAt: string }>>([])
 const posterVisible = ref(false)
 const posterUrl = ref('')
+const showAuthPopup = ref(false)
+const POSTER_WIDTH = 375
+const POSTER_HEIGHT = 600
+const POSTER_SCALE = 2
 
 const loadData = async (): Promise<void> => {
+  if (!authStore.isLogin) {
+    inviteCode.value = ''
+    invitees.value = []
+    return
+  }
   try {
     const data = await invitationApi.getMyInvitations()
     inviteCode.value = data.inviteCode
     invitees.value = data.invitees
   } catch (e) {
-    uni.showToast({ title: '加载失败，请重试', icon: 'none' })
+    if (authStore.isLogin) {
+      uni.showToast({ title: '加载失败，请重试', icon: 'none' })
+    }
   }
 }
 
 const copyCode = (): void => {
+  if (!authStore.isLogin) {
+    showAuthPopup.value = true
+    return
+  }
   uni.setClipboardData({
     data: inviteCode.value,
     success: () => {
@@ -92,6 +122,10 @@ const closePoster = (): void => {
 }
 
 const generatePoster = async (): Promise<void> => {
+  if (!authStore.isLogin) {
+    showAuthPopup.value = true
+    return
+  }
   if (!inviteCode.value) {
     uni.showToast({ title: '请先加载邀请码', icon: 'none' })
     return
@@ -109,15 +143,16 @@ const generatePoster = async (): Promise<void> => {
     ])
 
     const ctx = uni.createCanvasContext('posterCanvas')
-    const W = 375
-    const H = 600
+    const W = POSTER_WIDTH
+    const H = POSTER_HEIGHT
+    const BLEED = 8
 
     // 背景渐变
-    const grad = ctx.createLinearGradient(0, 0, W, H)
+    const grad = ctx.createLinearGradient(0, 0, W, H + BLEED * 2)
     grad.addColorStop(0, '#667eea')
     grad.addColorStop(1, '#764ba2')
     ctx.setFillStyle(grad)
-    ctx.fillRect(0, 0, W, H)
+    ctx.fillRect(-BLEED, -BLEED, W + BLEED * 2, H + BLEED * 2)
 
     // 白色卡片
     ctx.setFillStyle('#ffffff')
@@ -182,6 +217,12 @@ const generatePoster = async (): Promise<void> => {
         canvasId: 'posterCanvas',
         fileType: 'jpg',
         quality: 0.92,
+        x: 0,
+        y: 0,
+        width: POSTER_WIDTH,
+        height: POSTER_HEIGHT,
+        destWidth: POSTER_WIDTH * POSTER_SCALE,
+        destHeight: POSTER_HEIGHT * POSTER_SCALE,
         success: (res) => resolve(res.tempFilePath),
         fail: reject,
       })
@@ -202,6 +243,13 @@ const formatTime = (iso: string): string => {
 }
 
 onShareAppMessage(() => {
+  if (!authStore.isLogin || !inviteCode.value) {
+    return {
+      title: '邀请你加入心悦部落',
+      path: '/pages/index/index',
+      imageUrl: '',
+    }
+  }
   return {
     title: `邀请你加入心悦部落`,
     path: `/pages/index/index?inviteCode=${inviteCode.value}`,
@@ -274,6 +322,43 @@ function roundRect(ctx: UniApp.CanvasContext, x: number, y: number, w: number, h
     }
   }
 
+  &__login-card {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    padding: 48rpx 40rpx;
+    margin-bottom: 32rpx;
+    text-align: center;
+    border: 1rpx solid var(--color-border);
+  }
+
+  &__login-title {
+    display: block;
+    font-size: 34rpx;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 16rpx;
+  }
+
+  &__login-desc {
+    display: block;
+    font-size: 26rpx;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    margin-bottom: 32rpx;
+  }
+
+  &__login-btn {
+    height: 84rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 28rpx;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   &__code-box {
     display: flex;
     align-items: center;
@@ -310,27 +395,43 @@ function roundRect(ctx: UniApp.CanvasContext, x: number, y: number, w: number, h
     &-btns {
       display: flex;
       gap: 24rpx;
+      align-items: stretch;
     }
 
     &-btn {
       flex: 1;
+      min-width: 0;
+      height: 168rpx;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 32rpx;
+      justify-content: center;
+      gap: 14rpx;
+      margin: 0;
+      padding: 0;
       border-radius: var(--radius-md);
+      border: none;
       background-color: var(--color-bg-white);
+      line-height: 1;
 
       text {
+        display: block;
+        line-height: 1;
         font-size: 26rpx;
         color: var(--color-text);
       }
 
-      &--wechat {
-        &::after {
-          border: none;
-        }
+      &::after {
+        border: none;
       }
+    }
+
+    &-icon {
+      display: block;
+      width: 48rpx;
+      height: 48rpx;
+      flex-shrink: 0;
     }
   }
 
@@ -404,8 +505,10 @@ function roundRect(ctx: UniApp.CanvasContext, x: number, y: number, w: number, h
 
   &__img {
     width: 600rpx;
-    height: 960rpx;
+    height: auto;
+    display: block;
     border-radius: 16rpx;
+    background: transparent;
   }
 
   &__tip {

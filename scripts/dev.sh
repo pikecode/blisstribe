@@ -54,17 +54,16 @@ if [ ! -f apps/api/.env ]; then
   warn "请编辑 apps/api/.env 填入真实配置后重新运行"
 fi
 
-# 5. 检查 Prisma Client
-if [ ! -d node_modules/.pnpm/@prisma+client@* ]; then
-  log "生成 Prisma Client ..."
-  pnpm db:generate
-fi
+# 5. 同步数据库结构并生成 Prisma Client
+log "应用数据库迁移 ..."
+pnpm --filter @blisstribe/api exec prisma migrate deploy
+
+log "生成 Prisma Client ..."
+pnpm db:generate
 
 # 5.5 构建 shared 包（API 用 CJS 产物）
-if [ ! -f packages/shared/dist/index.js ]; then
-  log "构建 @blisstribe/shared ..."
-  pnpm --filter @blisstribe/shared build
-fi
+log "构建 @blisstribe/shared ..."
+pnpm --filter @blisstribe/shared build
 
 # 6. 启动 API + Admin
 echo ""

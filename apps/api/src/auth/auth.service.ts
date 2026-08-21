@@ -111,6 +111,9 @@ export class AuthService {
       throw new BusinessException(ErrorCode.TEMP_TOKEN_INVALID)
     }
     if (!temp.phoneHash) throw new BusinessException(ErrorCode.GET_PHONE_FAILED)
+    const phoneHash = temp.phoneHash
+    const phoneCiphertext = temp.phoneCiphertext ?? Buffer.alloc(0)
+    const phoneMasked = temp.phoneMasked ?? ''
     if (!dto.agreement) throw new BusinessException(ErrorCode.AGREEMENT_NOT_ACCEPTED)
 
     // 昵称校验
@@ -119,55 +122,59 @@ export class AuthService {
       throw new BusinessException(ErrorCode.NICKNAME_FORMAT_ERROR)
     }
 
-    // 创建用户 + 微信账号
+    // 创建用户 + 微信账号 + 可选 Partner 邀请归属
     const inviteCode = this.invitationService.generateInviteCode()
-    const user = await this.prisma.user.create({
-      data: {
-        phoneCiphertext: temp.phoneCiphertext ?? Buffer.alloc(0),
-        phoneHash: temp.phoneHash,
-        phoneMasked: temp.phoneMasked ?? '',
-        nickname: name,
-        avatar: dto.avatar,
-        gender: dto.gender,
-        birthday: dto.birthday ? new Date(dto.birthday) : null,
-        realName: dto.realName,
-        wechatId: dto.wechatId,
-        email: dto.email,
-        age: dto.age,
-        favoriteColor: dto.favoriteColor,
-        occupation: dto.occupation,
-        tags: dto.tags ?? [],
-        identity: dto.identity,
-        status: 1,
-        inviteCode,
-        wechatAccount: {
-          create: {
-            wxOpenIdHash: temp.wxOpenIdHash ?? '',
-            wxUnionId: temp.wxUnionId,
-            wxNickname: temp.wxNickname,
-            wxAvatar: temp.wxAvatar,
-            wxGender: temp.wxGender,
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          phoneCiphertext,
+          phoneHash,
+          phoneMasked,
+          nickname: name,
+          avatar: dto.avatar || temp.wxAvatar || '',
+          gender: dto.gender,
+          birthday: dto.birthday ? new Date(dto.birthday) : null,
+          realName: dto.realName,
+          wechatId: dto.wechatId,
+          email: dto.email,
+          age: dto.age,
+          favoriteColor: dto.favoriteColor,
+          occupation: dto.occupation,
+          tags: dto.tags ?? [],
+          identity: dto.identity,
+          status: 1,
+          inviteCode,
+          wechatAccount: {
+            create: {
+              wxOpenIdHash: temp.wxOpenIdHash ?? '',
+              wxUnionId: temp.wxUnionId,
+              wxNickname: temp.wxNickname,
+              wxAvatar: temp.wxAvatar,
+              wxGender: temp.wxGender,
+            },
+          },
+          agreements: {
+            create: [
+              {
+                agreementType: 'user',
+                agreementVersion: '1.0',
+                agreedAt: new Date(),
+              },
+              {
+                agreementType: 'privacy',
+                agreementVersion: '1.0',
+                agreedAt: new Date(),
+              },
+            ],
           },
         },
-        agreements: {
-          create: [
-            {
-              agreementType: 'user',
-              agreementVersion: '1.0',
-              agreedAt: new Date(),
-            },
-            {
-              agreementType: 'privacy',
-              agreementVersion: '1.0',
-              agreedAt: new Date(),
-            },
-          ],
-        },
-      },
-    })
+      })
 
-    // 清理临时态
-    await this.prisma.userRegisterTemp.delete({ where: { tempToken: dto.tempToken } })
+      await this.invitationService.bindPartnerInviteForUser(tx, created.id, dto.inviteCode)
+      await tx.userRegisterTemp.delete({ where: { tempToken: dto.tempToken } })
+
+      return created
+    })
 
     const tokens = await this.issueTokens(user.id, 'wechat-mp')
     return {

@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { router } from '@/router'
+import { router } from '@/router/routes'
 import type { ApiResponse } from '@blisstribe/shared'
 
 const service: AxiosInstance = axios.create({

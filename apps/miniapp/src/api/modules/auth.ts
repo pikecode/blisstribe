@@ -41,7 +41,7 @@ export interface WechatPhoneResult {
 export interface RegisterParams {
   tempToken: string
   nickname: string
-  avatar: string
+  avatar?: string
   gender: number
   birthday?: string
   agreement: boolean

@@ -22,13 +22,30 @@
           <image v-if="form.avatar" :src="form.avatar" class="register__avatar-img" mode="aspectFill" />
           <view v-else class="register__avatar-placeholder">👤</view>
         </view>
-        <text class="register__avatar-tip">点击上传头像</text>
+        <text class="register__avatar-tip">点击上传头像（选填）</text>
+        <button class="register__avatar-wx-btn" open-type="chooseAvatar" @chooseavatar="onChooseWxAvatar">
+          选择微信头像
+        </button>
+      </view>
+
+      <view v-if="hasWxProfile" class="register__wx-profile">
+        <image
+          v-if="authStore.registerWxUserInfo?.avatarUrl"
+          :src="authStore.registerWxUserInfo.avatarUrl"
+          class="register__wx-avatar"
+          mode="aspectFill"
+        />
+        <view class="register__wx-info">
+          <text class="register__wx-title">使用微信资料</text>
+          <text class="register__wx-desc">{{ wxProfileDesc }}</text>
+        </view>
+        <view class="register__wx-btn" @tap="applyWxProfile">使用</view>
       </view>
 
       <view class="register__field">
         <text class="register__label">昵称 <text class="required">*</text></text>
         <view class="register__input-wrap" :class="{ error: errors.nickname }">
-          <input class="register__input" :value="form.nickname" placeholder="2-20 字符" :maxlength="20" @input="e => form.nickname = e.detail.value" />
+          <input class="register__input" type="nickname" :value="form.nickname" placeholder="2-20 字符" :maxlength="20" @input="onNicknameInput" />
         </view>
         <text v-if="errors.nickname" class="register__error">{{ errors.nickname }}</text>
       </view>
@@ -36,7 +53,7 @@
       <view class="register__field">
         <text class="register__label">真实姓名</text>
         <view class="register__input-wrap">
-          <input class="register__input" :value="form.realName" placeholder="选填" @input="e => form.realName = e.detail.value" />
+          <input class="register__input" :value="form.realName" placeholder="选填" @input="onRealNameInput" />
         </view>
       </view>
 
@@ -61,7 +78,7 @@
 
       <view class="register__field">
         <text class="register__label">生日</text>
-        <picker mode="date" :value="form.birthday" :end="today" @change="e => form.birthday = e.detail.value">
+        <picker mode="date" :value="form.birthday" :end="today" @change="onBirthdayChange">
           <view class="register__picker">
             <text :class="{ placeholder: !form.birthday }">{{ form.birthday || '请选择' }}</text>
           </view>
@@ -74,21 +91,21 @@
       <view class="register__field">
         <text class="register__label">微信号</text>
         <view class="register__input-wrap">
-          <input class="register__input" :value="form.wechatId" placeholder="选填" @input="e => form.wechatId = e.detail.value" />
+          <input class="register__input" :value="form.wechatId" placeholder="选填" @input="onWechatIdInput" />
         </view>
       </view>
 
       <view class="register__field">
         <text class="register__label">邮箱</text>
         <view class="register__input-wrap">
-          <input class="register__input" :value="form.email" placeholder="选填" type="email" @input="e => form.email = e.detail.value" />
+          <input class="register__input" :value="form.email" placeholder="选填" type="email" @input="onEmailInput" />
         </view>
       </view>
 
       <view class="register__field">
         <text class="register__label">年龄</text>
         <view class="register__input-wrap">
-          <input class="register__input" :value="form.age ? String(form.age) : ''" placeholder="选填" type="number" :maxlength="3" @input="e => form.age = Number(e.detail.value) || undefined" />
+          <input class="register__input" :value="form.age ? String(form.age) : ''" placeholder="选填" type="number" :maxlength="3" @input="onAgeInput" />
         </view>
       </view>
 
@@ -108,7 +125,7 @@
       <view class="register__field">
         <text class="register__label">职业</text>
         <view class="register__input-wrap">
-          <input class="register__input" :value="form.occupation" placeholder="选填，如：设计师、教师等" @input="e => form.occupation = e.detail.value" />
+          <input class="register__input" :value="form.occupation" placeholder="选填，如：设计师、教师等" @input="onOccupationInput" />
         </view>
       </view>
 
@@ -124,7 +141,15 @@
       <view class="register__field">
         <text class="register__label">邀请码</text>
         <view class="register__input-wrap">
-          <input class="register__input" :value="inviteCode" placeholder="如有邀请码请填写" :maxlength="6" @input="e => inviteCode = e.detail.value.toUpperCase()" />
+          <input class="register__input" :value="inviteCode" placeholder="如有邀请码请填写" :maxlength="12" @input="onInviteCodeInput" />
+        </view>
+        <view v-if="inviteCode" class="register__invite-state" :class="inviteStateClass">
+          <text v-if="inviteResolving">正在识别邀请码...</text>
+          <template v-else-if="inviteResolveResult?.valid && inviteResolveResult.partner">
+            <text class="register__invite-title">推荐方：{{ inviteResolveResult.partner.displayName }}</text>
+            <text class="register__invite-desc">注册成功后将自动绑定该 B 端主体</text>
+          </template>
+          <text v-else>{{ inviteResolveResult?.reason || '邀请码待识别' }}</text>
         </view>
       </view>
     </view>
@@ -152,7 +177,7 @@
       <view v-if="step > 1" class="register__btn register__btn--back" @tap="step--">上一步</view>
       <view v-if="step < 4" class="register__btn register__btn--next" :class="{ disabled: !canNext }" @tap="nextStep">下一步</view>
       <view v-if="step === 4" class="register__btn register__btn--submit" :class="{ disabled: !canSubmit || submitting }" @tap="handleSubmit">
-        {{ submitting ? '提交中...' : '完成入会' }}
+        {{ submitText }}
       </view>
     </view>
   </view>
@@ -168,8 +193,11 @@ import { authApi } from '@/api/modules/auth'
 import { userApi } from '@/api/modules/user'
 import { invitationApi } from '@/api/modules/invitation'
 import { redirectToHome } from '@/utils/auth'
+import { storage } from '@/utils/storage'
 import UserAgreement from '@/components/business/UserAgreement.vue'
-import type { Gender } from '@blisstribe/shared'
+import type { Gender, PartnerInvitationResolveResult } from '@blisstribe/shared'
+
+type UniValueEvent = { detail?: { value?: string | number } }
 
 const authStore = useAuthStore()
 const userStore = useUserStore()
@@ -180,6 +208,9 @@ const step = ref(1)
 const phoneMasked = ref('')
 const inviteCode = ref('')
 const submitting = ref(false)
+const inviteResolving = ref(false)
+const inviteResolveResult = ref<PartnerInvitationResolveResult | null>(null)
+const inviteResolveRequestId = ref(0)
 
 const stepTitles = ['基础信息', '联系方式', '职业与标签', '注册身份']
 
@@ -226,9 +257,8 @@ const tagOptions = [
 ]
 
 const identityOptions = [
-  { value: 'C', label: '单纯消费者', desc: '享受会员权益与服务' },
-  { value: 'B', label: '产品供应商', desc: '提供优质产品与合作' },
-  { value: 'S', label: '服务供应商', desc: '提供专业服务与支持' },
+  { value: 'C', label: '我是消费者', desc: '享受会员权益、活动和服务' },
+  { value: 'B', label: '我是经营者', desc: '申请成为团长、达人、门店或服务商' },
 ]
 
 const canNext = computed(() => {
@@ -237,6 +267,22 @@ const canNext = computed(() => {
 })
 
 const canSubmit = computed(() => !!form.identity && form.agreement && !submitting.value)
+const submitText = computed(() => {
+  if (submitting.value) return '提交中...'
+  return form.identity === 'B' ? '完成注册，继续填写入驻资料' : '完成入会'
+})
+const hasWxProfile = computed(() => {
+  const info = authStore.registerWxUserInfo
+  return !!(info?.nickName || info?.avatarUrl)
+})
+const wxProfileDesc = computed(() => {
+  const info = authStore.registerWxUserInfo
+  return info?.nickName ? `昵称：${info.nickName}` : '使用微信头像作为默认头像'
+})
+const inviteStateClass = computed(() => ({
+  valid: inviteResolveResult.value?.valid,
+  invalid: inviteResolveResult.value && !inviteResolveResult.value.valid,
+}))
 
 function toggleTag(tag: string) {
   const idx = form.tags.indexOf(tag)
@@ -244,6 +290,98 @@ function toggleTag(tag: string) {
     form.tags.splice(idx, 1)
   } else if (form.tags.length < 5) {
     form.tags.push(tag)
+  }
+}
+
+function getEventValue(e: unknown): string {
+  const detail = (e as UniValueEvent).detail
+  return detail?.value === undefined ? '' : String(detail.value)
+}
+
+function onNicknameInput(e: InputEvent) {
+  form.nickname = getEventValue(e)
+}
+
+function onRealNameInput(e: InputEvent) {
+  form.realName = getEventValue(e)
+}
+
+function onBirthdayChange(e: unknown) {
+  form.birthday = getEventValue(e)
+}
+
+function onWechatIdInput(e: InputEvent) {
+  form.wechatId = getEventValue(e)
+}
+
+function onEmailInput(e: InputEvent) {
+  form.email = getEventValue(e)
+}
+
+function onAgeInput(e: InputEvent) {
+  form.age = Number(getEventValue(e)) || undefined
+}
+
+function onOccupationInput(e: InputEvent) {
+  form.occupation = getEventValue(e)
+}
+
+function onInviteCodeInput(e: InputEvent) {
+  inviteCode.value = getEventValue(e).toUpperCase()
+  resolveInviteCode()
+}
+
+function onChooseWxAvatar(e: unknown): void {
+  const avatarUrl = (e as { detail?: { avatarUrl?: string } }).detail?.avatarUrl
+  if (avatarUrl) {
+    form.avatar = avatarUrl
+  }
+}
+
+function applyWxProfile(): void {
+  const info = authStore.registerWxUserInfo
+  if (!info) return
+  if (info.nickName) {
+    form.nickname = info.nickName.slice(0, 20)
+    errors.nickname = ''
+  }
+  if (info.avatarUrl) {
+    form.avatar = info.avatarUrl
+  }
+  if (info.gender !== undefined) {
+    form.gender = info.gender as Gender
+  }
+  uni.showToast({ title: '已使用微信资料', icon: 'success' })
+}
+
+async function resolveInviteCode(): Promise<void> {
+  const code = inviteCode.value.trim().toUpperCase()
+  inviteResolveRequestId.value += 1
+  const requestId = inviteResolveRequestId.value
+  inviteResolveResult.value = null
+  if (!code) {
+    inviteResolving.value = false
+    return
+  }
+  if (code.length < 4) {
+    inviteResolving.value = false
+    inviteResolveResult.value = { valid: false, code, reason: '邀请码长度不足' }
+    return
+  }
+  inviteResolving.value = true
+  try {
+    const result = await invitationApi.resolve(code)
+    if (requestId === inviteResolveRequestId.value) {
+      inviteResolveResult.value = result
+    }
+  } catch {
+    if (requestId === inviteResolveRequestId.value) {
+      inviteResolveResult.value = { valid: false, code, reason: '邀请码识别失败' }
+    }
+  } finally {
+    if (requestId === inviteResolveRequestId.value) {
+      inviteResolving.value = false
+    }
   }
 }
 
@@ -289,7 +427,7 @@ const handleSubmit = async (): Promise<void> => {
     const result = await authApi.register({
       tempToken: authStore.tempToken,
       nickname: form.nickname.trim(),
-      avatar: form.avatar,
+      avatar: form.avatar || undefined,
       gender: form.gender,
       birthday: form.birthday || undefined,
       realName: form.realName || undefined,
@@ -305,14 +443,18 @@ const handleSubmit = async (): Promise<void> => {
     })
     authStore.setToken(result.token, result.refreshToken)
     authStore.setTempToken('')
+    authStore.setRegisterWxUserInfo()
     userStore.setUserInfo(result.userInfo)
+    storage.remove('pendingInviteCode')
 
-    if (inviteCode.value.trim()) {
-      try { await invitationApi.useCode(inviteCode.value.trim().toUpperCase()) } catch { /* 不影响流程 */ }
+    if (form.identity === 'B') {
+      uni.showToast({ title: '注册成功，请提交入驻资料', icon: 'success' })
+      setTimeout(() => uni.redirectTo({ url: '/pages/partner/apply' }), 1000)
+    } else {
+      const title = inviteResolveResult.value?.valid ? '入会成功，已绑定推荐方' : '入会成功'
+      uni.showToast({ title, icon: 'success' })
+      setTimeout(redirectToHome, 1000)
     }
-
-    uni.showToast({ title: '入会成功', icon: 'success' })
-    setTimeout(redirectToHome, 1000)
   } catch (err) {
     uni.showToast({ title: err instanceof Error ? err.message : '入会失败', icon: 'none' })
   } finally {
@@ -322,7 +464,15 @@ const handleSubmit = async (): Promise<void> => {
 
 onLoad((options) => {
   if (!authStore.tempToken) uni.redirectTo({ url: '/pages/auth/auth' })
-  if (options?.inviteCode) inviteCode.value = String(options.inviteCode).toUpperCase()
+  const pendingInviteCode = options?.inviteCode || options?.code || storage.get<string>('pendingInviteCode')
+  const targetIdentity = options?.identity || options?.role
+  if (pendingInviteCode) {
+    inviteCode.value = String(pendingInviteCode).toUpperCase()
+    resolveInviteCode()
+  }
+  if (targetIdentity === 'B' || targetIdentity === 'C') {
+    form.identity = String(targetIdentity)
+  }
 })
 </script>
 
@@ -408,6 +558,40 @@ onLoad((options) => {
   &__input { flex: 1; font-size: 28rpx; color: #1a1a1a; }
   &__error { font-size: 22rpx; color: #ff4d4f; margin-top: 6rpx; }
 
+  &__invite-state {
+    margin-top: 12rpx;
+    padding: 16rpx 18rpx;
+    border-radius: 10rpx;
+    background: #f9f9f9;
+    border: 1rpx solid #e8e8e8;
+    font-size: 23rpx;
+    color: #999;
+
+    &.valid {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+      color: #15803d;
+    }
+
+    &.invalid {
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #c2410c;
+    }
+  }
+
+  &__invite-title {
+    display: block;
+    font-size: 24rpx;
+    font-weight: 600;
+    margin-bottom: 4rpx;
+  }
+
+  &__invite-desc {
+    display: block;
+    font-size: 22rpx;
+  }
+
   // ── 头像 ──
   &__avatar {
     display: flex;
@@ -431,6 +615,68 @@ onLoad((options) => {
       font-size: 64rpx;
     }
     &-tip { font-size: 22rpx; color: #999; margin-top: 8rpx; }
+    &-wx-btn {
+      margin: 16rpx 0 0;
+      padding: 0 28rpx;
+      height: 56rpx;
+      line-height: 56rpx;
+      border-radius: 999rpx;
+      background: rgba(7, 193, 96, 0.08);
+      color: var(--color-primary);
+      font-size: 24rpx;
+      &::after { border: none; }
+    }
+  }
+
+  &__wx-profile {
+    display: flex;
+    align-items: center;
+    gap: 20rpx;
+    margin-bottom: 24rpx;
+    padding: 20rpx 24rpx;
+    border-radius: 14rpx;
+    background: #f7fbf8;
+    border: 1rpx solid rgba(7, 193, 96, 0.16);
+  }
+
+  &__wx-avatar {
+    width: 72rpx;
+    height: 72rpx;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #eef1f3;
+  }
+
+  &__wx-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__wx-title {
+    display: block;
+    font-size: 26rpx;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 6rpx;
+  }
+
+  &__wx-desc {
+    display: block;
+    font-size: 22rpx;
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__wx-btn {
+    flex-shrink: 0;
+    padding: 12rpx 28rpx;
+    border-radius: 999rpx;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 24rpx;
+    line-height: 1;
   }
 
   // ── 手机号 ──

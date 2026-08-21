@@ -1,28 +1,29 @@
 <template>
   <div class="dashboard">
+    <div class="dashboard__section-head">
+      <div>
+        <div class="dashboard__eyebrow">OVERVIEW</div>
+        <h2 class="dashboard__title">核心运营指标</h2>
+      </div>
+    </div>
+
     <!-- 顶部统计卡片 -->
-    <el-row :gutter="16" class="dashboard__stats">
-      <el-col :span="9">
-        <div class="stat-card stat-card--primary" :style="{ '--accent': statCards[0].color }">
-          <div class="stat-card__bar" />
-          <div class="stat-card__meta">
-            <div class="stat-card__value">{{ statCards[0].value.toLocaleString('zh-CN') }}</div>
-            <div class="stat-card__label">{{ statCards[0].label }}</div>
-          </div>
-          <el-icon class="stat-card__glyph"><component :is="statCards[0].icon" /></el-icon>
+    <div class="dashboard__stats">
+      <div
+        v-for="(card, index) in statCards"
+        :key="card.label"
+        class="stat-card"
+        :class="{ 'stat-card--primary': index === 0 }"
+        :style="{ '--accent': card.color }"
+      >
+        <div class="stat-card__bar" />
+        <div class="stat-card__meta">
+          <div class="stat-card__value">{{ card.value.toLocaleString('zh-CN') }}</div>
+          <div class="stat-card__label">{{ card.label }}</div>
         </div>
-      </el-col>
-      <el-col :span="5" v-for="card in statCards.slice(1)" :key="card.label">
-        <div class="stat-card" :style="{ '--accent': card.color }">
-          <div class="stat-card__bar" />
-          <div class="stat-card__meta">
-            <div class="stat-card__value">{{ card.value.toLocaleString('zh-CN') }}</div>
-            <div class="stat-card__label">{{ card.label }}</div>
-          </div>
-          <el-icon class="stat-card__glyph"><component :is="card.icon" /></el-icon>
-        </div>
-      </el-col>
-    </el-row>
+        <el-icon class="stat-card__glyph"><component :is="card.icon" /></el-icon>
+      </div>
+    </div>
 
     <!-- 折线图 -->
     <div class="dashboard__chart-card">
@@ -41,15 +42,16 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import { statsApi } from '@/api'
+import { CircleCheck, Remove, TrendCharts, User } from '@element-plus/icons-vue'
 
 const chartRef = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
 
 const statCards = ref([
-  { label: '总用户数', value: 0, icon: 'User', color: '#d97706' },
-  { label: '活跃用户', value: 0, icon: 'CircleCheck', color: '#16a34a' },
-  { label: '今日新增', value: 0, icon: 'TrendCharts', color: '#f59e0b' },
-  { label: '已禁用', value: 0, icon: 'Remove', color: '#ef4444' },
+  { label: '总用户数', value: 0, icon: User, color: '#c26a11' },
+  { label: '活跃用户', value: 0, icon: CircleCheck, color: '#039855' },
+  { label: '今日新增', value: 0, icon: TrendCharts, color: '#1570ef' },
+  { label: '已禁用', value: 0, icon: Remove, color: '#d92d20' },
 ])
 
 const loadOverview = async () => {
@@ -65,16 +67,16 @@ const loadTrend = async () => {
   if (!chartRef.value) return
   chart = echarts.init(chartRef.value)
   chart.setOption({
-    tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: '#e7e5e4', textStyle: { color: '#1c1917' } },
-    grid: { top: 20, right: 20, bottom: 30, left: 50 },
-    xAxis: { type: 'category', data: data.map(d => d.date), axisLine: { lineStyle: { color: '#e7e5e4' } }, axisLabel: { color: '#a8a29e', fontSize: 12 } },
-    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#f0ece6', type: 'dashed' } }, axisLabel: { color: '#a8a29e', fontSize: 12 } },
+    tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: '#e4dfd8', textStyle: { color: '#171412' }, extraCssText: 'box-shadow: 0 8px 30px rgba(23,20,18,.12); border-radius: 8px;' },
+    grid: { top: 20, right: 20, bottom: 30, left: 48 },
+    xAxis: { type: 'category', data: data.map(d => d.date), axisTick: { show: false }, axisLine: { lineStyle: { color: '#e4dfd8' } }, axisLabel: { color: '#8f8981', fontSize: 12 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#ece7df', type: 'dashed' } }, axisLabel: { color: '#8f8981', fontSize: 12 } },
     series: [{
       data: data.map(d => d.count), type: 'line', smooth: true,
       symbol: 'circle', symbolSize: 6,
-      lineStyle: { color: '#d97706', width: 2 },
-      itemStyle: { color: '#d97706' },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(217,119,6,0.15)' }, { offset: 1, color: 'rgba(217,119,6,0)' }]) },
+      lineStyle: { color: '#c26a11', width: 2 },
+      itemStyle: { color: '#c26a11' },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(194,106,17,0.16)' }, { offset: 1, color: 'rgba(194,106,17,0)' }]) },
     }],
   })
 }
@@ -93,13 +95,40 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .dashboard {
-  &__stats { margin-bottom: 20px; }
+  &__section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  &__eyebrow {
+    color: #8f8981;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+
+  &__title {
+    margin: 4px 0 0;
+    font-size: 18px;
+    color: #171412;
+    line-height: 1.2;
+  }
+
+  &__stats {
+    display: grid;
+    grid-template-columns: minmax(280px, 1.4fr) repeat(3, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
 
   &__chart-card {
     background: #fff;
     border-radius: 12px;
-    padding: 28px 24px 20px;
-    border: 1px solid #ede9e4;
+    padding: 24px 24px 18px;
+    border: 1px solid #e4dfd8;
+    box-shadow: 0 1px 2px rgba(23, 20, 18, 0.04);
   }
 
   &__chart-header {
@@ -109,8 +138,7 @@ onUnmounted(() => {
   &__chart-title {
     font-size: 15px;
     font-weight: 700;
-    color: #1c1917;
-    letter-spacing: 0.01em;
+    color: #171412;
   }
 
   &__chart-sub {
@@ -118,7 +146,7 @@ onUnmounted(() => {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #a8a29e;
+    color: #8f8981;
     margin-top: 2px;
   }
 
@@ -126,21 +154,22 @@ onUnmounted(() => {
 }
 
 .stat-card {
-  background: #fffdf9;
-  border-radius: 10px;
-  padding: 20px 20px 20px 24px;
-  border: 1px solid #ede9e4;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 18px 20px 22px;
+  border: 1px solid #e4dfd8;
   display: flex;
   align-items: center;
   gap: 12px;
   position: relative;
   overflow: hidden;
-  transition: box-shadow 0.2s, border-color 0.2s;
-  height: 100%;
+  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
+  min-height: 118px;
 
   &:hover {
-    box-shadow: 0 4px 20px rgba(217, 119, 6, 0.1);
-    border-color: color-mix(in srgb, var(--accent) 40%, #ede9e4);
+    box-shadow: 0 10px 28px rgba(23, 20, 18, 0.08);
+    border-color: color-mix(in srgb, var(--accent) 36%, #e4dfd8);
+    transform: translateY(-1px);
   }
 
   &__bar {
@@ -161,7 +190,7 @@ onUnmounted(() => {
   &__value {
     font-size: 32px;
     font-weight: 800;
-    color: #1c1917;
+    color: #171412;
     line-height: 1;
     margin-bottom: 6px;
     font-variant-numeric: tabular-nums;
@@ -172,7 +201,7 @@ onUnmounted(() => {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #a8a29e;
+    color: #8f8981;
   }
 
   &__glyph {
@@ -191,6 +220,18 @@ onUnmounted(() => {
 
   &--primary &__glyph {
     font-size: 48px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .dashboard__stats {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard__stats {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -46,6 +46,10 @@ model User {
   receivedInvitations MemberInvitation[] @relation("Invitee")
   inviterUser   User?    @relation("UserInvitedBy", fields: [invitedBy], references: [id])
   invitees      User[]   @relation("UserInvitedBy")
+  partnerMembers PartnerMember[]
+  invitationRecords InvitationRecord[]
+  customerRelations CustomerRelation[]
+  relationEvents    RelationEvent[]
 
   @@index([status])
   @@index([createdAt])
@@ -162,6 +166,167 @@ model MemberInvitation {
   @@index([inviteeId])
   @@index([inviteCode])
   @@index([status])
+}
+
+// B 端经营主体
+model Partner {
+  id                     BigInt   @id @default(autoincrement())
+  partnerNo              String   @unique
+  displayName            String
+  type                   String
+  level                  String   @default("normal")
+  status                 Int      @default(0) // 0待审 1正常 2拒绝 3冻结 4停用
+  auditStatus            Int      @default(0) // 0待审 1通过 2拒绝
+  auditReason            String?
+  contactName            String?
+  contactPhoneCiphertext Bytes?
+  contactPhoneHash       String?
+  contactPhoneMasked     String?
+  regionCode             String?
+  profile                Json     @default("{}")
+  approvedAt             DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  deletedAt              DateTime?
+
+  members PartnerMember[]
+  invitationRecords InvitationRecord[]
+  customerRelations CustomerRelation[]
+  relationEvents    RelationEvent[]
+
+  @@index([status, auditStatus])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// B 端成员关系
+model PartnerMember {
+  id        BigInt   @id @default(autoincrement())
+  partnerId BigInt
+  userId    BigInt
+  role      String   @default("owner") // owner/operator/finance/customer_service
+  status    Int      @default(1) // 0禁用 1启用
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([partnerId, userId, role])
+  @@index([userId, status])
+  @@index([partnerId, status])
+}
+
+// 审计日志
+model AuditLog {
+  id           BigInt   @id @default(autoincrement())
+  actorType    String // admin/user/system
+  actorId      BigInt?
+  action       String
+  targetType   String
+  targetId     BigInt?
+  reason       String?
+  metadata     Json     @default("{}")
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@index([actorType, actorId])
+  @@index([targetType, targetId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// 通用邀请码
+model InvitationCode {
+  id              BigInt   @id @default(autoincrement())
+  ownerType       String // user/partner/campaign
+  ownerId         BigInt
+  code            String   @unique
+  scene           String // register/partner_apply/campaign
+  maxUses         Int?
+  usedCount       Int      @default(0)
+  expiresAt       DateTime?
+  status          Int      @default(1) // 0停用 1启用
+  createdByUserId BigInt?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  records InvitationRecord[]
+
+  @@index([ownerType, ownerId])
+  @@index([scene, status])
+  @@index([expiresAt])
+}
+
+// 邀请记录
+model InvitationRecord {
+  id           BigInt   @id @default(autoincrement())
+  codeId       BigInt?
+  code         String
+  scene        String
+  partnerId    BigInt?
+  userId       BigInt?
+  status       Int      @default(0) // 0已解析 1已注册 2已绑定 3无效 4跳过绑定
+  failureReason String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  invitationCode InvitationCode? @relation(fields: [codeId], references: [id], onDelete: SetNull)
+  partner        Partner?        @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([code])
+  @@index([partnerId, status])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// B-C 当前归属关系
+model CustomerRelation {
+  id                   BigInt   @id @default(autoincrement())
+  partnerId            BigInt
+  customerUserId       BigInt
+  sourceInvitationCode String?
+  status               Int      @default(1) // 0失效 1有效 2争议中
+  boundAt              DateTime @default(now())
+  unboundAt            DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  partner      Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  customerUser User    @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  events       RelationEvent[]
+
+  @@unique([partnerId, customerUserId])
+  @@index([customerUserId, status])
+  @@index([partnerId, status])
+  @@index([boundAt])
+}
+
+// B-C 关系事件账本
+model RelationEvent {
+  id             BigInt   @id @default(autoincrement())
+  relationId     BigInt?
+  partnerId      BigInt?
+  customerUserId BigInt?
+  eventType      String // invited/bound/bind_skipped/transferred/unbound/disputed/resolved
+  sourceType     String? // invitation/admin/system/order
+  sourceId       String?
+  operatorType   String // user/admin/system
+  operatorId     BigInt?
+  reason         String?
+  snapshot       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  relation     CustomerRelation? @relation(fields: [relationId], references: [id], onDelete: SetNull)
+  partner      Partner?          @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  customerUser User?             @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
+
+  @@index([relationId])
+  @@index([partnerId, createdAt])
+  @@index([customerUserId, createdAt])
+  @@index([eventType])
 }
 
 // Banner 轮播图表

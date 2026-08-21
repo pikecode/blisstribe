@@ -7,6 +7,15 @@ export interface UpdateUserParams {
   avatar?: string
   gender?: Gender
   birthday?: string
+  realName?: string
+  wechatId?: string
+  email?: string
+  age?: number
+  favoriteColor?: string
+  occupation?: string
+  tags?: string[]
+  identity?: string
+  douyinPayCode?: string
 }
 
 export interface SetPasswordParams {

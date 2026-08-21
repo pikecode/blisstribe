@@ -12,6 +12,7 @@ import { RedisModule } from './common/redis.module'
 import { InvitationModule } from './invitation/invitation.module'
 import { BannerModule } from './banner/banner.module'
 import { MiniappModule } from './miniapp/miniapp.module'
+import { PartnerModule } from './partner/partner.module'
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { MiniappModule } from './miniapp/miniapp.module'
     InvitationModule,
     BannerModule,
     MiniappModule,
+    PartnerModule,
   ],
 })
 export class AppModule {}

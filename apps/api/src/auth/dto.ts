@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsNotEmpty } from 'class-validator'
+import { IsIn, IsString, IsOptional, IsNumber, IsBoolean, IsNotEmpty } from 'class-validator'
 
 export class WechatLoginDto {
   @IsString()
@@ -35,8 +35,8 @@ export class RegisterDto {
   @IsNotEmpty()
   nickname!: string
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   avatar!: string
 
   @IsNumber()
@@ -75,6 +75,7 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['C', 'B'])
   identity?: string
 
   @IsOptional()

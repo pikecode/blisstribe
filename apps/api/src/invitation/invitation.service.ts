@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../common/prisma.service'
 import { BusinessException } from '../common/interceptors/response.interceptor'
 import { ErrorCode } from '@blisstribe/shared'
@@ -11,6 +12,191 @@ export class InvitationService {
   // 生成6位随机邀请码
   generateInviteCode(): string {
     return randomBytes(3).toString('hex').toUpperCase().slice(0, 6)
+  }
+
+  async resolvePartnerInvitation(code: string): Promise<{
+    valid: boolean
+    code: string
+    scene?: string
+    partner?: {
+      id: number
+      partnerNo: string
+      displayName: string
+      type: string
+    }
+    reason?: string
+  }> {
+    const normalized = this.normalizeCode(code)
+    if (!normalized) return { valid: false, code: '', reason: '邀请码为空' }
+
+    const invitation = await this.prisma.invitationCode.findUnique({
+      where: { code: normalized },
+    })
+    if (!invitation || invitation.status !== 1 || invitation.scene !== 'register' || invitation.ownerType !== 'partner') {
+      await this.createInvalidInvitationRecord(normalized, 'register', '邀请码无效')
+      return { valid: false, code: normalized, reason: '邀请码无效' }
+    }
+    if (invitation.expiresAt && invitation.expiresAt < new Date()) {
+      await this.createInvalidInvitationRecord(normalized, invitation.scene, '邀请码已过期')
+      return { valid: false, code: normalized, reason: '邀请码已过期' }
+    }
+    if (invitation.maxUses !== null && invitation.usedCount >= invitation.maxUses) {
+      await this.createInvalidInvitationRecord(normalized, invitation.scene, '邀请码已达使用上限')
+      return { valid: false, code: normalized, reason: '邀请码已达使用上限' }
+    }
+
+    const partner = await this.prisma.partner.findFirst({
+      where: { id: invitation.ownerId, status: 1, deletedAt: null },
+      select: { id: true, partnerNo: true, displayName: true, type: true },
+    })
+    if (!partner) {
+      await this.createInvalidInvitationRecord(normalized, invitation.scene, '入驻主体不可用')
+      return { valid: false, code: normalized, reason: '入驻主体不可用' }
+    }
+
+    await this.prisma.invitationRecord.create({
+      data: {
+        codeId: invitation.id,
+        code: normalized,
+        scene: invitation.scene,
+        partnerId: partner.id,
+        status: 0,
+      },
+    })
+
+    return {
+      valid: true,
+      code: normalized,
+      scene: invitation.scene,
+      partner: {
+        id: Number(partner.id),
+        partnerNo: partner.partnerNo,
+        displayName: partner.displayName,
+        type: partner.type,
+      },
+    }
+  }
+
+  async bindPartnerInviteForUser(
+    tx: Prisma.TransactionClient,
+    userId: bigint,
+    code?: string
+  ): Promise<void> {
+    const normalized = this.normalizeCode(code)
+    if (!normalized) return
+
+    const invitation = await tx.invitationCode.findUnique({ where: { code: normalized } })
+    if (!invitation || invitation.status !== 1 || invitation.scene !== 'register' || invitation.ownerType !== 'partner') {
+      await tx.invitationRecord.create({
+        data: {
+          code: normalized,
+          scene: 'register',
+          userId,
+          status: 3,
+          failureReason: '邀请码无效',
+        },
+      })
+      return
+    }
+
+    const partner = await tx.partner.findFirst({
+      where: { id: invitation.ownerId, status: 1, deletedAt: null },
+      select: { id: true, partnerNo: true, displayName: true },
+    })
+    if (!partner) {
+      await tx.invitationRecord.create({
+        data: {
+          codeId: invitation.id,
+          code: normalized,
+          scene: invitation.scene,
+          userId,
+          status: 3,
+          failureReason: '入驻主体不可用',
+        },
+      })
+      return
+    }
+
+    await tx.relationEvent.create({
+      data: {
+        partnerId: partner.id,
+        customerUserId: userId,
+        eventType: 'invited',
+        sourceType: 'invitation',
+        sourceId: invitation.id.toString(),
+        operatorType: 'system',
+        snapshot: {
+          code: normalized,
+          partnerNo: partner.partnerNo,
+          partnerName: partner.displayName,
+        } as Prisma.InputJsonValue,
+      },
+    })
+
+    const existingActive = await tx.customerRelation.findFirst({
+      where: { customerUserId: userId, status: 1 },
+    })
+    if (existingActive) {
+      await tx.invitationRecord.create({
+        data: {
+          codeId: invitation.id,
+          code: normalized,
+          scene: invitation.scene,
+          partnerId: partner.id,
+          userId,
+          status: 4,
+          failureReason: '用户已有有效归属',
+        },
+      })
+      await tx.relationEvent.create({
+        data: {
+          partnerId: partner.id,
+          customerUserId: userId,
+          eventType: 'bind_skipped',
+          sourceType: 'invitation',
+          sourceId: invitation.id.toString(),
+          operatorType: 'system',
+          reason: '用户已有有效归属',
+          snapshot: { existingRelationId: existingActive.id.toString(), code: normalized },
+        },
+      })
+      return
+    }
+
+    const relation = await tx.customerRelation.create({
+      data: {
+        partnerId: partner.id,
+        customerUserId: userId,
+        sourceInvitationCode: normalized,
+        status: 1,
+      },
+    })
+    await tx.relationEvent.create({
+      data: {
+        relationId: relation.id,
+        partnerId: partner.id,
+        customerUserId: userId,
+        eventType: 'bound',
+        sourceType: 'invitation',
+        sourceId: invitation.id.toString(),
+        operatorType: 'system',
+        snapshot: { code: normalized },
+      },
+    })
+    await tx.invitationRecord.create({
+      data: {
+        codeId: invitation.id,
+        code: normalized,
+        scene: invitation.scene,
+        partnerId: partner.id,
+        userId,
+        status: 2,
+      },
+    })
+    await tx.invitationCode.update({
+      where: { id: invitation.id },
+      data: { usedCount: { increment: 1 } },
+    })
   }
 
   // 为用户生成唯一邀请码
@@ -30,6 +216,21 @@ export class InvitationService {
     })
 
     return code
+  }
+
+  private normalizeCode(code?: string): string {
+    return (code ?? '').trim().toUpperCase()
+  }
+
+  private async createInvalidInvitationRecord(code: string, scene: string, reason: string): Promise<void> {
+    await this.prisma.invitationRecord.create({
+      data: {
+        code,
+        scene,
+        status: 3,
+        failureReason: reason,
+      },
+    })
   }
 
   // 获取我的邀请码（没有则生成）

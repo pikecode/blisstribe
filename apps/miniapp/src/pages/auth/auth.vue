@@ -34,6 +34,7 @@ import { ref } from 'vue'
 import { useAuth } from '@/composables/useAuth'
 import { redirectToHome } from '@/utils/auth'
 import { useAuthStore } from '@/stores/modules/auth'
+import { storage } from '@/utils/storage'
 import UserAgreement from '@/components/business/UserAgreement.vue'
 
 const { wechatLogin } = useAuth()
@@ -72,8 +73,11 @@ const handleWechatLogin = async (): Promise<void> => {
     const result = await wechatLogin(wxUserInfo)
 
     if (result.isNewUser) {
+      authStore.setRegisterWxUserInfo(wxUserInfo)
       // 新用户：跳转完善信息页
-      uni.redirectTo({ url: '/pages/register/register' })
+      const inviteCode = storage.get<string>('pendingInviteCode')
+      const query = inviteCode ? `?inviteCode=${encodeURIComponent(inviteCode)}` : ''
+      uni.redirectTo({ url: `/pages/register/register${query}` })
     } else {
       // 老用户：wechatLogin 内部已跳转首页，兜底再跳一次
       redirectToHome()

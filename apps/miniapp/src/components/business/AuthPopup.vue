@@ -27,12 +27,15 @@
 import { ref } from 'vue'
 import { useAuth } from '@/composables/useAuth'
 import { redirectToHome } from '@/utils/auth'
+import { storage } from '@/utils/storage'
+import { useAuthStore, type RegisterWxUserInfo } from '@/stores/modules/auth'
 import UserAgreement from './UserAgreement.vue'
 
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const { wechatLogin } = useAuth()
+const authStore = useAuthStore()
 const loading = ref(false)
 const agreed = ref(false)
 
@@ -48,10 +51,26 @@ const handleLogin = async (): Promise<void> => {
   if (loading.value) return
   loading.value = true
   try {
-    const result = await wechatLogin()
+    let wxUserInfo: RegisterWxUserInfo | undefined
+    try {
+      const res = await uni.getUserProfile({ desc: '用于完善用户资料' })
+      const info = res.userInfo as unknown as RegisterWxUserInfo
+      wxUserInfo = {
+        nickName: info.nickName,
+        avatarUrl: info.avatarUrl,
+        gender: info.gender ?? 0,
+      }
+    } catch {
+      // 用户拒绝头像昵称授权时，仍允许继续微信登录并手动注册资料。
+    }
+
+    const result = await wechatLogin(wxUserInfo)
     emit('close')   // 无论老用户还是新用户，授权成功后先关闭弹窗
     if (result.isNewUser) {
-      uni.navigateTo({ url: '/pages/register/register' })
+      authStore.setRegisterWxUserInfo(wxUserInfo)
+      const inviteCode = storage.get<string>('pendingInviteCode')
+      const query = inviteCode ? `?inviteCode=${encodeURIComponent(inviteCode)}` : ''
+      uni.navigateTo({ url: `/pages/register/register${query}` })
     }
   } catch (err) {
     uni.showToast({ title: err instanceof Error ? err.message : '授权失败', icon: 'none' })

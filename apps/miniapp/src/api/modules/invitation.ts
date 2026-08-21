@@ -1,4 +1,5 @@
 import { request } from '@/api/request'
+import type { PartnerInvitationResolveResult } from '@blisstribe/shared'
 
 export interface MyInvitationResult {
   inviteCode: string
@@ -12,6 +13,10 @@ export interface MyInvitationResult {
 }
 
 export const invitationApi = {
+  resolve(code: string): Promise<PartnerInvitationResolveResult> {
+    return request({ url: '/invitation/resolve', method: 'POST', data: { code } })
+  },
+
   getMyCode(): Promise<{ inviteCode: string }> {
     return request({ url: '/invitation/my-code', method: 'GET' })
   },

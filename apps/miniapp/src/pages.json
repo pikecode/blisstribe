@@ -56,6 +56,30 @@
       "style": {
         "navigationBarTitleText": "邀请好友"
       }
+    },
+    {
+      "path": "pages/partner/apply",
+      "style": {
+        "navigationBarTitleText": "B 端入驻"
+      }
+    },
+    {
+      "path": "pages/partner/dashboard",
+      "style": {
+        "navigationBarTitleText": "B 工作台"
+      }
+    },
+    {
+      "path": "pages/partner/invite",
+      "style": {
+        "navigationBarTitleText": "邀请客户"
+      }
+    },
+    {
+      "path": "pages/partner/customers",
+      "style": {
+        "navigationBarTitleText": "我的客户"
+      }
     }
   ],
   "globalStyle": {
