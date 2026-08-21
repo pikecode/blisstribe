@@ -34,3 +34,10 @@ apps/admin/.env
 apps/api/.omc/
 .gstack/
 .playwright-mcp/
+
+# Local verification screenshots
+admin-ui-refresh-*.png
+
+# Admin dev transpilation artifacts
+apps/admin/src/**/*.js
+apps/admin/src/**/*.js.map
