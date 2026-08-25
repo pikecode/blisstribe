@@ -1,0 +1,79 @@
+name: blisstribe-prod-local
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: blisstribe-prod-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: blisstribe
+      POSTGRES_PASSWORD: blisstribe
+      POSTGRES_DB: blisstribe
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - prod_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blisstribe"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: blisstribe-prod-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:16379:6379"
+    volumes:
+      - prod_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: ${API_IMAGE:-crpi-yn27wibgl46ugj8h.cn-hangzhou.personal.cr.aliyuncs.com/pikecode/blisstribe-api:202608241618}
+    container_name: blisstribe-prod-api
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql://blisstribe:blisstribe@postgres:5432/blisstribe?schema=public
+      REDIS_URL: redis://redis:6379
+      PORT: 4000
+      UPLOAD_DIR: /app/uploads
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:14000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:18080}
+    ports:
+      - "14000:4000"
+    volumes:
+      - prod_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+      args:
+        VITE_API_BASE_URL: /api/v1
+    image: ${ADMIN_IMAGE:-crpi-yn27wibgl46ugj8h.cn-hangzhou.personal.cr.aliyuncs.com/pikecode/blisstribe-admin:202608241618}
+    container_name: blisstribe-prod-admin
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+volumes:
+  prod_pgdata:
+  prod_redisdata:
+  prod_uploads:

@@ -128,7 +128,7 @@ import request from '@/utils/request'
 
 const authStore = useAuthStore()
 
-const uploadAction = `${import.meta.env.VITE_API_BASE_URL}/upload/banner`
+const uploadAction = `${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/upload/banner`
 const uploadHeaders = computed(() => ({ Authorization: authStore.token }))
 
 const gradientPresets = [

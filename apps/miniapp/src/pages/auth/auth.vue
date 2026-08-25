@@ -32,7 +32,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAuth } from '@/composables/useAuth'
-import { redirectToHome } from '@/utils/auth'
+import { redirectAfterLogin } from '@/utils/auth'
 import { useAuthStore } from '@/stores/modules/auth'
 import { storage } from '@/utils/storage'
 import UserAgreement from '@/components/business/UserAgreement.vue'
@@ -79,8 +79,7 @@ const handleWechatLogin = async (): Promise<void> => {
       const query = inviteCode ? `?inviteCode=${encodeURIComponent(inviteCode)}` : ''
       uni.redirectTo({ url: `/pages/register/register${query}` })
     } else {
-      // 老用户：wechatLogin 内部已跳转首页，兜底再跳一次
-      redirectToHome()
+      // 老用户：wechatLogin 内部已按来源页完成跳转
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : '授权失败'
@@ -92,7 +91,7 @@ const handleWechatLogin = async (): Promise<void> => {
 
 // 已登录用户直接进首页
 if (authStore.isLogin) {
-  redirectToHome()
+  redirectAfterLogin()
 }
 </script>
 

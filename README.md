@@ -79,6 +79,9 @@ pnpm dev:miniapp      # 小程序（需微信开发者工具导入 dist/dev/mp-w
 - [数据库设计](docs/DATABASE.md)
 - [前端架构](docs/FRONTEND.md)
 - [安全设计](docs/SECURITY.md)
+- [Docker 部署标准](docs/DEPLOYMENT.md)
+- [上线前检查清单](docs/GO_LIVE_CHECKLIST.md)
+- [产品精准推荐阶段路线图](docs/plans/2026-08-25-product-recommendation-roadmap.md)
 
 ## 技术栈
 

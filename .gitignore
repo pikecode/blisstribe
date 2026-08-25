@@ -26,6 +26,7 @@ packages/*/dist
 packages/*/node_modules
 apps/miniapp/unpackage
 apps/api/.env
+.env.production
 apps/api/uploads
 apps/admin/.env
 *.tsbuildinfo

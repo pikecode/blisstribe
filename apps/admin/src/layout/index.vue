@@ -99,14 +99,18 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
   ArrowDown as ArrowDownIcon,
+  CollectionTag,
   DataLine,
   Document,
+  EditPen,
+  Goods,
   Lock,
   Menu as MenuIcon,
   OfficeBuilding,
   Picture,
   Share,
   SwitchButton,
+  Tickets,
   User,
 } from '@element-plus/icons-vue'
 
@@ -129,6 +133,11 @@ const menuItems = [
   { path: '/invitations', title: '邀请管理', icon: Share, desc: '查看邀请效果、注册记录与奖励链路' },
   { path: '/partners', title: 'B 入驻审核', icon: OfficeBuilding, desc: '审核经营主体、客户归属与邀请记录' },
   { path: '/banners', title: 'Banner 管理', icon: Picture, desc: '维护小程序首页展示资源' },
+  { path: '/tags', title: '标签管理', icon: CollectionTag, desc: '维护评估、产品和推荐规则共用标签' },
+  { path: '/products', title: '产品管理', icon: Goods, desc: '维护产品模块、标签、推荐优先级与上下架' },
+  { path: '/assessment-templates', title: '评估管理', icon: EditPen, desc: '维护模块评估题目、选项和标签映射' },
+  { path: '/recommendation-rules', title: '推荐规则', icon: Goods, desc: '配置评估标签命中后的产品加权和推荐理由' },
+  { path: '/product-leads', title: '产品线索', icon: Tickets, desc: '查看用户需求并记录线索跟进状态' },
   { path: '/admins', title: '管理员与权限', icon: Lock, desc: '管理后台账号、角色与权限' },
   { path: '/agreements', title: '协议管理', icon: Document, desc: '维护用户协议和隐私政策版本' },
 ]

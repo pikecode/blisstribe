@@ -12,44 +12,46 @@ datasource db {
 
 // 用户表
 model User {
-  id              BigInt   @id @default(autoincrement())
+  id              BigInt    @id @default(autoincrement())
   phoneCiphertext Bytes
-  phoneHash       String   @unique
+  phoneHash       String    @unique
   phoneMasked     String
   nickname        String
-  avatar          String   @default("")
-  gender          Int      @default(0) // 0保密 1男 2女
+  avatar          String    @default("")
+  gender          Int       @default(0) // 0保密 1男 2女
   birthday        DateTime?
   passwordHash    String?
-  inviteCode      String?  @unique // 个人邀请码
-  invitedBy       BigInt?  // 邀请人ID
-  realName        String?  // 真实姓名
-  wechatId        String?  // 微信号
-  email           String?  // 邮箱
-  age             Int?     // 年龄
-  favoriteColor   String?  // 喜欢的颜色
-  occupation      String?  // 职业
+  inviteCode      String?   @unique // 个人邀请码
+  invitedBy       BigInt? // 邀请人ID
+  realName        String? // 真实姓名
+  wechatId        String? // 微信号
+  email           String? // 邮箱
+  age             Int? // 年龄
+  favoriteColor   String? // 喜欢的颜色
+  occupation      String? // 职业
   tags            String[] // 用户自我标签
-  identity        String?  // 注册身份: C/B/S
-  level           String   @default("normal") // 注册级别
-  douyinPayCode   String?  // 收款码(抖音)
-  status          Int      @default(1) // 0禁用 1正常 2待完善
+  identity        String? // 注册身份: C/B/S
+  level           String    @default("normal") // 注册级别
+  douyinPayCode   String? // 收款码(抖音)
+  status          Int       @default(1) // 0禁用 1正常 2待完善
   lastLoginAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  wechatAccount WechatAccount?
-  sessions      UserSession[]
-  agreements    UserAgreement[]
+  wechatAccount       WechatAccount?
+  sessions            UserSession[]
+  agreements          UserAgreement[]
   sentInvitations     MemberInvitation[] @relation("Inviter")
   receivedInvitations MemberInvitation[] @relation("Invitee")
-  inviterUser   User?    @relation("UserInvitedBy", fields: [invitedBy], references: [id])
-  invitees      User[]   @relation("UserInvitedBy")
-  partnerMembers PartnerMember[]
-  invitationRecords InvitationRecord[]
-  customerRelations CustomerRelation[]
-  relationEvents    RelationEvent[]
+  inviterUser         User?              @relation("UserInvitedBy", fields: [invitedBy], references: [id])
+  invitees            User[]             @relation("UserInvitedBy")
+  partnerMembers      PartnerMember[]
+  invitationRecords   InvitationRecord[]
+  customerRelations   CustomerRelation[]
+  relationEvents      RelationEvent[]
+  productLeads        ProductLead[]
+  assessments         UserAssessment[]
 
   @@index([status])
   @@index([createdAt])
@@ -57,21 +59,42 @@ model User {
   @@index([invitedBy])
 }
 
+// 用户需求评估记录
+model UserAssessment {
+  id             BigInt   @id @default(autoincrement())
+  userId         BigInt
+  moduleCode     String
+  assessmentType String
+  tags           String[]
+  tagIds         BigInt[]
+  tagWeights     Json     @default("{}")
+  summary        String   @default("")
+  answers        Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleCode])
+  @@index([userId, updatedAt])
+  @@index([moduleCode, assessmentType])
+}
+
 // 微信账号表
 model WechatAccount {
-  id            BigInt   @id @default(autoincrement())
-  userId        BigInt   @unique
-  wxOpenIdHash  String   @unique
-  wxUnionId     String?
-  wxNickname    String?
-  wxAvatar      String?
-  wxGender      Int      @default(0)
-  wxCountry     String?
-  wxProvince    String?
-  wxCity        String?
-  status        Int      @default(1) // 0解绑 1绑定
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           BigInt   @id @default(autoincrement())
+  userId       BigInt   @unique
+  wxOpenIdHash String   @unique
+  wxUnionId    String?
+  wxNickname   String?
+  wxAvatar     String?
+  wxGender     Int      @default(0)
+  wxCountry    String?
+  wxProvince   String?
+  wxCity       String?
+  status       Int      @default(1) // 0解绑 1绑定
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -80,18 +103,18 @@ model WechatAccount {
 
 // 用户会话表
 model UserSession {
-  id                BigInt   @id @default(autoincrement())
-  userId            BigInt
-  jti               String   @unique
-  refreshTokenHash  String
-  expiresAt         DateTime
-  refreshExpiresAt  DateTime
-  ipAddress         String?
-  userAgent         String?
-  platform          String?
-  status            Int      @default(1) // 0失效 1有效
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               BigInt   @id @default(autoincrement())
+  userId           BigInt
+  jti              String   @unique
+  refreshTokenHash String
+  expiresAt        DateTime
+  refreshExpiresAt DateTime
+  ipAddress        String?
+  userAgent        String?
+  platform         String?
+  status           Int      @default(1) // 0失效 1有效
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -151,13 +174,13 @@ model Agreement {
 
 // 会员邀请记录表
 model MemberInvitation {
-  id          BigInt   @id @default(autoincrement())
-  inviterId   BigInt   // 邀请人
-  inviteeId   BigInt?  // 被邀请人（注册后填充）
-  inviteCode  String   // 使用的邀请码
-  status      Int      @default(0) // 0待注册 1已注册 2已入会
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         BigInt   @id @default(autoincrement())
+  inviterId  BigInt // 邀请人
+  inviteeId  BigInt? // 被邀请人（注册后填充）
+  inviteCode String // 使用的邀请码
+  status     Int      @default(0) // 0待注册 1已注册 2已入会
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   inviter User  @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
   invitee User? @relation("Invitee", fields: [inviteeId], references: [id], onDelete: SetNull)
@@ -170,29 +193,30 @@ model MemberInvitation {
 
 // B 端经营主体
 model Partner {
-  id                     BigInt   @id @default(autoincrement())
-  partnerNo              String   @unique
+  id                     BigInt    @id @default(autoincrement())
+  partnerNo              String    @unique
   displayName            String
   type                   String
-  level                  String   @default("normal")
-  status                 Int      @default(0) // 0待审 1正常 2拒绝 3冻结 4停用
-  auditStatus            Int      @default(0) // 0待审 1通过 2拒绝
+  level                  String    @default("normal")
+  status                 Int       @default(0) // 0待审 1正常 2拒绝 3冻结 4停用
+  auditStatus            Int       @default(0) // 0待审 1通过 2拒绝
   auditReason            String?
   contactName            String?
   contactPhoneCiphertext Bytes?
   contactPhoneHash       String?
   contactPhoneMasked     String?
   regionCode             String?
-  profile                Json     @default("{}")
+  profile                Json      @default("{}")
   approvedAt             DateTime?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
   deletedAt              DateTime?
 
-  members PartnerMember[]
+  members           PartnerMember[]
   invitationRecords InvitationRecord[]
   customerRelations CustomerRelation[]
   relationEvents    RelationEvent[]
+  productLeads      ProductLead[]
 
   @@index([status, auditStatus])
   @@index([type])
@@ -220,16 +244,16 @@ model PartnerMember {
 
 // 审计日志
 model AuditLog {
-  id           BigInt   @id @default(autoincrement())
-  actorType    String // admin/user/system
-  actorId      BigInt?
-  action       String
-  targetType   String
-  targetId     BigInt?
-  reason       String?
-  metadata     Json     @default("{}")
-  ipAddress    String?
-  createdAt    DateTime @default(now())
+  id         BigInt   @id @default(autoincrement())
+  actorType  String // admin/user/system
+  actorId    BigInt?
+  action     String
+  targetType String
+  targetId   BigInt?
+  reason     String?
+  metadata   Json     @default("{}")
+  ipAddress  String?
+  createdAt  DateTime @default(now())
 
   @@index([actorType, actorId])
   @@index([targetType, targetId])
@@ -239,18 +263,18 @@ model AuditLog {
 
 // 通用邀请码
 model InvitationCode {
-  id              BigInt   @id @default(autoincrement())
+  id              BigInt    @id @default(autoincrement())
   ownerType       String // user/partner/campaign
   ownerId         BigInt
-  code            String   @unique
+  code            String    @unique
   scene           String // register/partner_apply/campaign
   maxUses         Int?
-  usedCount       Int      @default(0)
+  usedCount       Int       @default(0)
   expiresAt       DateTime?
-  status          Int      @default(1) // 0停用 1启用
+  status          Int       @default(1) // 0停用 1启用
   createdByUserId BigInt?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   records InvitationRecord[]
 
@@ -261,16 +285,16 @@ model InvitationCode {
 
 // 邀请记录
 model InvitationRecord {
-  id           BigInt   @id @default(autoincrement())
-  codeId       BigInt?
-  code         String
-  scene        String
-  partnerId    BigInt?
-  userId       BigInt?
-  status       Int      @default(0) // 0已解析 1已注册 2已绑定 3无效 4跳过绑定
+  id            BigInt   @id @default(autoincrement())
+  codeId        BigInt?
+  code          String
+  scene         String
+  partnerId     BigInt?
+  userId        BigInt?
+  status        Int      @default(0) // 0已解析 1已注册 2已绑定 3无效 4跳过绑定
   failureReason String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   invitationCode InvitationCode? @relation(fields: [codeId], references: [id], onDelete: SetNull)
   partner        Partner?        @relation(fields: [partnerId], references: [id], onDelete: SetNull)
@@ -284,18 +308,18 @@ model InvitationRecord {
 
 // B-C 当前归属关系
 model CustomerRelation {
-  id                   BigInt   @id @default(autoincrement())
+  id                   BigInt    @id @default(autoincrement())
   partnerId            BigInt
   customerUserId       BigInt
   sourceInvitationCode String?
-  status               Int      @default(1) // 0失效 1有效 2争议中
-  boundAt              DateTime @default(now())
+  status               Int       @default(1) // 0失效 1有效 2争议中
+  boundAt              DateTime  @default(now())
   unboundAt            DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  partner      Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  customerUser User    @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  partner      Partner         @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  customerUser User            @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
   events       RelationEvent[]
 
   @@unique([partnerId, customerUserId])
@@ -345,17 +369,228 @@ model Banner {
   @@index([status, sort])
 }
 
+// 产品模块
+model ProductModule {
+  id                BigInt    @id @default(autoincrement())
+  code              String    @unique
+  name              String
+  description       String    @default("")
+  icon              String    @default("")
+  coverUrl          String    @default("")
+  showOnHome        Boolean   @default(false)
+  assessmentEnabled Boolean   @default(false)
+  assessmentType    String    @default("")
+  sortOrder         Int       @default(0)
+  status            Int       @default(1) // 0停用 1启用
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  products            Product[]
+  assessmentTemplates AssessmentTemplate[]
+  recommendationRules AssessmentRecommendationRule[]
+  tags                TagDictionary[]
+
+  @@index([status, sortOrder])
+  @@index([status, showOnHome, sortOrder])
+}
+
+// 标签字典
+model TagDictionary {
+  id          BigInt    @id @default(autoincrement())
+  code        String    @unique
+  name        String
+  group       String    @default("")
+  moduleId    BigInt?
+  description String    @default("")
+  status      Int       @default(1) // 0停用 1启用
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  module ProductModule? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+
+  @@index([moduleId, status, sortOrder])
+  @@index([group, status, sortOrder])
+  @@index([status, sortOrder])
+}
+
+// 模块评估模板
+model AssessmentTemplate {
+  id        BigInt    @id @default(autoincrement())
+  moduleId  BigInt
+  title     String
+  subtitle  String    @default("")
+  version   Int       @default(1)
+  status    Int       @default(1) // 0停用 1启用
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  module    ProductModule        @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  questions AssessmentQuestion[]
+
+  @@index([moduleId, status, sortOrder])
+  @@index([status, sortOrder])
+}
+
+// 评估题目
+model AssessmentQuestion {
+  id         BigInt   @id @default(autoincrement())
+  templateId BigInt
+  key        String
+  title      String
+  type       String   @default("single") // single 当前只支持单选，后续可扩展 multi/text
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  template AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  options  AssessmentOption[]
+
+  @@unique([templateId, key])
+  @@index([templateId, sortOrder])
+}
+
+// 评估选项
+model AssessmentOption {
+  id         BigInt   @id @default(autoincrement())
+  questionId BigInt
+  label      String
+  value      String
+  tags       String[]
+  tagIds     BigInt[]
+  tagWeights Json     @default("{}")
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  question AssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, value])
+  @@index([questionId, sortOrder])
+}
+
+// 评估推荐规则
+model AssessmentRecommendationRule {
+  id              BigInt    @id @default(autoincrement())
+  moduleId        BigInt
+  productId       BigInt
+  name            String
+  conditionTags   String[]
+  conditionTagIds BigInt[]
+  scoreBoost      Int       @default(0)
+  reason          String    @default("")
+  status          Int       @default(1) // 0停用 1启用
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  module  ProductModule @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  product Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([moduleId, status, sortOrder])
+  @@index([productId, status])
+}
+
+// 产品或服务
+model Product {
+  id              BigInt    @id @default(autoincrement())
+  moduleId        BigInt
+  title           String
+  subtitle        String    @default("")
+  coverUrl        String    @default("")
+  priceText       String    @default("")
+  summary         String    @default("")
+  detail          String    @default("")
+  targetUserText  String    @default("")
+  painPointText   String    @default("")
+  serviceProcess  String    @default("")
+  tags            String[]
+  tagIds          BigInt[]
+  primaryTagIds   BigInt[]
+  secondaryTagIds BigInt[]
+  excludeTagIds   BigInt[]
+  priority        Int       @default(0)
+  sortOrder       Int       @default(0)
+  status          Int       @default(0) // 0草稿 1上架 2下架
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  module              ProductModule                  @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  leads               ProductLead[]
+  recommendationRules AssessmentRecommendationRule[]
+
+  @@index([moduleId, status])
+  @@index([status, priority, sortOrder])
+  @@index([publishedAt])
+  @@index([deletedAt])
+}
+
+// 产品咨询或报名线索
+model ProductLead {
+  id               BigInt    @id @default(autoincrement())
+  productId        BigInt
+  userId           BigInt
+  partnerId        BigInt?
+  sourceInviteCode String?
+  sourceScene      String    @default("miniapp")
+  needTags         String[]
+  needTagIds       BigInt[]
+  message          String    @default("")
+  status           String    @default("new") // new/contacted/qualified/converted/invalid
+  followUpNote     String    @default("")
+  nextFollowAt     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  product   Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner   Partner?              @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  followUps ProductLeadFollowUp[]
+
+  @@index([productId, createdAt])
+  @@index([userId, createdAt])
+  @@index([partnerId, createdAt])
+  @@index([status, createdAt])
+  @@index([status, nextFollowAt])
+}
+
+// 产品线索跟进记录
+model ProductLeadFollowUp {
+  id           BigInt    @id @default(autoincrement())
+  leadId       BigInt
+  operatorId   BigInt?
+  operatorType String    @default("admin") // admin/partner/system
+  fromStatus   String
+  toStatus     String
+  note         String    @default("")
+  nextFollowAt DateTime?
+  createdAt    DateTime  @default(now())
+
+  lead ProductLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@index([operatorType, operatorId])
+  @@index([nextFollowAt])
+}
+
 // 管理员表（后台独立账号体系）
 model Admin {
-  id           BigInt   @id @default(autoincrement())
-  username     String   @unique
+  id           BigInt    @id @default(autoincrement())
+  username     String    @unique
   passwordHash String
   nickname     String
-  avatar       String   @default("")
-  status       Int      @default(1) // 0禁用 1正常
+  avatar       String    @default("")
+  status       Int       @default(1) // 0禁用 1正常
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   adminRoles AdminRole[]
 }
@@ -375,8 +610,8 @@ model Role {
 
 // 管理员-角色关联
 model AdminRole {
-  adminId BigInt
-  roleId  BigInt
+  adminId    BigInt
+  roleId     BigInt
   assignedAt DateTime @default(now())
 
   admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)

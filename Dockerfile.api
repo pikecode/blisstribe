@@ -1,0 +1,51 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
+
+RUN apk add --no-cache openssl
+RUN corepack enable
+RUN corepack prepare pnpm@10.22.0 --activate
+RUN pnpm config set registry ${NPM_CONFIG_REGISTRY}
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/admin/package.json apps/admin/package.json
+COPY apps/miniapp/package.json apps/miniapp/package.json
+COPY packages/shared/package.json packages/shared/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+RUN pnpm --filter @blisstribe/shared build
+RUN pnpm --filter @blisstribe/api exec prisma generate
+RUN pnpm --filter @blisstribe/api build
+
+FROM node:20-alpine AS runtime
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
+
+RUN apk add --no-cache openssl
+RUN corepack enable
+RUN corepack prepare pnpm@10.22.0 --activate
+RUN pnpm config set registry ${NPM_CONFIG_REGISTRY}
+
+COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+
+WORKDIR /app/apps/api
+
+EXPOSE 4000
+
+CMD ["node", "dist/main.js"]

@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.DS_Store
+*.log
+.env
+apps/api/.env
+apps/api/uploads
+coverage
+**/.turbo
+**/.cache

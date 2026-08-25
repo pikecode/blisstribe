@@ -1,11 +1,13 @@
 import { authApi, type WechatLoginResult } from '@/api/modules/auth'
 import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
-import { redirectToHome } from '@/utils/auth'
+import { useAssessmentSync } from '@/composables/useAssessmentSync'
+import { redirectAfterLogin, redirectToHome } from '@/utils/auth'
 
 export function useAuth() {
   const authStore = useAuthStore()
   const userStore = useUserStore()
+  const { syncLocalAssessments } = useAssessmentSync()
 
   /**
    * 微信授权登录
@@ -21,7 +23,8 @@ export function useAuth() {
       // 老用户：直接登录
       authStore.setToken(result.token, result.refreshToken!)
       userStore.setUserInfo(result.userInfo)
-      redirectToHome()
+      await syncLocalAssessments(true)
+      redirectAfterLogin()
     } else if (result.isNewUser && result.tempToken) {
       authStore.setTempToken(result.tempToken)
       // 导航由调用方（AuthPopup / auth.vue）负责，composable 只存 tempToken

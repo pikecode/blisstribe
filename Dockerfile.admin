@@ -1,0 +1,29 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
+ARG VITE_API_BASE_URL=/api/v1
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
+RUN corepack enable
+RUN corepack prepare pnpm@10.22.0 --activate
+RUN pnpm config set registry ${NPM_CONFIG_REGISTRY}
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/admin/package.json apps/admin/package.json
+COPY packages/shared/package.json packages/shared/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+RUN pnpm --filter @blisstribe/shared build
+RUN pnpm --filter @blisstribe/admin build
+
+FROM nginx:1.27-alpine AS runtime
+
+COPY deploy/nginx/admin.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/apps/admin/dist /usr/share/nginx/html
+
+EXPOSE 80

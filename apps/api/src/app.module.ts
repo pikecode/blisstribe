@@ -13,6 +13,7 @@ import { InvitationModule } from './invitation/invitation.module'
 import { BannerModule } from './banner/banner.module'
 import { MiniappModule } from './miniapp/miniapp.module'
 import { PartnerModule } from './partner/partner.module'
+import { ProductModule } from './product/product.module'
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PartnerModule } from './partner/partner.module'
     BannerModule,
     MiniappModule,
     PartnerModule,
+    ProductModule,
   ],
 })
 export class AppModule {}

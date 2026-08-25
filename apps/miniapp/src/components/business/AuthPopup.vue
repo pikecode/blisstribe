@@ -26,7 +26,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAuth } from '@/composables/useAuth'
-import { redirectToHome } from '@/utils/auth'
 import { storage } from '@/utils/storage'
 import { useAuthStore, type RegisterWxUserInfo } from '@/stores/modules/auth'
 import UserAgreement from './UserAgreement.vue'

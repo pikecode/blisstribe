@@ -188,11 +188,12 @@ import { ref, computed, reactive } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
+import { useAssessmentSync } from '@/composables/useAssessmentSync'
 import { useAuth } from '@/composables/useAuth'
 import { authApi } from '@/api/modules/auth'
 import { userApi } from '@/api/modules/user'
 import { invitationApi } from '@/api/modules/invitation'
-import { redirectToHome } from '@/utils/auth'
+import { redirectAfterLogin } from '@/utils/auth'
 import { storage } from '@/utils/storage'
 import UserAgreement from '@/components/business/UserAgreement.vue'
 import type { Gender, PartnerInvitationResolveResult } from '@blisstribe/shared'
@@ -201,6 +202,7 @@ type UniValueEvent = { detail?: { value?: string | number } }
 
 const authStore = useAuthStore()
 const userStore = useUserStore()
+const { syncLocalAssessments } = useAssessmentSync()
 const { getPhoneNumber } = useAuth()
 
 const today = new Date().toISOString().slice(0, 10)
@@ -446,6 +448,7 @@ const handleSubmit = async (): Promise<void> => {
     authStore.setRegisterWxUserInfo()
     userStore.setUserInfo(result.userInfo)
     storage.remove('pendingInviteCode')
+    await syncLocalAssessments(true)
 
     if (form.identity === 'B') {
       uni.showToast({ title: '注册成功，请提交入驻资料', icon: 'success' })
@@ -453,7 +456,7 @@ const handleSubmit = async (): Promise<void> => {
     } else {
       const title = inviteResolveResult.value?.valid ? '入会成功，已绑定推荐方' : '入会成功'
       uni.showToast({ title, icon: 'success' })
-      setTimeout(redirectToHome, 1000)
+      setTimeout(redirectAfterLogin, 1000)
     }
   } catch (err) {
     uni.showToast({ title: err instanceof Error ? err.message : '入会失败', icon: 'none' })

@@ -6,7 +6,9 @@
   "scripts": {
     "dev:miniapp": "pnpm --filter @blisstribe/miniapp dev:mp-weixin",
     "dev:mp": "pnpm dev:miniapp",
-    "build:miniapp": "pnpm --filter @blisstribe/miniapp build:mp-weixin",
+    "build:miniapp": "pnpm --filter @blisstribe/miniapp build:mp-weixin && pnpm miniapp:strip-sourcemap",
+    "miniapp:strip-sourcemap": "node scripts/strip-miniapp-sourcemap.mjs",
+    "miniapp:watch-strip-sourcemap": "node scripts/strip-miniapp-sourcemap.mjs --watch",
     "dev:api": "pnpm --filter @blisstribe/api dev",
     "build:api": "pnpm --filter @blisstribe/api build",
     "dev:admin": "pnpm --filter @blisstribe/admin dev",
@@ -16,6 +18,7 @@
     "type-check": "pnpm -r type-check",
     "db:generate": "pnpm --filter @blisstribe/api prisma:generate",
     "db:migrate": "pnpm --filter @blisstribe/api prisma:migrate",
+    "deploy:acr": "./scripts/deploy-acr.sh",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },

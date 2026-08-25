@@ -52,9 +52,33 @@
       }
     },
     {
+      "path": "pages/profile/product-leads",
+      "style": {
+        "navigationBarTitleText": "我的咨询"
+      }
+    },
+    {
       "path": "pages/invite/invite",
       "style": {
         "navigationBarTitleText": "邀请好友"
+      }
+    },
+    {
+      "path": "pages/products/index",
+      "style": {
+        "navigationBarTitleText": "专属推荐"
+      }
+    },
+    {
+      "path": "pages/products/assessment",
+      "style": {
+        "navigationBarTitleText": "健康需求评估"
+      }
+    },
+    {
+      "path": "pages/products/detail",
+      "style": {
+        "navigationBarTitleText": "产品详情"
       }
     },
     {

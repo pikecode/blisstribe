@@ -30,6 +30,10 @@
         <text>邀请好友</text>
         <text>›</text>
       </view>
+      <view class="profile__link" @tap="goProductLeads">
+        <text>我的咨询</text>
+        <text>›</text>
+      </view>
       <view class="profile__link" @tap="goPartner">
         <text>B 端工作台</text>
         <text>›</text>
@@ -67,6 +71,10 @@ const goEdit = (): void => {
 
 const goInvite = (): void => {
   uni.navigateTo({ url: '/pages/invite/invite' })
+}
+
+const goProductLeads = (): void => {
+  uni.navigateTo({ url: '/pages/profile/product-leads' })
 }
 
 const goPartner = (): void => {

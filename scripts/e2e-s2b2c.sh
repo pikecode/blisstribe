@@ -7,6 +7,13 @@ cd "$(dirname "$0")/.."
 API_BASE="${API_BASE:-http://localhost:4000/api/v1}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin123}"
+if [ -z "${JWT_ACCESS_SECRET:-}" ]; then
+  if [ -f .env.production ]; then
+    JWT_ACCESS_SECRET="$(grep '^JWT_ACCESS_SECRET=' .env.production | head -n 1 | cut -d= -f2-)"
+  elif [ -f apps/api/.env ]; then
+    JWT_ACCESS_SECRET="$(grep '^JWT_ACCESS_SECRET=' apps/api/.env | head -n 1 | cut -d= -f2-)"
+  fi
+fi
 JWT_SECRET="${JWT_ACCESS_SECRET:-blisstribe_access_secret_2026_32chars}"
 
 GREEN='\033[0;32m'
@@ -19,7 +26,24 @@ warn() { echo -e "${YELLOW}[warn]${NC} $1"; }
 err() { echo -e "${RED}[err]${NC} $1"; }
 
 psql_db() {
-  docker exec blisstribe-db psql -U blisstribe -d blisstribe -tAc "$1"
+  if [ -z "${PSQL_DATABASE_URL:-}" ]; then
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -qx 'blisstribe-db'; then
+      docker exec blisstribe-db psql -U blisstribe -d blisstribe -tAc "$1"
+      return
+    elif [ -n "${DATABASE_URL:-}" ]; then
+      PSQL_DATABASE_URL="$DATABASE_URL"
+    elif [ -f apps/api/.env ]; then
+      PSQL_DATABASE_URL="$(grep '^DATABASE_URL=' apps/api/.env | head -n 1 | cut -d= -f2-)"
+    fi
+  fi
+  if [ -z "${PSQL_DATABASE_URL:-}" ]; then
+    err "未找到 DATABASE_URL，无法连接本地 PostgreSQL"
+    exit 1
+  fi
+
+  local clean_url="${PSQL_DATABASE_URL%%\?*}"
+  clean_url="${clean_url/127.0.0.1/localhost}"
+  psql "$clean_url" -tAc "$1"
 }
 
 json_get() {
@@ -42,10 +66,15 @@ ADMIN_TOKEN=$(curl -fsS -X POST "$API_BASE/admin/login" \
   -H 'Content-Type: application/json' \
   -d "{\"username\":\"$ADMIN_USERNAME\",\"password\":\"$ADMIN_PASSWORD\"}" | json_get data.token)
 
+TS="$(date +%s)"
+RAND="$RANDOM"
 PARTNER_ID="${1:-$(psql_db 'select id from "Partner" order by id limit 1;')}"
 if [ -z "$PARTNER_ID" ]; then
-  err "没有可验收的 B 主体，请先在小程序提交入驻申请"
-  exit 1
+  log "没有可验收的 B 主体，自动创建验收测试主体"
+  OWNER_PHONE="137$(printf '%08d' "$((TS % 100000000))")"
+  OWNER_INVITE_CODE="BO${TS: -4}${RAND:0:2}"
+  PARTNER_NO="P-E2E-${TS}-${RAND}"
+  PARTNER_ID=$(psql_db "with owner_user as (insert into \"User\" (\"phoneCiphertext\", \"phoneHash\", \"phoneMasked\", nickname, avatar, gender, status, tags, identity, \"inviteCode\", \"updatedAt\") values (convert_to('$OWNER_PHONE','UTF8'), 'e2e_owner_$OWNER_PHONE', substring('$OWNER_PHONE' from 1 for 3) || '****' || substring('$OWNER_PHONE' from 8 for 4), '验收B负责人', '$API_BASE/uploads/owner-avatar.png', 0, 1, '{}', 'B', '$OWNER_INVITE_CODE', now()) returning id), partner as (insert into \"Partner\" (\"partnerNo\", \"displayName\", type, status, \"auditStatus\", \"contactName\", \"contactPhoneCiphertext\", \"contactPhoneHash\", \"contactPhoneMasked\", \"regionCode\", profile, \"updatedAt\") select '$PARTNER_NO', '验收测试经营主体', 'group_leader', 0, 0, '验收负责人', convert_to('$OWNER_PHONE','UTF8'), 'e2e_partner_$OWNER_PHONE', substring('$OWNER_PHONE' from 1 for 3) || '****' || substring('$OWNER_PHONE' from 8 for 4), '深圳', '{\"description\":\"本地端到端验收主体\"}'::jsonb, now() from owner_user returning id) insert into \"PartnerMember\" (\"partnerId\", \"userId\", role, status, \"updatedAt\") select partner.id, owner_user.id, 'owner', 1, now() from partner, owner_user returning \"partnerId\";" | head -n 1)
 fi
 
 PARTNER_NAME=$(psql_db "select \"displayName\" from \"Partner\" where id = $PARTNER_ID;")
@@ -67,8 +96,6 @@ if [ -z "$INVITE_CODE" ]; then
 fi
 log "B 邀请码：$INVITE_CODE"
 
-TS="$(date +%s)"
-RAND="$RANDOM"
 TEMP_TOKEN="temp_e2e_${TS}_${RAND}"
 PHONE="139$(printf '%08d' "$((TS % 100000000))")"
 WX_HASH="e2e_wx_${TS}_${RAND}"
