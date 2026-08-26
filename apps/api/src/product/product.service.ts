@@ -82,9 +82,9 @@ export class ProductService {
     return { list: rows.map((p) => this.toPublicProductVO(p, tags)), total, page: params.page, pageSize: params.pageSize }
   }
 
-  async recommended(userId: bigint | null, params: { moduleCode?: string; tags?: string[]; limit: number }) {
+  async recommended(userId: bigint | null, params: { moduleCode?: string; tags?: string[]; tagIds?: number[]; limit: number }) {
     const user = userId
-      ? await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null }, select: { tags: true } })
+      ? await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null }, select: { tags: true, tagIds: true } })
       : null
     const assessment = userId && params.moduleCode
       ? await this.prisma.userAssessment.findUnique({
@@ -94,7 +94,7 @@ export class ProductService {
       : null
     const queryTagIds = await this.resolveTagIdsByNames(params.tags ?? [], undefined, params.moduleCode)
     const inputTags = this.cleanTags([...(user?.tags ?? []), ...(assessment?.tags ?? []), ...(params.tags ?? [])])
-    const inputTagIds = this.cleanTagIds([...(assessment?.tagIds ?? []), ...queryTagIds])
+    const inputTagIds = this.cleanTagIds([...(user?.tagIds ?? []), ...(assessment?.tagIds ?? []), ...(params.tagIds ?? []), ...queryTagIds])
     const inputTagWeights = this.normalizeTagWeights(assessment?.tagWeights, inputTagIds)
     const where = await this.buildPublicProductWhere(params.moduleCode)
     const products = await this.prisma.product.findMany({
@@ -153,9 +153,12 @@ export class ProductService {
     const partnerId = await this.resolveLeadPartnerId(userId, dto.inviteCode)
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { tags: true },
+      select: { tags: true, tagIds: true },
     })
-    const needTagSnapshot = await this.normalizeTagsForModule(product.moduleId, dto.needTagIds, [
+    const needTagSnapshot = await this.normalizeTagsForModule(product.moduleId, [
+      ...(dto.needTagIds ?? []),
+      ...(user?.tagIds ?? []),
+    ], [
       ...(dto.needTags ?? []),
       ...(user?.tags ?? []),
     ])
@@ -451,6 +454,13 @@ export class ProductService {
       orderBy: [{ group: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
     })
     return rows.map((item) => this.toTagVO(item))
+  }
+
+  async listTagsPublic(params: { moduleId?: bigint; status?: number; keyword?: string; group?: string }) {
+    return this.listTagsAdmin({
+      ...params,
+      status: 1,
+    })
   }
 
   async createTagAdmin(dto: CreateTagDictionaryDto) {
@@ -909,7 +919,7 @@ export class ProductService {
     return Array.from(new Map(ids.map((id) => [String(id), id])).values()).slice(0, 20)
   }
 
-  private async normalizeTagsForModule(moduleId: bigint | undefined, tagIds: number[] | undefined, tags: string[] = []) {
+  private async normalizeTagsForModule(moduleId: bigint | undefined, tagIds: Array<number | bigint> | undefined, tags: string[] = []) {
     const ids = this.cleanTagIds(tagIds ?? [])
     const names = this.cleanTags(tags)
     if (!ids.length && !names.length) return { ids: [], names: [] }

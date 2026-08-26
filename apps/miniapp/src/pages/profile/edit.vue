@@ -1,17 +1,24 @@
 <template>
   <view class="edit">
-    <!-- 头像 -->
-    <view class="edit__avatar" @tap="chooseAvatar">
-      <view class="edit__avatar-wrap">
-        <image v-if="form.avatar" :src="form.avatar" class="edit__avatar-img" mode="aspectFill" />
-        <view v-else class="edit__avatar-placeholder">👤</view>
+    <view class="edit__hero">
+      <view class="edit__avatar" @tap="chooseAvatar">
+        <view class="edit__avatar-wrap">
+          <image v-if="form.avatar" :src="form.avatar" class="edit__avatar-img" mode="aspectFill" />
+          <view v-else class="edit__avatar-placeholder">头像</view>
+        </view>
+        <view class="edit__avatar-action">更换头像</view>
       </view>
-      <text class="edit__avatar-tip">点击更换头像</text>
+      <view class="edit__hero-main">
+        <text class="edit__hero-title">{{ form.nickname || '完善个人资料' }}</text>
+        <text class="edit__hero-desc">资料和标签会用于服务推荐、咨询跟进和伙伴识别。</text>
+      </view>
     </view>
 
-    <!-- 基础信息 -->
     <view class="edit__section">
-      <text class="edit__section-title">基础信息</text>
+      <view class="edit__section-head">
+        <text class="edit__section-title">基础信息</text>
+        <text class="edit__section-desc">用于账号识别</text>
+      </view>
       <view class="edit__card">
         <view class="edit__row">
           <text class="edit__label">昵称</text>
@@ -46,9 +53,11 @@
       </view>
     </view>
 
-    <!-- 联系方式 -->
     <view class="edit__section">
-      <text class="edit__section-title">联系方式</text>
+      <view class="edit__section-head">
+        <text class="edit__section-title">联系方式</text>
+        <text class="edit__section-desc">便于后续服务沟通</text>
+      </view>
       <view class="edit__card">
         <view class="edit__row">
           <text class="edit__label">微信号</text>
@@ -58,22 +67,14 @@
           <text class="edit__label">邮箱</text>
           <input class="edit__input" :value="form.email" placeholder="选填" type="email" @input="onEmailInput" />
         </view>
-        <view class="edit__row">
-          <text class="edit__label">抖音收款码</text>
-          <view class="edit__upload" @tap="choosePayCode">
-            <image v-if="form.douyinPayCode" :src="form.douyinPayCode" class="edit__upload-preview" mode="aspectFill" />
-            <view v-else class="edit__upload-placeholder">
-              <text class="edit__upload-icon">＋</text>
-              <text class="edit__upload-text">上传收款码</text>
-            </view>
-          </view>
-        </view>
       </view>
     </view>
 
-    <!-- 职业与标签 -->
     <view class="edit__section">
-      <text class="edit__section-title">职业与标签</text>
+      <view class="edit__section-head">
+        <text class="edit__section-title">偏好标签</text>
+        <text class="edit__section-desc">用于提升推荐准确度</text>
+      </view>
       <view class="edit__card">
         <view class="edit__row">
           <text class="edit__label">职业</text>
@@ -90,18 +91,32 @@
         </view>
         <view class="edit__row edit__row--column">
           <text class="edit__label">自我标签 <text class="edit__label-hint">最多5个</text></text>
-          <view class="edit__tags">
-            <view v-for="tag in tagOptions" :key="tag" class="edit__tag" :class="{ active: form.tags.includes(tag) }" @tap="toggleTag(tag)">
-              <text>{{ tag }}</text>
+          <view v-if="tagGroups.length" class="edit__tag-groups">
+            <view v-for="group in tagGroups" :key="group.label" class="edit__tag-group">
+              <text class="edit__tag-group-title">{{ group.label }}</text>
+              <view class="edit__tags">
+                <view
+                  v-for="tag in group.options"
+                  :key="tag.id"
+                  class="edit__tag"
+                  :class="{ active: isTagSelected(tag.id) }"
+                  @tap="toggleTag(tag)"
+                >
+                  <text>{{ tag.name }}</text>
+                </view>
+              </view>
             </view>
           </view>
+          <text v-else class="edit__tag-empty">暂无可选标签</text>
         </view>
       </view>
     </view>
 
-    <!-- 注册身份 -->
     <view class="edit__section">
-      <text class="edit__section-title">注册身份</text>
+      <view class="edit__section-head">
+        <text class="edit__section-title">注册身份</text>
+        <text class="edit__section-desc">决定后续工作台入口</text>
+      </view>
       <view class="edit__card">
         <view class="edit__identity-list">
           <view v-for="id in identityOptions" :key="id.value" class="edit__identity-item" :class="{ active: form.identity === id.value }" @tap="form.identity = id.value">
@@ -124,10 +139,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/stores/modules/user'
 import { userApi } from '@/api/modules/user'
+import { productApi, type TagDictionary } from '@/api/modules/product'
 import type { Gender } from '@blisstribe/shared'
 
 type UniValueEvent = { detail?: { value?: string | number } }
@@ -142,8 +158,7 @@ const form = reactive({
   realName: '', wechatId: '', email: '',
   age: undefined as number | undefined,
   favoriteColor: '', occupation: '',
-  tags: [] as string[], identity: '',
-  douyinPayCode: '',
+  tags: [] as string[], tagIds: [] as number[], identity: '',
 })
 
 const genderOptions = [
@@ -164,11 +179,16 @@ const colorOptions = [
   { label: '白', value: 'white', hex: '#f0f0f0' },
 ]
 
-const tagOptions = [
-  '生活方式', '健康养生', '时尚美容', '美食探店', '旅行达人',
-  '运动健身', '读书学习', '科技数码', '音乐艺术', '亲子育儿',
-  '宠物爱好者', '职场进阶', '创业者', '投资理财', '公益志愿',
-]
+const tagOptions = ref<TagDictionary[]>([])
+const tagGroups = computed(() => {
+  const groups = new Map<string, TagDictionary[]>()
+  for (const tag of tagOptions.value) {
+    const moduleName = tag.module?.name || '通用'
+    const label = `${moduleName} / ${tag.group || '未分组'}`
+    groups.set(label, [...(groups.get(label) || []), tag])
+  }
+  return Array.from(groups.entries()).map(([label, options]) => ({ label, options }))
+})
 
 const identityOptions = [
   { value: 'C', label: '单纯消费者', desc: '享受会员权益与服务' },
@@ -176,10 +196,23 @@ const identityOptions = [
   { value: 'S', label: '服务供应商', desc: '提供专业服务与支持' },
 ]
 
-function toggleTag(tag: string) {
-  const idx = form.tags.indexOf(tag)
-  if (idx >= 0) form.tags.splice(idx, 1)
-  else if (form.tags.length < 5) form.tags.push(tag)
+function isTagSelected(tagId: number) {
+  return form.tagIds.includes(tagId)
+}
+
+function toggleTag(tag: TagDictionary) {
+  const idx = form.tagIds.indexOf(tag.id)
+  if (idx >= 0) {
+    form.tagIds.splice(idx, 1)
+    form.tags = form.tags.filter((name) => name !== tag.name)
+    return
+  }
+  if (form.tagIds.length >= 5) {
+    uni.showToast({ title: '最多选择5个标签', icon: 'none' })
+    return
+  }
+  form.tagIds.push(tag.id)
+  if (!form.tags.includes(tag.name)) form.tags.push(tag.name)
 }
 
 function getEventValue(e: unknown): string {
@@ -216,6 +249,7 @@ function onOccupationInput(e: InputEvent) {
 }
 
 onShow(async () => {
+  await loadTagOptions()
   try {
     const u = await userApi.getInfo()
     userStore.setUserInfo(u)
@@ -231,8 +265,8 @@ onShow(async () => {
     form.favoriteColor = u.favoriteColor || ''
     form.occupation = u.occupation || ''
     form.tags = [...(u.tags || [])]
+    form.tagIds = resolveSelectedTagIds(u.tagIds || [], u.tags || [])
     form.identity = u.identity || ''
-    form.douyinPayCode = u.douyinPayCode || ''
   } catch {
     // 接口失败时回退到本地缓存
     const u = userStore.userInfo
@@ -249,10 +283,24 @@ onShow(async () => {
     form.favoriteColor = u.favoriteColor || ''
     form.occupation = u.occupation || ''
     form.tags = [...(u.tags || [])]
+    form.tagIds = resolveSelectedTagIds(u.tagIds || [], u.tags || [])
     form.identity = u.identity || ''
-    form.douyinPayCode = u.douyinPayCode || ''
   }
 })
+
+async function loadTagOptions() {
+  try {
+    tagOptions.value = await productApi.listTags({ status: 1 })
+  } catch {
+    tagOptions.value = []
+  }
+}
+
+function resolveSelectedTagIds(tagIds: number[], tags: string[]) {
+  if (tagIds.length) return tagIds
+  const names = new Set(tags)
+  return tagOptions.value.filter((item) => names.has(item.name)).map((item) => item.id)
+}
 
 const chooseAvatar = async () => {
   try {
@@ -261,16 +309,6 @@ const chooseAvatar = async () => {
     uni.showLoading({ title: '上传中...' })
     const result = await userApi.uploadAvatar(tempFilePaths[0])
     form.avatar = result.url
-  } catch { /* ignore */ } finally { uni.hideLoading() }
-}
-
-const choosePayCode = async () => {
-  try {
-    const { tempFilePaths } = await uni.chooseImage({ count: 1, sizeType: ['compressed'], sourceType: ['album', 'camera'] })
-    if (!tempFilePaths.length) return
-    uni.showLoading({ title: '上传中...' })
-    const result = await userApi.uploadAvatar(tempFilePaths[0])
-    form.douyinPayCode = result.url
   } catch { /* ignore */ } finally { uni.hideLoading() }
 }
 
@@ -289,8 +327,8 @@ const handleSave = async () => {
       favoriteColor: form.favoriteColor || undefined,
       occupation: form.occupation || undefined,
       tags: form.tags,
+      tagIds: form.tagIds,
       identity: form.identity || undefined,
-      douyinPayCode: form.douyinPayCode || undefined,
     })
     userStore.setUserInfo(updated)
     uni.showToast({ title: '保存成功', icon: 'success' })
@@ -302,134 +340,374 @@ const handleSave = async () => {
 <style lang="scss" scoped>
 .edit {
   min-height: 100vh;
-  background: #f5f5f5;
-  padding-bottom: 120rpx;
+  background: #f4f6f5;
+  padding: 20rpx 22rpx 132rpx;
+
+  &__hero {
+    display: flex;
+    align-items: center;
+    gap: 22rpx;
+    padding: 26rpx;
+    background: #fff;
+    border-radius: 20rpx;
+    box-shadow: 0 10rpx 26rpx rgba(31, 41, 55, 0.06);
+    margin-bottom: 22rpx;
+  }
 
   &__avatar {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 48rpx 0 32rpx;
-    background: #fff;
-    margin-bottom: 16rpx;
+    position: relative;
+    flex-shrink: 0;
+
     &-wrap {
-      width: 140rpx; height: 140rpx;
-      border-radius: 50%; overflow: hidden; background: #f0f0f0;
+      width: 124rpx;
+      height: 124rpx;
+      border-radius: 62rpx;
+      overflow: hidden;
+      background: #edf3f0;
+      border: 4rpx solid #fff;
+      box-shadow: 0 8rpx 18rpx rgba(31, 41, 55, 0.12);
     }
-    &-img { width: 100%; height: 100%; }
+
+    &-img {
+      width: 100%;
+      height: 100%;
+    }
+
     &-placeholder {
-      width: 100%; height: 100%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 64rpx;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #667085;
+      font-size: 24rpx;
+      font-weight: 600;
     }
-    &-tip { font-size: 24rpx; color: #999; margin-top: 12rpx; }
+
+    &-action {
+      position: absolute;
+      left: 50%;
+      bottom: -10rpx;
+      transform: translateX(-50%);
+      min-width: 108rpx;
+      padding: 6rpx 12rpx;
+      border-radius: 999rpx;
+      background: #07c160;
+      color: #fff;
+      font-size: 20rpx;
+      line-height: 26rpx;
+      text-align: center;
+      box-shadow: 0 6rpx 14rpx rgba(7, 193, 96, 0.24);
+    }
+  }
+
+  &__hero-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__hero-title {
+    display: block;
+    color: #1f2937;
+    font-size: 34rpx;
+    font-weight: 750;
+    line-height: 44rpx;
+  }
+
+  &__hero-desc {
+    display: block;
+    color: #667085;
+    font-size: 24rpx;
+    line-height: 34rpx;
+    margin-top: 6rpx;
   }
 
   &__section {
-    margin-bottom: 16rpx;
-    &-title {
-      font-size: 24rpx; color: #999; letter-spacing: 1rpx;
-      padding: 16rpx 32rpx 8rpx;
-    }
+    margin-bottom: 22rpx;
+  }
+
+  &__section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18rpx;
+    padding: 0 6rpx 10rpx;
+  }
+
+  &__section-title {
+    color: #1f2937;
+    font-size: 29rpx;
+    font-weight: 700;
+    line-height: 36rpx;
+  }
+
+  &__section-desc {
+    color: #98a2b3;
+    font-size: 22rpx;
+    line-height: 30rpx;
+    text-align: right;
   }
 
   &__card {
     background: #fff;
-    border-radius: 0;
+    border-radius: 18rpx;
+    overflow: hidden;
+    box-shadow: 0 8rpx 22rpx rgba(31, 41, 55, 0.045);
   }
 
   &__row {
     display: flex;
     align-items: center;
-    padding: 28rpx 32rpx;
-    border-bottom: 1rpx solid #f5f5f5;
-    min-height: 88rpx;
-    &:last-child { border-bottom: none; }
-    &--readonly { background: #fafafa; }
-    &--column { flex-direction: column; align-items: flex-start; gap: 20rpx; }
+    min-height: 96rpx;
+    padding: 20rpx 26rpx;
+    border-bottom: 1rpx solid #eef1f0;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &--readonly {
+      background: #fafcfb;
+    }
+
+    &--column {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16rpx;
+      padding-top: 24rpx;
+      padding-bottom: 26rpx;
+    }
   }
 
   &__label {
-    width: 160rpx; flex-shrink: 0;
-    font-size: 28rpx; color: #333;
-    &-hint { font-size: 22rpx; color: #aaa; margin-left: 8rpx; }
+    width: 164rpx;
+    flex-shrink: 0;
+    color: #344054;
+    font-size: 28rpx;
+    font-weight: 600;
+    line-height: 38rpx;
+
+    &-hint {
+      color: #98a2b3;
+      font-size: 22rpx;
+      font-weight: 400;
+      margin-left: 8rpx;
+    }
   }
 
   &__input {
-    flex: 1; font-size: 28rpx; color: #1a1a1a;
+    flex: 1;
+    min-width: 0;
+    color: #101828;
+    font-size: 28rpx;
+    line-height: 40rpx;
     text-align: right;
   }
 
   &__value {
-    flex: 1; font-size: 28rpx; color: #1a1a1a; text-align: right;
-    &.placeholder { color: #bbb; }
+    flex: 1;
+    min-width: 0;
+    color: #101828;
+    font-size: 28rpx;
+    line-height: 40rpx;
+    text-align: right;
+
+    &.placeholder {
+      color: #b6beca;
+    }
   }
 
   &__options {
-    display: flex; gap: 16rpx; flex: 1; justify-content: flex-end;
-  }
-  &__option {
-    padding: 8rpx 24rpx;
-    border-radius: 30rpx; border: 1rpx solid #e8e8e8;
-    font-size: 24rpx; color: #666;
-    &.active { border-color: var(--color-primary); color: var(--color-primary); background: rgba(7,193,96,0.06); }
+    display: flex;
+    flex: 1;
+    justify-content: flex-end;
+    gap: 10rpx;
   }
 
-  &__upload {
-    flex: 1; display: flex; justify-content: flex-end;
-    &-preview { width: 120rpx; height: 120rpx; border-radius: 8rpx; }
-    &-placeholder {
-      width: 120rpx; height: 120rpx; border-radius: 8rpx;
-      border: 1rpx dashed #ddd; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; background: #fafafa;
+  &__option {
+    min-width: 82rpx;
+    padding: 9rpx 18rpx;
+    border-radius: 999rpx;
+    border: 1rpx solid #d0d5dd;
+    color: #667085;
+    font-size: 24rpx;
+    line-height: 32rpx;
+    text-align: center;
+
+    &.active {
+      border-color: #07c160;
+      color: #08783d;
+      background: #e9f8ef;
+      font-weight: 600;
     }
-    &-icon { font-size: 36rpx; color: #ccc; }
-    &-text { font-size: 20rpx; color: #ccc; margin-top: 4rpx; }
   }
 
   &__colors {
-    display: flex; flex-wrap: wrap; gap: 16rpx;
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12rpx;
   }
+
   &__color-item {
-    display: flex; flex-direction: column; align-items: center; gap: 6rpx;
-    padding: 10rpx; border-radius: 8rpx; border: 2rpx solid transparent;
-    &.active { border-color: var(--color-primary); background: rgba(7,193,96,0.06); }
-  }
-  &__color-dot { width: 44rpx; height: 44rpx; border-radius: 50%; border: 1rpx solid rgba(0,0,0,0.08); }
-  &__color-label { font-size: 20rpx; color: #666; }
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6rpx;
+    padding: 12rpx 8rpx;
+    border-radius: 14rpx;
+    border: 1rpx solid #edf0ef;
+    background: #fafcfb;
 
-  &__tags { display: flex; flex-wrap: wrap; gap: 12rpx; }
+    &.active {
+      border-color: #07c160;
+      background: #e9f8ef;
+    }
+  }
+
+  &__color-dot {
+    width: 44rpx;
+    height: 44rpx;
+    border-radius: 50%;
+    border: 1rpx solid rgba(0,0,0,0.08);
+  }
+
+  &__color-label {
+    color: #667085;
+    font-size: 20rpx;
+    line-height: 28rpx;
+  }
+
+  &__tag-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 18rpx;
+    width: 100%;
+  }
+
+  &__tag-group-title {
+    display: block;
+    color: #667085;
+    font-size: 23rpx;
+    font-weight: 600;
+    line-height: 30rpx;
+    margin-bottom: 10rpx;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10rpx;
+  }
+
   &__tag {
-    padding: 10rpx 24rpx; border-radius: 32rpx;
-    border: 1rpx solid #e8e8e8; font-size: 24rpx; color: #666; background: #fafafa;
-    &.active { border-color: var(--color-primary); color: var(--color-primary); background: rgba(7,193,96,0.06); }
+    max-width: 260rpx;
+    padding: 9rpx 20rpx;
+    border-radius: 999rpx;
+    border: 1rpx solid #d0d5dd;
+    color: #475467;
+    background: #fff;
+    font-size: 24rpx;
+    line-height: 32rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &.active {
+      border-color: #07c160;
+      color: #08783d;
+      background: #e9f8ef;
+      font-weight: 600;
+    }
   }
 
-  &__identity-list { display: flex; flex-direction: column; }
+  &__tag-empty {
+    color: #98a2b3;
+    font-size: 24rpx;
+    line-height: 36rpx;
+  }
+
+  &__identity-list {
+    display: flex;
+    flex-direction: column;
+  }
+
   &__identity-item {
-    display: flex; align-items: center; gap: 24rpx;
-    padding: 28rpx 32rpx; border-bottom: 1rpx solid #f5f5f5;
-    &:last-child { border-bottom: none; }
-    &.active { background: rgba(7,193,96,0.03); }
+    display: flex;
+    align-items: center;
+    gap: 20rpx;
+    padding: 22rpx 26rpx;
+    border-bottom: 1rpx solid #eef1f0;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &.active {
+      background: #f1fbf5;
+    }
   }
+
   &__identity-badge {
-    width: 52rpx; height: 52rpx; border-radius: 50%; flex-shrink: 0;
-    background: #e0e0e0; color: #666; font-size: 24rpx; font-weight: bold;
-    display: flex; align-items: center; justify-content: center;
-    &.active { background: var(--color-primary); color: #fff; }
+    width: 54rpx;
+    height: 54rpx;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #edf0ef;
+    color: #667085;
+    font-size: 24rpx;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &.active {
+      background: #07c160;
+      color: #fff;
+    }
   }
-  &__identity-name { display: block; font-size: 28rpx; font-weight: 500; color: #1a1a1a; margin-bottom: 4rpx; }
-  &__identity-desc { font-size: 22rpx; color: #999; }
+
+  &__identity-name {
+    display: block;
+    color: #1f2937;
+    font-size: 28rpx;
+    font-weight: 650;
+    line-height: 36rpx;
+    margin-bottom: 2rpx;
+  }
+
+  &__identity-desc {
+    color: #667085;
+    font-size: 22rpx;
+    line-height: 30rpx;
+  }
 
   &__footer {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    padding: 16rpx 32rpx; background: #fff; border-top: 1rpx solid #f0f0f0;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 14rpx 22rpx calc(14rpx + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1rpx solid #eef1f0;
+    box-shadow: 0 -8rpx 24rpx rgba(31, 41, 55, 0.06);
   }
+
   &__save-btn {
-    height: 88rpx; background: var(--color-primary); color: #fff;
-    border-radius: 44rpx; font-size: 30rpx; font-weight: 500;
-    display: flex; align-items: center; justify-content: center;
-    &.loading { background: #ccc; }
+    height: 88rpx;
+    border-radius: 44rpx;
+    background: #07c160;
+    color: #fff;
+    font-size: 30rpx;
+    font-weight: 700;
+    line-height: 88rpx;
+    text-align: center;
+    box-shadow: 0 10rpx 22rpx rgba(7, 193, 96, 0.24);
+
+    &.loading {
+      background: #a6b5ad;
+      box-shadow: none;
+    }
   }
 }
 </style>

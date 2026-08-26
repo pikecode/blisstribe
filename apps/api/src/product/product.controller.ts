@@ -24,6 +24,12 @@ function parseTags(tags?: string) {
   return tags ? tags.split(',').map((tag) => tag.trim()).filter(Boolean) : []
 }
 
+function parseTagIds(tagIds?: string) {
+  return tagIds
+    ? tagIds.split(',').map((tagId) => Number(tagId)).filter((tagId) => Number.isInteger(tagId) && tagId > 0)
+    : []
+}
+
 function pageParams(page = '1', pageSize = '20') {
   return {
     page: Number(page) || 1,
@@ -39,11 +45,13 @@ export class ProductController {
   recommended(
     @Query('moduleCode') moduleCode?: string,
     @Query('tags') tags?: string,
+    @Query('tagIds') tagIds?: string,
     @Query('limit') limit = '10'
   ) {
     return this.productService.recommended(null, {
       moduleCode,
       tags: parseTags(tags),
+      tagIds: parseTagIds(tagIds),
       limit: Number(limit) || 10,
     })
   }
@@ -112,6 +120,26 @@ export class ProductModuleController {
   @Get(':moduleCode/assessment-template')
   assessmentTemplate(@Param('moduleCode') moduleCode: string) {
     return this.productService.publicAssessmentTemplate(moduleCode)
+  }
+}
+
+@Controller('tags')
+export class TagDictionaryPublicController {
+  constructor(private readonly productService: ProductService) {}
+
+  @Get()
+  list(
+    @Query('moduleId') moduleId?: string,
+    @Query('status') status?: string,
+    @Query('group') group?: string,
+    @Query('keyword') keyword?: string
+  ) {
+    return this.productService.listTagsPublic({
+      moduleId: moduleId ? BigInt(moduleId) : undefined,
+      status: status === undefined || status === '' ? undefined : Number(status),
+      group,
+      keyword,
+    })
   }
 }
 

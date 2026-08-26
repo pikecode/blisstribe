@@ -1,5 +1,11 @@
 <template>
   <view class="leads">
+    <view class="leads__head">
+      <text class="leads__eyebrow">咨询进展</text>
+      <text class="leads__title">我的服务咨询</text>
+      <text class="leads__subtitle">查看已提交需求、服务伙伴和后续跟进记录</text>
+    </view>
+
     <view v-if="loading" class="leads__state">
       <text>正在加载咨询记录</text>
     </view>
@@ -143,8 +149,40 @@ onShow(loadLeads)
 <style lang="scss" scoped>
 .leads {
   min-height: 100vh;
-  background: #f6f7f8;
-  padding: 24rpx;
+  background: var(--color-bg);
+  padding: 0 28rpx 32rpx;
+
+  &__head {
+    margin: 0 -28rpx 24rpx;
+    padding: 42rpx 32rpx 30rpx;
+    background: linear-gradient(180deg, #ffffff 0%, #f6faf7 100%);
+    border-bottom: 1rpx solid var(--color-border);
+  }
+
+  &__eyebrow {
+    display: block;
+    color: var(--color-primary);
+    font-size: 23rpx;
+    font-weight: 700;
+    line-height: 32rpx;
+    margin-bottom: 8rpx;
+  }
+
+  &__title {
+    display: block;
+    color: var(--color-text);
+    font-size: 42rpx;
+    font-weight: 800;
+    line-height: 1.24;
+    margin-bottom: 10rpx;
+  }
+
+  &__subtitle {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: 25rpx;
+    line-height: 1.5;
+  }
 
   &__list {
     display: flex;
@@ -159,7 +197,7 @@ onShow(loadLeads)
     align-items: center;
     justify-content: center;
     gap: 24rpx;
-    color: #98a2b3;
+    color: var(--color-text-tertiary);
     font-size: 28rpx;
   }
 
@@ -174,8 +212,9 @@ onShow(loadLeads)
 
 .lead-card {
   padding: 28rpx;
-  background: #fff;
-  border-radius: 16rpx;
+  background: var(--color-bg-white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
 
   &__head {
     display: flex;
@@ -195,14 +234,14 @@ onShow(loadLeads)
   &__cover {
     width: 96rpx;
     height: 72rpx;
-    border-radius: 8rpx;
+    border-radius: 12rpx;
     background: #e9eef3;
     flex-shrink: 0;
     &--empty {
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #98a2b3;
+      color: var(--color-text-tertiary);
       font-size: 22rpx;
     }
   }
@@ -214,7 +253,7 @@ onShow(loadLeads)
 
   &__title {
     display: block;
-    color: #1f2937;
+    color: var(--color-text);
     font-size: 30rpx;
     font-weight: 600;
     line-height: 1.35;
@@ -223,7 +262,7 @@ onShow(loadLeads)
   &__time {
     display: block;
     margin-top: 6rpx;
-    color: #98a2b3;
+    color: var(--color-text-tertiary);
     font-size: 22rpx;
   }
 
@@ -231,16 +270,17 @@ onShow(loadLeads)
     flex-shrink: 0;
     padding: 8rpx 16rpx;
     border-radius: 24rpx;
-    background: #f2f4f7;
-    color: #667085;
+    background: var(--color-bg-gray);
+    color: var(--color-text-secondary);
     font-size: 22rpx;
     &--qualified,
     &--converted {
-      background: rgba(7, 193, 96, 0.1);
+      background: var(--color-primary-light);
       color: var(--color-primary);
+      font-weight: 700;
     }
     &--invalid {
-      background: rgba(250, 81, 81, 0.1);
+      background: rgba(217, 45, 32, 0.1);
       color: var(--color-danger);
     }
   }
@@ -255,7 +295,7 @@ onShow(loadLeads)
   &__tag {
     padding: 6rpx 14rpx;
     border-radius: 20rpx;
-    background: rgba(7, 193, 96, 0.08);
+    background: var(--color-primary-light);
     color: var(--color-primary);
     font-size: 22rpx;
   }
@@ -267,7 +307,7 @@ onShow(loadLeads)
   &__label {
     display: block;
     margin-bottom: 6rpx;
-    color: #98a2b3;
+    color: var(--color-text-tertiary);
     font-size: 22rpx;
   }
 
@@ -282,14 +322,14 @@ onShow(loadLeads)
   &__timeline {
     margin-top: 22rpx;
     padding-top: 18rpx;
-    border-top: 1rpx solid #eef0f2;
+    border-top: 1rpx solid var(--color-border);
   }
 
   &__follow {
     position: relative;
     padding-left: 22rpx;
     margin-bottom: 18rpx;
-    border-left: 3rpx solid rgba(7, 193, 96, 0.18);
+    border-left: 3rpx solid rgba(7, 193, 96, 0.22);
     &:last-child {
       margin-bottom: 0;
     }
@@ -297,14 +337,14 @@ onShow(loadLeads)
 
   &__follow-time {
     display: block;
-    color: #98a2b3;
+    color: var(--color-text-tertiary);
     font-size: 22rpx;
     margin-bottom: 4rpx;
   }
 
   &__follow-text {
     display: block;
-    color: #1f2937;
+    color: var(--color-text);
     font-size: 24rpx;
     font-weight: 600;
   }
@@ -312,7 +352,7 @@ onShow(loadLeads)
   &__follow-note {
     display: block;
     margin-top: 4rpx;
-    color: #667085;
+    color: var(--color-text-secondary);
     font-size: 23rpx;
     line-height: 1.5;
   }

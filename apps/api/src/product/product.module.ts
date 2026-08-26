@@ -10,6 +10,7 @@ import {
   ProductModuleController,
   ProductModuleAdminController,
   ProductPartnerController,
+  TagDictionaryPublicController,
   RecommendationRuleAdminController,
   TagDictionaryAdminController,
 } from './product.controller'
@@ -24,6 +25,7 @@ import {
     ProductAdminController,
     ProductLeadAdminController,
     RecommendationRuleAdminController,
+    TagDictionaryPublicController,
     TagDictionaryAdminController,
     ProductPartnerController,
   ],

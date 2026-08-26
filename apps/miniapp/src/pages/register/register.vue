@@ -131,11 +131,23 @@
 
       <view class="register__field">
         <text class="register__label">自我标签 <text class="register__label-hint">（最多选5个）</text></text>
-        <view class="register__tags">
-          <view v-for="tag in tagOptions" :key="tag" class="register__tag" :class="{ active: form.tags?.includes(tag) }" @tap="toggleTag(tag)">
-            <text>{{ tag }}</text>
+        <view v-if="tagGroups.length" class="register__tag-groups">
+          <view v-for="group in tagGroups" :key="group.label" class="register__tag-group">
+            <text class="register__tag-group-title">{{ group.label }}</text>
+            <view class="register__tags">
+              <view
+                v-for="tag in group.options"
+                :key="tag.id"
+                class="register__tag"
+                :class="{ active: isTagSelected(tag.id) }"
+                @tap="toggleTag(tag)"
+              >
+                <text>{{ tag.name }}</text>
+              </view>
+            </view>
           </view>
         </view>
+        <text v-else class="register__tag-empty">暂无可选标签</text>
       </view>
 
       <view class="register__field">
@@ -192,6 +204,7 @@ import { useAssessmentSync } from '@/composables/useAssessmentSync'
 import { useAuth } from '@/composables/useAuth'
 import { authApi } from '@/api/modules/auth'
 import { userApi } from '@/api/modules/user'
+import { productApi, type TagDictionary } from '@/api/modules/product'
 import { invitationApi } from '@/api/modules/invitation'
 import { redirectAfterLogin } from '@/utils/auth'
 import { storage } from '@/utils/storage'
@@ -213,6 +226,7 @@ const submitting = ref(false)
 const inviteResolving = ref(false)
 const inviteResolveResult = ref<PartnerInvitationResolveResult | null>(null)
 const inviteResolveRequestId = ref(0)
+const tagOptions = ref<TagDictionary[]>([])
 
 const stepTitles = ['基础信息', '联系方式', '职业与标签', '注册身份']
 
@@ -228,6 +242,7 @@ const form = reactive({
   favoriteColor: '',
   occupation: '',
   tags: [] as string[],
+  tagIds: [] as number[],
   identity: '' as string,
   agreement: false,
 })
@@ -250,12 +265,6 @@ const colorOptions = [
   { label: '粉', value: 'pink', hex: '#eb2f96' },
   { label: '黑', value: 'black', hex: '#1a1a1a' },
   { label: '白', value: 'white', hex: '#f0f0f0' },
-]
-
-const tagOptions = [
-  '生活方式', '健康养生', '时尚美容', '美食探店', '旅行达人',
-  '运动健身', '读书学习', '科技数码', '音乐艺术', '亲子育儿',
-  '宠物爱好者', '职场进阶', '创业者', '投资理财', '公益志愿',
 ]
 
 const identityOptions = [
@@ -285,14 +294,33 @@ const inviteStateClass = computed(() => ({
   valid: inviteResolveResult.value?.valid,
   invalid: inviteResolveResult.value && !inviteResolveResult.value.valid,
 }))
-
-function toggleTag(tag: string) {
-  const idx = form.tags.indexOf(tag)
-  if (idx >= 0) {
-    form.tags.splice(idx, 1)
-  } else if (form.tags.length < 5) {
-    form.tags.push(tag)
+const tagGroups = computed(() => {
+  const groups = new Map<string, TagDictionary[]>()
+  for (const tag of tagOptions.value) {
+    const moduleName = tag.module?.name || '通用'
+    const label = `${moduleName} / ${tag.group || '未分组'}`
+    groups.set(label, [...(groups.get(label) || []), tag])
   }
+  return Array.from(groups.entries()).map(([label, options]) => ({ label, options }))
+})
+
+function isTagSelected(tagId: number) {
+  return form.tagIds.includes(tagId)
+}
+
+function toggleTag(tag: TagDictionary) {
+  const idx = form.tagIds.indexOf(tag.id)
+  if (idx >= 0) {
+    form.tagIds.splice(idx, 1)
+    form.tags = form.tags.filter((name) => name !== tag.name)
+    return
+  }
+  if (form.tagIds.length >= 5) {
+    uni.showToast({ title: '最多选择5个标签', icon: 'none' })
+    return
+  }
+  form.tagIds.push(tag.id)
+  if (!form.tags.includes(tag.name)) form.tags.push(tag.name)
 }
 
 function getEventValue(e: unknown): string {
@@ -439,6 +467,7 @@ const handleSubmit = async (): Promise<void> => {
       favoriteColor: form.favoriteColor || undefined,
       occupation: form.occupation || undefined,
       tags: form.tags,
+      tagIds: form.tagIds,
       identity: form.identity || undefined,
       inviteCode: inviteCode.value.trim().toUpperCase() || undefined,
       agreement: form.agreement,
@@ -465,8 +494,17 @@ const handleSubmit = async (): Promise<void> => {
   }
 }
 
+async function loadTagOptions() {
+  try {
+    tagOptions.value = await productApi.listTags({ status: 1 })
+  } catch {
+    tagOptions.value = []
+  }
+}
+
 onLoad((options) => {
   if (!authStore.tempToken) uni.redirectTo({ url: '/pages/auth/auth' })
+  loadTagOptions()
   const pendingInviteCode = options?.inviteCode || options?.code || storage.get<string>('pendingInviteCode')
   const targetIdentity = options?.identity || options?.role
   if (pendingInviteCode) {
@@ -763,6 +801,18 @@ onLoad((options) => {
   &__color-label { font-size: 20rpx; color: #666; }
 
   // ── 标签 ──
+  &__tag-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 22rpx;
+  }
+  &__tag-group-title {
+    display: block;
+    color: #999;
+    font-size: 22rpx;
+    line-height: 30rpx;
+    margin-bottom: 12rpx;
+  }
   &__tags {
     display: flex;
     flex-wrap: wrap;
@@ -780,6 +830,10 @@ onLoad((options) => {
       color: var(--color-primary);
       background: rgba(7, 193, 96, 0.06);
     }
+  }
+  &__tag-empty {
+    color: #999;
+    font-size: 24rpx;
   }
 
   // ── 身份卡片 ──

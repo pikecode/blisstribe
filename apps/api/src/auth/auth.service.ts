@@ -124,6 +124,7 @@ export class AuthService {
 
     // 创建用户 + 微信账号 + 可选 Partner 邀请归属
     const inviteCode = this.invitationService.generateInviteCode()
+    const tagSnapshot = await this.normalizeUserTags(dto.tagIds, dto.tags ?? [])
     const user = await this.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
@@ -140,7 +141,8 @@ export class AuthService {
           age: dto.age,
           favoriteColor: dto.favoriteColor,
           occupation: dto.occupation,
-          tags: dto.tags ?? [],
+          tags: tagSnapshot.names,
+          tagIds: tagSnapshot.ids,
           identity: dto.identity,
           status: 1,
           inviteCode,
@@ -312,6 +314,38 @@ export class AuthService {
     })
   }
 
+  private async normalizeUserTags(tagIds: number[] | undefined, tags: string[] = []) {
+    const ids = this.cleanTagIds(tagIds ?? [])
+    const names = this.cleanTags(tags)
+    if (!ids.length && !names.length) return { ids: [], names: [] }
+    const rows = await this.prisma.tagDictionary.findMany({
+      where: {
+        deletedAt: null,
+        status: 1,
+        OR: [
+          ...(ids.length ? [{ id: { in: ids } }] : []),
+          ...(names.length ? [{ name: { in: names } }] : []),
+        ],
+      },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    })
+    return {
+      ids: this.cleanTagIds(rows.map((item) => item.id)),
+      names: this.cleanTags(rows.map((item) => item.name)),
+    }
+  }
+
+  private cleanTags(tags: string[]) {
+    return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))].slice(0, 20)
+  }
+
+  private cleanTagIds(tagIds: Array<number | bigint>) {
+    const ids = tagIds
+      .map((tagId) => BigInt(tagId))
+      .filter((tagId) => tagId > 0n)
+    return Array.from(new Map(ids.map((tagId) => [String(tagId), tagId])).values()).slice(0, 20)
+  }
+
   private toUserVO(user: {
     id: bigint
     phoneMasked: string
@@ -326,6 +360,7 @@ export class AuthService {
     favoriteColor?: string | null
     occupation?: string | null
     tags: string[]
+    tagIds?: bigint[]
     identity?: string | null
     level: string
     douyinPayCode?: string | null
@@ -348,6 +383,7 @@ export class AuthService {
       favoriteColor: user.favoriteColor ?? undefined,
       occupation: user.occupation ?? undefined,
       tags: user.tags,
+      tagIds: user.tagIds?.map(Number) ?? [],
       identity: (user.identity ?? undefined) as User['identity'],
       level: (user.level || 'normal') as User['level'],
       douyinPayCode: user.douyinPayCode ?? undefined,

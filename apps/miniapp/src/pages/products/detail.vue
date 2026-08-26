@@ -1,11 +1,14 @@
 <template>
   <view class="detail" v-if="product">
-    <image v-if="product.coverUrl" :src="product.coverUrl" class="detail__cover" mode="aspectFill" />
-    <view v-else class="detail__cover detail__cover--empty">
-      <text>{{ product.module.name }}</text>
+    <view class="detail__hero">
+      <image v-if="product.coverUrl" :src="product.coverUrl" class="detail__cover" mode="aspectFill" />
+      <view v-else class="detail__cover detail__cover--empty">
+        <text>{{ product.module.name }}</text>
+      </view>
     </view>
 
     <view class="detail__main">
+      <text class="detail__module">{{ product.module.name }}</text>
       <view class="detail__title-row">
         <text class="detail__title">{{ product.title }}</text>
         <text v-if="product.priceText" class="detail__price">{{ product.priceText }}</text>
@@ -204,9 +207,14 @@ onLoad((options) => {
 <style lang="scss" scoped>
 .detail {
   min-height: 100vh;
-  background: #f6f7f8;
+  background: var(--color-bg);
   padding-bottom: 140rpx;
 
+  &__hero {
+    position: relative;
+    overflow: hidden;
+    background: #e9eef3;
+  }
   &__cover {
     width: 100%;
     height: 420rpx;
@@ -215,16 +223,29 @@ onLoad((options) => {
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #667085;
+      color: var(--color-text-secondary);
       font-size: 34rpx;
     }
   }
   &__main,
   &__section,
   &__lead {
-    background: #fff;
-    margin-bottom: 16rpx;
-    padding: 28rpx 32rpx;
+    background: var(--color-bg-white);
+    margin: 20rpx 28rpx 0;
+    padding: 28rpx;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+  }
+  &__module {
+    display: inline-flex;
+    margin-bottom: 12rpx;
+    padding: 7rpx 16rpx;
+    border-radius: var(--radius-round);
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    font-size: 22rpx;
+    font-weight: 700;
+    line-height: 30rpx;
   }
   &__title-row {
     display: flex;
@@ -235,9 +256,9 @@ onLoad((options) => {
   }
   &__title {
     flex: 1;
-    color: #1f2937;
+    color: var(--color-text);
     font-size: 40rpx;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1.35;
   }
   &__price {
@@ -249,8 +270,8 @@ onLoad((options) => {
   &__subtitle,
   &__text {
     display: block;
-    color: #667085;
-    font-size: 28rpx;
+    color: var(--color-text-secondary);
+    font-size: 26rpx;
     line-height: 1.7;
     white-space: pre-wrap;
   }
@@ -265,20 +286,21 @@ onLoad((options) => {
   &__need-tag {
     padding: 8rpx 18rpx;
     border-radius: 24rpx;
-    background: #f2f4f7;
-    color: #667085;
+    background: var(--color-bg-gray);
+    color: var(--color-text-secondary);
     font-size: 24rpx;
     &.matched,
     &.active {
       color: var(--color-primary);
-      background: rgba(7, 193, 96, 0.1);
+      background: var(--color-primary-light);
+      font-weight: 700;
     }
   }
   &__section-title {
     display: block;
-    color: #1f2937;
+    color: var(--color-text);
     font-size: 30rpx;
-    font-weight: 600;
+    font-weight: 700;
     margin-bottom: 14rpx;
   }
   &__assurance {
@@ -287,44 +309,44 @@ onLoad((options) => {
     gap: 16rpx;
     &-item {
       padding: 20rpx;
-      border-radius: 12rpx;
-      background: #f9fafb;
+      border-radius: var(--radius-md);
+      background: var(--color-bg-subtle);
     }
     &-title {
       display: block;
-      color: #1f2937;
+      color: var(--color-text);
       font-size: 28rpx;
       font-weight: 600;
       margin-bottom: 6rpx;
     }
     &-desc {
       display: block;
-      color: #667085;
+      color: var(--color-text-secondary);
       font-size: 24rpx;
       line-height: 1.5;
     }
   }
   &__lead-desc {
     display: block;
-    color: #667085;
+    color: var(--color-text-secondary);
     font-size: 24rpx;
     line-height: 1.6;
   }
   &__assessment {
     margin-top: 20rpx;
     padding: 20rpx;
-    border-radius: 12rpx;
-    background: #f9fafb;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-subtle);
     &-title {
       display: block;
-      color: #1f2937;
+      color: var(--color-text);
       font-size: 26rpx;
       font-weight: 600;
       margin-bottom: 6rpx;
     }
     &-summary {
       display: block;
-      color: #667085;
+      color: var(--color-text-secondary);
       font-size: 24rpx;
       line-height: 1.55;
     }
@@ -335,9 +357,9 @@ onLoad((options) => {
     margin-top: 24rpx;
     padding: 20rpx;
     box-sizing: border-box;
-    border-radius: 12rpx;
-    background: #f9fafb;
-    color: #1f2937;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-subtle);
+    color: var(--color-text);
     font-size: 26rpx;
   }
   &__footer {
@@ -347,7 +369,7 @@ onLoad((options) => {
     bottom: 0;
     padding: 16rpx 32rpx;
     background: #fff;
-    border-top: 1rpx solid #eef0f2;
+    border-top: 1rpx solid var(--color-border);
   }
   &__submit {
     height: 88rpx;
@@ -356,6 +378,7 @@ onLoad((options) => {
     color: #fff;
     font-size: 30rpx;
     font-weight: 600;
+    box-shadow: var(--shadow-action);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -364,13 +387,14 @@ onLoad((options) => {
     }
     &.disabled {
       background: #d0d5dd;
-      color: #667085;
+      color: var(--color-text-secondary);
+      box-shadow: none;
     }
   }
   &__empty {
     padding-top: 180rpx;
     text-align: center;
-    color: #98a2b3;
+    color: var(--color-text-tertiary);
   }
   &__success-mask {
     position: fixed;
@@ -392,7 +416,7 @@ onLoad((options) => {
     &-title {
       display: block;
       text-align: center;
-      color: #1f2937;
+      color: var(--color-text);
       font-size: 36rpx;
       font-weight: 700;
       margin-bottom: 16rpx;
@@ -400,7 +424,7 @@ onLoad((options) => {
     &-desc {
       display: block;
       text-align: center;
-      color: #667085;
+      color: var(--color-text-secondary);
       font-size: 26rpx;
       line-height: 1.6;
       margin-bottom: 32rpx;
@@ -420,7 +444,7 @@ onLoad((options) => {
       align-items: center;
       justify-content: center;
       &--ghost {
-        background: #f2f4f7;
+        background: var(--color-bg-gray);
         color: #344054;
       }
     }

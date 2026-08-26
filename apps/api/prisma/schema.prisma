@@ -30,6 +30,7 @@ model User {
   favoriteColor   String? // 喜欢的颜色
   occupation      String? // 职业
   tags            String[] // 用户自我标签
+  tagIds          BigInt[] @default([]) // 用户自我标签 ID 快照
   identity        String? // 注册身份: C/B/S
   level           String    @default("normal") // 注册级别
   douyinPayCode   String? // 收款码(抖音)

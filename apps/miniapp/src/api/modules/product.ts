@@ -14,6 +14,20 @@ export interface ProductModule {
   status: number
 }
 
+export interface TagDictionary {
+  id: number
+  code: string
+  name: string
+  group: string
+  moduleId: number | null
+  module: ProductModule | null
+  description: string
+  status: number
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Product {
   id: number
   module: ProductModule
@@ -77,6 +91,8 @@ export interface UserAssessment {
   moduleCode: string
   assessmentType: string
   tags: string[]
+  tagIds?: number[]
+  tagWeights?: Record<string, number>
   summary: string
   answers: Record<string, unknown>
   createdAt: string
@@ -136,11 +152,12 @@ export const productApi = {
       method: 'GET',
     })
   },
-  recommended(params?: { moduleCode?: string; tags?: string[]; limit?: number }): Promise<Product[]> {
+  recommended(params?: { moduleCode?: string; tags?: string[]; tagIds?: number[]; limit?: number }): Promise<Product[]> {
     return request<Product[]>({
       url: withQuery('/products/recommended', {
         moduleCode: params?.moduleCode,
         tags: params?.tags?.join(','),
+        tagIds: params?.tagIds?.join(','),
         limit: params?.limit,
       }),
       method: 'GET',
@@ -198,6 +215,17 @@ export const productApi = {
       url: '/products/my-assessments/sync',
       method: 'POST',
       data: { items },
+    })
+  },
+  listTags(params?: { moduleId?: number; status?: number; group?: string; keyword?: string }): Promise<TagDictionary[]> {
+    return request<TagDictionary[]>({
+      url: withQuery('/tags', {
+        moduleId: params?.moduleId,
+        status: params?.status,
+        group: params?.group,
+        keyword: params?.keyword,
+      }),
+      method: 'GET',
     })
   },
 }

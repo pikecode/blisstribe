@@ -1,71 +1,46 @@
 <template>
   <view class="index">
+    <view class="index__hero">
+      <swiper v-if="banners.length" class="index__banner" :indicator-dots="false" autoplay circular interval="4500">
+        <swiper-item v-for="(item, i) in banners" :key="i">
+          <view class="index__banner-item" :style="{ background: item.gradient || '#f5f5f7' }">
+            <image v-if="item.imageUrl" :src="item.imageUrl" class="index__banner-bg" mode="aspectFill" />
+          </view>
+        </swiper-item>
+      </swiper>
+      <view v-else class="index__banner index__banner--fallback" />
 
-    <!-- Banner -->
-    <swiper class="index__banner" :indicator-dots="false" autoplay circular interval="4500">
-      <swiper-item v-for="(item, i) in banners" :key="i">
-        <view class="index__banner-item" :style="{ background: item.gradient || '#f5f5f7' }">
-          <image v-if="item.imageUrl" :src="item.imageUrl" class="index__banner-bg" mode="aspectFill" />
-          <view v-if="!item.imageUrl" class="index__banner-content">
-            <text class="index__banner-title">{{ item.title }}</text>
-            <text class="index__banner-desc">{{ item.description }}</text>
+      <view class="index__hero-content">
+        <view class="index__hero-kicker">{{ isLogin ? '你的服务推荐' : 'BlissTribe 心悦部落' }}</view>
+        <text class="index__hero-title">{{ isLogin ? userStore.displayName : '先了解需求，再推荐合适服务' }}</text>
+        <text class="index__hero-desc">{{ heroDesc }}</text>
+        <view class="index__hero-actions">
+          <view class="index__hero-btn" @tap="chooseAssessment">先做评估</view>
+          <view class="index__hero-btn index__hero-btn--ghost" @tap="isLogin ? goLeadList() : showAuthPopup = true">
+            {{ isLogin ? '咨询进展' : '登录同步' }}
           </view>
         </view>
-      </swiper-item>
-    </swiper>
-
-    <view v-if="isLogin" class="index__overview">
-      <view class="index__overview-main">
-        <image :src="userStore.avatarUrl" class="index__overview-avatar" mode="aspectFill" />
-        <view class="index__overview-info">
-          <text class="index__overview-name">{{ userStore.displayName }}</text>
-          <text class="index__overview-desc">{{ overviewText }}</text>
-        </view>
-      </view>
-      <view class="index__overview-actions">
-        <view class="index__overview-action" @tap="chooseAssessment">选择评估</view>
-        <view class="index__overview-action index__overview-action--ghost" @tap="goLeadList">我的咨询</view>
-      </view>
-    </view>
-
-    <view v-if="!isLogin" class="index__cta">
-      <text class="index__cta-title">心悦部落</text>
-      <text class="index__cta-sub">先了解你的需求，再推荐合适的服务</text>
-      <view class="index__cta-actions">
-        <view class="index__cta-btn" @tap="showAuthPopup = true">立即入会</view>
-        <view class="index__cta-btn index__cta-btn--ghost" @tap="chooseAssessment">选择评估</view>
       </view>
     </view>
 
     <view class="index__section">
-      <view class="index__section-head">
-        <text class="index__section-title">需求评估</text>
-        <text class="index__section-more">{{ assessmentCount }}/{{ productModules.length }} 已完成</text>
-      </view>
-      <view class="index__modules">
-        <view
-          v-for="item in productModules"
-          :key="item.code"
-          class="index__module"
-          @tap="goProductModule(item)"
-        >
-          <image v-if="item.coverUrl" :src="item.coverUrl" class="index__module-bg" mode="aspectFill" />
-          <view class="index__module-head">
-            <text class="index__module-icon">{{ item.icon || item.name.slice(0, 2) }}</text>
-            <text class="index__module-status" :class="{ done: hasAssessment(item.code) }">
-              {{ hasAssessment(item.code) ? '已评估' : '待评估' }}
-            </text>
-          </view>
-          <text class="index__module-title">{{ item.name }}</text>
-          <text class="index__module-desc">{{ item.description || `${item.name}类服务推荐` }}</text>
+      <view class="app-section-head">
+        <view>
+          <text class="app-section-title">需求评估</text>
+          <text class="app-section-desc">按模块梳理需求，再生成推荐</text>
         </view>
+        <text class="app-link-text">{{ assessmentCount }}/{{ productModules.length }} 已完成</text>
       </view>
+      <ModuleAssessmentList :items="moduleAssessmentItems" @module-tap="handleModuleTap" />
     </view>
 
     <view v-if="isLogin && recentLead" class="index__section">
-      <view class="index__section-head">
-        <text class="index__section-title">咨询进展</text>
-        <text class="index__section-more" @tap="goLeadList">全部</text>
+      <view class="app-section-head">
+        <view>
+          <text class="app-section-title">咨询进展</text>
+          <text class="app-section-desc">最近一次服务跟进</text>
+        </view>
+        <text class="app-link-text" @tap="goLeadList">全部</text>
       </view>
       <view class="index__lead" @tap="goLeadList">
         <view>
@@ -78,45 +53,20 @@
     </view>
 
     <view class="index__section">
-      <view class="index__section-head">
-        <text class="index__section-title">为你推荐</text>
-        <text v-if="recommendedProducts.length" class="index__section-more" @tap="goProducts">查看全部</text>
-      </view>
-      <view v-if="recommendLoading" class="index__recommend-state">
-        <text>正在匹配推荐</text>
-      </view>
-      <view v-else-if="recommendError" class="index__recommend-state">
-        <text>推荐加载失败</text>
-        <view class="index__recommend-retry" @tap="loadRecommendedProducts">重试</view>
-      </view>
-      <view v-else-if="recommendedProducts.length" class="index__recommend">
-        <view
-          v-for="item in recommendedProducts"
-          :key="item.id"
-          class="index__recommend-item"
-          @tap="goProductDetail(item.id)"
-        >
-          <image v-if="item.coverUrl" :src="item.coverUrl" class="index__recommend-cover" mode="aspectFill" />
-          <view v-else class="index__recommend-cover index__recommend-cover--empty">
-            <text>{{ item.module.name }}</text>
-          </view>
-          <view class="index__recommend-main">
-            <view class="index__recommend-head">
-              <text class="index__recommend-module">{{ item.module.name }}</text>
-              <text v-if="item.priceText" class="index__recommend-price">{{ item.priceText }}</text>
-            </view>
-            <text class="index__recommend-title">{{ item.title }}</text>
-            <text class="index__recommend-desc">{{ item.summary || item.subtitle }}</text>
-            <view v-if="item.matchedTags.length" class="index__recommend-tags">
-              <text v-for="tag in item.matchedTags.slice(0, 2)" :key="tag" class="index__recommend-tag">{{ tag }}</text>
-            </view>
-            <text class="index__recommend-reason">{{ item.recommendReason }}</text>
-          </view>
+      <view class="app-section-head">
+        <view>
+          <text class="app-section-title">为你推荐</text>
+          <text class="app-section-desc">优先展示和你标签匹配的服务</text>
         </view>
+        <text v-if="recommendedProducts.length" class="app-link-text" @tap="goProducts">查看全部</text>
       </view>
-      <view v-else class="index__recommend-state">
-        <text>暂无推荐产品</text>
-      </view>
+      <ProductRecommendList
+        :products="recommendedProducts"
+        :loading="recommendLoading"
+        :error="recommendError"
+        @retry="loadRecommendedProducts"
+        @product-tap="goProductDetail"
+      />
     </view>
 
   </view>
@@ -136,6 +86,8 @@ import { useHealthAssessment } from '@/composables/useHealthAssessment'
 import { useAssessmentSync } from '@/composables/useAssessmentSync'
 import { storage } from '@/utils/storage'
 import AuthPopup from '@/components/business/AuthPopup.vue'
+import ModuleAssessmentList from '@/components/business/ModuleAssessmentList.vue'
+import ProductRecommendList from '@/components/business/ProductRecommendList.vue'
 
 const authStore = useAuthStore()
 const userStore = useUserStore()
@@ -153,10 +105,23 @@ const { getAssessment } = useHealthAssessment()
 const { syncLocalAssessments } = useAssessmentSync()
 
 const assessmentCount = computed(() => Object.values(assessmentMap.value).filter(Boolean).length)
+const moduleAssessmentItems = computed(() => productModules.value.map((item) => ({
+  code: item.code,
+  name: item.name,
+  description: item.description,
+  coverUrl: item.coverUrl,
+  icon: item.icon,
+  done: hasAssessment(item.code),
+})))
 const overviewText = computed(() => {
   if (recentLead.value) return `${leadStatusText(recentLead.value.status)}：${recentLead.value.product.title}`
   if (assessmentCount.value > 0) return `已完成 ${assessmentCount.value} 个需求评估`
   return '先完成评估，推荐会更精准'
+})
+const heroDesc = computed(() => {
+  if (recentLead.value) return overviewText.value
+  if (assessmentCount.value > 0) return `已完成 ${assessmentCount.value} 个评估，继续查看更匹配的服务。`
+  return '用几个问题缩小选择范围，减少无效浏览和反复沟通。'
 })
 
 async function loadBanners() {
@@ -201,6 +166,7 @@ async function loadRecommendedProducts() {
     recommendedProducts.value = await productApi.recommended({
       moduleCode,
       tags: [...new Set([...(user?.tags || []), ...(assessment?.tags || [])])],
+      tagIds: [...new Set([...(user?.tagIds || []), ...(assessment?.tagIds || [])])],
       limit: 3,
     })
   } catch {
@@ -241,6 +207,10 @@ const goProductModule = (item: ProductModule) => {
     return
   }
   uni.navigateTo({ url: `/pages/products/index?moduleCode=${item.code}` })
+}
+const handleModuleTap = (code: string) => {
+  const module = productModules.value.find((item) => item.code === code)
+  if (module) goProductModule(module)
 }
 const goEditProfile = () => {
   if (!isLogin.value) {
@@ -295,98 +265,105 @@ onShow(async () => {
 <style lang="scss" scoped>
 .index {
   min-height: 100vh;
-  background: #f9f9f9;
-  padding-bottom: 80rpx;
+  background: var(--color-bg);
+  padding-bottom: 84rpx;
 
-  // ── Banner ──────────────────────────
+  &__hero {
+    position: relative;
+    min-height: 430rpx;
+    margin-bottom: 34rpx;
+    overflow: hidden;
+    background: #122017;
+  }
+
   &__banner {
-    height: 400rpx;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+
+    &--fallback {
+      background: linear-gradient(135deg, #173824 0%, #335f43 58%, #8aa174 100%);
+    }
+
     &-item {
       position: relative;
       height: 100%;
     }
+
     &-bg {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-    }
-    &-content {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 40rpx 48rpx;
-      background: linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 100%);
-    }
-    &-title {
-      display: block;
-      font-size: 44rpx;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 8rpx;
-    }
-    &-desc {
-      font-size: 26rpx;
-      color: rgba(255,255,255,0.85);
+      opacity: .62;
     }
   }
 
-  &__overview {
-    margin: 28rpx 32rpx 32rpx;
-    padding: 30rpx;
+  &__hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(12, 26, 18, .16) 0%, rgba(12, 26, 18, .76) 100%);
+  }
+
+  &__hero-content {
+    position: relative;
+    z-index: 1;
+    padding: 150rpx 32rpx 34rpx;
+  }
+
+  &__hero-kicker {
+    display: inline-flex;
+    padding: 8rpx 16rpx;
+    border-radius: var(--radius-round);
+    background: rgba(255, 255, 255, .16);
+    color: rgba(255, 255, 255, .88);
+    font-size: 22rpx;
+    line-height: 30rpx;
+  }
+
+  &__hero-title {
+    display: block;
+    max-width: 620rpx;
+    margin-top: 18rpx;
+    color: #fff;
+    font-size: var(--font-size-hero);
+    font-weight: 800;
+    line-height: 1.18;
+  }
+
+  &__hero-desc {
+    display: block;
+    max-width: 610rpx;
+    margin-top: 14rpx;
+    color: rgba(255, 255, 255, .86);
+    font-size: 25rpx;
+    line-height: 1.52;
+  }
+
+  &__hero-actions {
+    display: flex;
+    gap: 16rpx;
+    margin-top: 28rpx;
+  }
+
+  &__hero-btn {
+    min-width: 188rpx;
+    height: 76rpx;
+    padding: 0 28rpx;
+    border-radius: 38rpx;
     background: #fff;
-    border-radius: 16rpx;
-    &-main {
-      display: flex;
-      align-items: center;
-      gap: 22rpx;
-    }
-    &-avatar {
-      width: 88rpx;
-      height: 88rpx;
-      border-radius: 50%;
-      background: #e9eef3;
-      flex-shrink: 0;
-    }
-    &-info {
-      flex: 1;
-      min-width: 0;
-    }
-    &-name {
-      display: block;
-      font-size: 32rpx;
-      font-weight: 700;
-      color: #1f2937;
-      line-height: 1.35;
-    }
-    &-desc {
-      display: block;
-      margin-top: 8rpx;
-      color: #667085;
-      font-size: 24rpx;
-      line-height: 1.45;
-    }
-    &-actions {
-      display: flex;
-      gap: 16rpx;
-      margin-top: 26rpx;
-    }
-    &-action {
-      flex: 1;
-      height: 72rpx;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 36rpx;
-      background: var(--color-primary);
+    color: #0f3a24;
+    font-size: 27rpx;
+    font-weight: 700;
+    line-height: 76rpx;
+    text-align: center;
+
+    &--ghost {
+      background: rgba(255, 255, 255, .14);
       color: #fff;
-      font-size: 26rpx;
-      font-weight: 600;
-      &--ghost {
-        background: #f2f4f7;
-        color: #475467;
-      }
+      border: 1rpx solid rgba(255, 255, 255, .34);
     }
   }
 
@@ -395,12 +372,13 @@ onShow(async () => {
     align-items: flex-start;
     justify-content: space-between;
     gap: 20rpx;
-    padding: 28rpx;
-    background: #fff;
-    border-radius: 16rpx;
+    padding: 26rpx;
+    background: var(--color-bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
     &-title {
       display: block;
-      color: #1f2937;
+      color: var(--color-text);
       font-size: 30rpx;
       font-weight: 600;
       line-height: 1.35;
@@ -408,259 +386,29 @@ onShow(async () => {
     &-desc {
       display: block;
       margin-top: 8rpx;
-      color: #667085;
+      color: var(--color-text-secondary);
       font-size: 24rpx;
       line-height: 1.45;
     }
     &-time {
       display: block;
       margin-top: 10rpx;
-      color: #98a2b3;
+      color: var(--color-text-tertiary);
       font-size: 22rpx;
     }
     &-status {
       flex-shrink: 0;
       padding: 8rpx 16rpx;
       border-radius: 24rpx;
-      background: rgba(7, 193, 96, 0.1);
+      background: var(--color-primary-light);
       color: var(--color-primary);
       font-size: 22rpx;
       font-weight: 600;
     }
   }
 
-  // ── CTA ──────────────────────────────
-  &__cta {
-    margin: 32rpx;
-    padding: 56rpx 40rpx;
-    background: #fff;
-    border-radius: 16rpx;
-    &-title {
-      display: block;
-      font-size: 48rpx;
-      font-weight: 700;
-      color: #1a1a1a;
-      margin-bottom: 12rpx;
-    }
-    &-sub {
-      display: block;
-      font-size: 26rpx;
-      color: #999;
-      margin-bottom: 34rpx;
-    }
-    &-actions {
-      display: flex;
-      gap: 16rpx;
-    }
-    &-btn {
-      flex: 1;
-      height: 76rpx;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #1a1a1a;
-      color: #fff;
-      font-size: 28rpx;
-      font-weight: 500;
-      border-radius: 60rpx;
-      &--ghost {
-        background: #f2f4f7;
-        color: #475467;
-      }
-    }
-  }
-
-  // ── Section ──────────────────────────
   &__section {
-    margin: 0 32rpx 32rpx;
-    &-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20rpx;
-    }
-    &-title {
-      display: block;
-      font-size: 28rpx;
-      font-weight: 600;
-      color: #1a1a1a;
-      margin-bottom: 20rpx;
-    }
-    &-head &-title { margin-bottom: 0; }
-    &-more {
-      font-size: 24rpx;
-      color: var(--color-primary);
-    }
-  }
-
-  &__modules {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16rpx;
-  }
-  &__module {
-    position: relative;
-    width: calc((100% - 16rpx) / 2);
-    min-height: 190rpx;
-    padding: 24rpx;
-    background: #fff;
-    border-radius: 16rpx;
-    box-sizing: border-box;
-    overflow: hidden;
-    &-bg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      opacity: .22;
-    }
-    &-head {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 18rpx;
-    }
-    &-icon {
-      color: #1f2937;
-      font-size: 30rpx;
-      font-weight: 700;
-    }
-    &-status {
-      padding: 5rpx 12rpx;
-      border-radius: 20rpx;
-      background: #f2f4f7;
-      color: #98a2b3;
-      font-size: 20rpx;
-      &.done {
-        background: rgba(7, 193, 96, 0.1);
-        color: var(--color-primary);
-      }
-    }
-    &-title {
-      position: relative;
-      display: block;
-      color: #1f2937;
-      font-size: 30rpx;
-      font-weight: 600;
-      line-height: 1.35;
-    }
-    &-desc {
-      position: relative;
-      display: block;
-      margin-top: 8rpx;
-      color: #667085;
-      font-size: 23rpx;
-      line-height: 1.45;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-    }
-  }
-
-  &__recommend {
-    background: #fff;
-    border-radius: 16rpx;
-    overflow: hidden;
-    &-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 18rpx;
-      padding: 28rpx;
-      border-bottom: 1rpx solid #f0f0f0;
-      &:last-child { border-bottom: none; }
-    }
-    &-cover {
-      width: 116rpx;
-      height: 92rpx;
-      border-radius: 10rpx;
-      background: #e9eef3;
-      flex-shrink: 0;
-      &--empty {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #667085;
-        font-size: 22rpx;
-      }
-    }
-    &-main { flex: 1; min-width: 0; }
-    &-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14rpx;
-      margin-bottom: 8rpx;
-    }
-    &-module {
-      color: var(--color-primary);
-      font-size: 22rpx;
-      font-weight: 600;
-    }
-    &-title {
-      display: block;
-      font-size: 30rpx;
-      font-weight: 600;
-      color: #1a1a1a;
-      line-height: 1.35;
-    }
-    &-desc {
-      display: block;
-      margin-top: 8rpx;
-      font-size: 24rpx;
-      color: #666;
-      line-height: 1.45;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-    }
-    &-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8rpx;
-      margin-top: 12rpx;
-    }
-    &-tag {
-      padding: 5rpx 12rpx;
-      border-radius: 18rpx;
-      background: rgba(7, 193, 96, 0.08);
-      color: var(--color-primary);
-      font-size: 20rpx;
-    }
-    &-reason {
-      display: block;
-      margin-top: 10rpx;
-      font-size: 22rpx;
-      color: #999;
-    }
-    &-price {
-      flex-shrink: 0;
-      font-size: 24rpx;
-      color: #f97316;
-      font-weight: 600;
-    }
-  }
-  &__recommend-state {
-    min-height: 128rpx;
-    background: #fff;
-    border-radius: 16rpx;
-    color: #999;
-    font-size: 24rpx;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16rpx;
-  }
-  &__recommend-retry {
-    padding: 8rpx 20rpx;
-    border-radius: 24rpx;
-    background: var(--color-primary);
-    color: #fff;
-    font-size: 22rpx;
+    margin: 0 28rpx 34rpx;
   }
 }
 </style>

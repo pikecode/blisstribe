@@ -1,6 +1,7 @@
 <template>
   <view class="products">
     <view class="products__head">
+      <text class="products__eyebrow">服务推荐</text>
       <text class="products__title">专属{{ currentModule?.name || '服务' }}推荐</text>
       <text class="products__subtitle">{{ canUseAssessment && assessment ? '已根据需求评估优先匹配产品' : '按你的标签优先展示更匹配的产品' }}</text>
       <view v-if="canUseAssessment && assessment" class="products__assessment">
@@ -19,6 +20,10 @@
       </view>
       <view v-if="canUseAssessment && !assessment" class="products__assessment-entry" @tap="goAssessment">
         <text>做一次{{ currentModule?.name || '' }}需求评估</text>
+      </view>
+      <view class="products__meta">
+        <text>{{ products.length }} 个服务</text>
+        <text>{{ effectiveTags.length ? `${effectiveTags.length} 个匹配标签` : '暂无匹配标签' }}</text>
       </view>
       <view v-if="moduleCode === 'health'" class="products__scenes">
         <text
@@ -170,24 +175,35 @@ onShow(loadProducts)
 <style lang="scss" scoped>
 .products {
   min-height: 100vh;
-  background: #f6f7f8;
-  padding-bottom: 48rpx;
+  background: var(--color-bg);
+  padding-bottom: 56rpx;
 
   &__head {
-    padding: 40rpx 32rpx 28rpx;
-    background: #fff;
+    padding: 42rpx 32rpx 30rpx;
+    background: linear-gradient(180deg, #ffffff 0%, #f6faf7 100%);
+    border-bottom: 1rpx solid var(--color-border);
+  }
+  &__eyebrow {
+    display: block;
+    color: var(--color-primary);
+    font-size: 23rpx;
+    font-weight: 700;
+    line-height: 32rpx;
+    margin-bottom: 8rpx;
   }
   &__title {
     display: block;
-    font-size: 40rpx;
-    font-weight: 700;
-    color: #1f2937;
+    font-size: 42rpx;
+    font-weight: 800;
+    color: var(--color-text);
+    line-height: 1.24;
     margin-bottom: 8rpx;
   }
   &__subtitle {
     display: block;
-    font-size: 26rpx;
-    color: #667085;
+    font-size: 25rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
   }
   &__tags {
     display: flex;
@@ -199,9 +215,10 @@ onShow(loadProducts)
   &__profile {
     padding: 10rpx 20rpx;
     border-radius: 28rpx;
-    background: rgba(7, 193, 96, 0.08);
+    background: var(--color-primary-light);
     color: var(--color-primary);
     font-size: 24rpx;
+    font-weight: 600;
   }
   &__profile {
     display: inline-flex;
@@ -210,18 +227,19 @@ onShow(loadProducts)
   &__assessment {
     margin-top: 24rpx;
     padding: 22rpx;
-    border-radius: 16rpx;
-    background: #f9fafb;
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-white);
+    box-shadow: var(--shadow-sm);
     &-title {
       display: block;
-      color: #1f2937;
+      color: var(--color-text);
       font-size: 26rpx;
       font-weight: 600;
       margin-bottom: 8rpx;
     }
     &-summary {
       display: block;
-      color: #667085;
+      color: var(--color-text-secondary);
       font-size: 24rpx;
       line-height: 1.55;
     }
@@ -243,6 +261,14 @@ onShow(loadProducts)
     background: var(--color-primary);
     color: #fff;
     font-size: 24rpx;
+    font-weight: 700;
+  }
+  &__meta {
+    display: flex;
+    gap: 18rpx;
+    margin-top: 24rpx;
+    color: var(--color-text-tertiary);
+    font-size: 23rpx;
   }
   &__scenes {
     display: flex;
@@ -253,16 +279,17 @@ onShow(loadProducts)
   &__scene {
     padding: 10rpx 20rpx;
     border-radius: 28rpx;
-    background: #f2f4f7;
-    color: #667085;
+    background: var(--color-bg-gray);
+    color: var(--color-text-secondary);
     font-size: 24rpx;
     &.active {
-      background: rgba(7, 193, 96, 0.12);
+      background: var(--color-primary-light);
       color: var(--color-primary);
+      font-weight: 700;
     }
   }
   &__list {
-    padding: 24rpx 24rpx 0;
+    padding: 24rpx 28rpx 0;
   }
   &__state {
     display: flex;
@@ -270,7 +297,7 @@ onShow(loadProducts)
     align-items: center;
     gap: 24rpx;
     padding: 120rpx 32rpx;
-    color: #98a2b3;
+    color: var(--color-text-tertiary);
     font-size: 28rpx;
   }
   &__retry {
@@ -283,31 +310,32 @@ onShow(loadProducts)
   &__empty {
     padding: 120rpx 32rpx;
     text-align: center;
-    color: #98a2b3;
+    color: var(--color-text-tertiary);
     font-size: 28rpx;
   }
 }
 
 .product-card {
-  margin-bottom: 20rpx;
-  background: #fff;
-  border-radius: 16rpx;
+  margin-bottom: 22rpx;
+  background: var(--color-bg-white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 
   &__cover {
     width: 100%;
-    height: 280rpx;
+    height: 292rpx;
     background: #e9eef3;
     &--empty {
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #667085;
+      color: var(--color-text-secondary);
       font-size: 30rpx;
     }
   }
   &__body {
-    padding: 24rpx;
+    padding: 26rpx;
   }
   &__top {
     display: flex;
@@ -320,7 +348,7 @@ onShow(loadProducts)
     flex: 1;
     font-size: 32rpx;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--color-text);
     line-height: 1.35;
   }
   &__price {
@@ -331,8 +359,8 @@ onShow(loadProducts)
   }
   &__summary {
     display: block;
-    color: #667085;
-    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    font-size: 25rpx;
     line-height: 1.5;
     margin-bottom: 16rpx;
   }
@@ -345,18 +373,22 @@ onShow(loadProducts)
   &__tag {
     padding: 6rpx 14rpx;
     border-radius: 20rpx;
-    background: #f2f4f7;
-    color: #667085;
+    background: var(--color-bg-gray);
+    color: var(--color-text-secondary);
     font-size: 22rpx;
     &.matched {
-      background: rgba(7, 193, 96, 0.1);
+      background: var(--color-primary-light);
       color: var(--color-primary);
+      font-weight: 700;
     }
   }
   &__reason {
     display: block;
-    color: #98a2b3;
+    padding-top: 14rpx;
+    border-top: 1rpx solid var(--color-border);
+    color: var(--color-text-tertiary);
     font-size: 22rpx;
+    line-height: 1.45;
   }
 }
 </style>

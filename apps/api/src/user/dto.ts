@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsNotEmpty, IsArray } from 'class-validator'
+import { IsString, IsOptional, IsNumber, IsNotEmpty, IsArray, IsInt } from 'class-validator'
 
 export class UpdateUserDto {
   @IsOptional() @IsString() nickname?: string
@@ -12,6 +12,7 @@ export class UpdateUserDto {
   @IsOptional() @IsString() favoriteColor?: string
   @IsOptional() @IsString() occupation?: string
   @IsOptional() @IsArray() tags?: string[]
+  @IsOptional() @IsArray() @IsInt({ each: true }) tagIds?: number[]
   @IsOptional() @IsString() identity?: string
   @IsOptional() @IsString() douyinPayCode?: string
 }
@@ -20,4 +21,3 @@ export class SetPasswordDto {
   @IsString() @IsNotEmpty() password!: string
   @IsString() @IsNotEmpty() confirmPassword!: string
 }
-

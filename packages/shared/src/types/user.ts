@@ -22,6 +22,7 @@ export interface User {
   favoriteColor?: string
   occupation?: string
   tags: string[]
+  tagIds?: number[]
   identity?: UserIdentity
   level: UserLevel
   douyinPayCode?: string
@@ -44,8 +45,8 @@ export interface RegisterForm {
   favoriteColor?: string
   occupation?: string
   tags?: string[]
+  tagIds?: number[]
   identity?: UserIdentity
   inviteCode?: string
   agreement: boolean
 }
-

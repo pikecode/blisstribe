@@ -1,13 +1,23 @@
 <template>
   <view class="assessment">
     <view class="assessment__head">
+      <text class="assessment__eyebrow">需求评估</text>
       <text class="assessment__title">{{ currentTemplate.title }}</text>
       <text class="assessment__subtitle">{{ currentTemplate.subtitle }}</text>
+      <view class="assessment__progress">
+        <view class="assessment__progress-bar">
+          <view class="assessment__progress-value" :style="{ width: `${progressPercent}%` }" />
+        </view>
+        <text class="assessment__progress-text">{{ answeredCount }}/{{ currentTemplate.questions.length }}</text>
+      </view>
     </view>
 
     <view class="assessment__form">
-      <view v-for="question in currentTemplate.questions" :key="question.key" class="question">
-        <text class="question__title">{{ question.title }}</text>
+      <view v-for="(question, index) in currentTemplate.questions" :key="question.key" class="question">
+        <view class="question__head">
+          <text class="question__index">{{ index + 1 }}</text>
+          <text class="question__title">{{ question.title }}</text>
+        </view>
         <view class="question__options">
           <view
             v-for="option in question.options"
@@ -219,6 +229,11 @@ const templates: Record<string, LocalAssessmentTemplate> = {
 const answers = reactive<Record<string, string>>({})
 const currentTemplate = ref<LocalAssessmentTemplate>(templates.health)
 const canSubmit = computed(() => currentTemplate.value.questions.every((item) => !!answers[item.key]))
+const answeredCount = computed(() => currentTemplate.value.questions.filter((item) => !!answers[item.key]).length)
+const progressPercent = computed(() => {
+  const total = currentTemplate.value.questions.length || 1
+  return Math.round((answeredCount.value / total) * 100)
+})
 
 function fallbackTemplate(type: string) {
   return templates[type] || templates[returnModuleCode] || templates.health
@@ -298,27 +313,62 @@ onLoad(async (options) => {
 <style lang="scss" scoped>
 .assessment {
   min-height: 100vh;
-  background: #f6f7f8;
+  background: var(--color-bg);
   padding-bottom: 140rpx;
 
   &__head {
-    padding: 44rpx 32rpx 28rpx;
-    background: #fff;
+    padding: 42rpx 32rpx 30rpx;
+    background: linear-gradient(180deg, #ffffff 0%, #f6faf7 100%);
+    border-bottom: 1rpx solid var(--color-border);
+  }
+  &__eyebrow {
+    display: block;
+    color: var(--color-primary);
+    font-size: 23rpx;
+    font-weight: 700;
+    line-height: 32rpx;
+    margin-bottom: 8rpx;
   }
   &__title {
     display: block;
-    color: #1f2937;
-    font-size: 40rpx;
-    font-weight: 700;
+    color: var(--color-text);
+    font-size: 42rpx;
+    font-weight: 800;
+    line-height: 1.24;
     margin-bottom: 10rpx;
   }
   &__subtitle {
     display: block;
-    color: #667085;
-    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    font-size: 25rpx;
+    line-height: 1.5;
+  }
+  &__progress {
+    display: flex;
+    align-items: center;
+    gap: 18rpx;
+    margin-top: 28rpx;
+  }
+  &__progress-bar {
+    flex: 1;
+    height: 12rpx;
+    border-radius: 999rpx;
+    background: #e7ece9;
+    overflow: hidden;
+  }
+  &__progress-value {
+    height: 100%;
+    border-radius: 999rpx;
+    background: var(--color-primary);
+    transition: width .2s ease;
+  }
+  &__progress-text {
+    color: var(--color-text-secondary);
+    font-size: 23rpx;
+    font-weight: 700;
   }
   &__form {
-    padding: 24rpx;
+    padding: 24rpx 28rpx;
   }
   &__footer {
     position: fixed;
@@ -327,7 +377,7 @@ onLoad(async (options) => {
     bottom: 0;
     padding: 16rpx 32rpx;
     background: #fff;
-    border-top: 1rpx solid #eef0f2;
+    border-top: 1rpx solid var(--color-border);
   }
   &__submit {
     height: 88rpx;
@@ -339,26 +389,47 @@ onLoad(async (options) => {
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: var(--shadow-action);
     &.disabled {
       background: #d0d5dd;
-      color: #667085;
+      color: var(--color-text-secondary);
+      box-shadow: none;
     }
   }
 }
 
 .question {
-  margin-bottom: 20rpx;
+  margin-bottom: 22rpx;
   padding: 28rpx;
-  background: #fff;
-  border-radius: 16rpx;
+  background: var(--color-bg-white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
 
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 16rpx;
+    margin-bottom: 22rpx;
+  }
+  &__index {
+    width: 42rpx;
+    height: 42rpx;
+    border-radius: 50%;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    font-size: 22rpx;
+    font-weight: 800;
+    line-height: 42rpx;
+    text-align: center;
+    flex-shrink: 0;
+  }
   &__title {
     display: block;
-    color: #1f2937;
+    flex: 1;
+    color: var(--color-text);
     font-size: 30rpx;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.45;
-    margin-bottom: 22rpx;
   }
   &__options {
     display: flex;
@@ -368,13 +439,13 @@ onLoad(async (options) => {
   &__option {
     padding: 16rpx 22rpx;
     border-radius: 32rpx;
-    background: #f2f4f7;
+    background: var(--color-bg-gray);
     color: #475467;
     font-size: 26rpx;
     &.active {
       color: var(--color-primary);
-      background: rgba(7, 193, 96, 0.12);
-      font-weight: 600;
+      background: var(--color-primary-light);
+      font-weight: 700;
     }
   }
 }

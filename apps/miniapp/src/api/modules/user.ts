@@ -14,6 +14,7 @@ export interface UpdateUserParams {
   favoriteColor?: string
   occupation?: string
   tags?: string[]
+  tagIds?: number[]
   identity?: string
   douyinPayCode?: string
 }

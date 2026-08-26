@@ -52,6 +52,7 @@ export interface RegisterParams {
   favoriteColor?: string
   occupation?: string
   tags?: string[]
+  tagIds?: number[]
   identity?: string
   inviteCode?: string
 }

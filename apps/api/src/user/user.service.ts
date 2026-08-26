@@ -20,6 +20,9 @@ export class UserService {
 
   async updateInfo(userId: string, dto: UpdateUserDto): Promise<User> {
     const current = await this.findUserOrThrow(userId)
+    const tagSnapshot = dto.tags !== undefined || dto.tagIds !== undefined
+      ? await this.normalizeUserTags(dto.tagIds, dto.tags ?? [])
+      : undefined
     const user = await this.prisma.user.update({
       where: { id: BigInt(userId) },
       data: {
@@ -33,7 +36,7 @@ export class UserService {
         ...(dto.age !== undefined && { age: dto.age }),
         ...(dto.favoriteColor !== undefined && { favoriteColor: dto.favoriteColor }),
         ...(dto.occupation !== undefined && { occupation: dto.occupation }),
-        ...(dto.tags !== undefined && { tags: dto.tags }),
+        ...(tagSnapshot !== undefined && { tags: tagSnapshot.names, tagIds: tagSnapshot.ids }),
         ...(dto.identity !== undefined && { identity: dto.identity }),
         ...(dto.douyinPayCode !== undefined && { douyinPayCode: dto.douyinPayCode }),
       },
@@ -42,6 +45,38 @@ export class UserService {
       this.uploadService.deleteFile(current.avatar)
     }
     return this.toUserVO(user)
+  }
+
+  private async normalizeUserTags(tagIds: number[] | undefined, tags: string[] = []) {
+    const ids = this.cleanTagIds(tagIds ?? [])
+    const names = this.cleanTags(tags)
+    if (!ids.length && !names.length) return { ids: [], names: [] }
+    const rows = await this.prisma.tagDictionary.findMany({
+      where: {
+        deletedAt: null,
+        status: 1,
+        OR: [
+          ...(ids.length ? [{ id: { in: ids } }] : []),
+          ...(names.length ? [{ name: { in: names } }] : []),
+        ],
+      },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    })
+    return {
+      ids: this.cleanTagIds(rows.map((item) => item.id)),
+      names: this.cleanTags(rows.map((item) => item.name)),
+    }
+  }
+
+  private cleanTags(tags: string[]) {
+    return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))].slice(0, 20)
+  }
+
+  private cleanTagIds(tagIds: Array<number | bigint>) {
+    const ids = tagIds
+      .map((tagId) => BigInt(tagId))
+      .filter((tagId) => tagId > 0n)
+    return Array.from(new Map(ids.map((tagId) => [String(tagId), tagId])).values()).slice(0, 20)
   }
 
   async setPassword(userId: string, dto: SetPasswordDto): Promise<void> {
@@ -58,22 +93,49 @@ export class UserService {
 
   async deactivateAccount(userId: string): Promise<void> {
     await this.findUserOrThrow(userId)
-    const tombstone = `deleted_${userId}_${Date.now()}`
+    const deletedAt = new Date()
+    const tombstone = `deleted_${userId}_${deletedAt.getTime()}`
+    const wxTombstone = `deleted_wx_${userId}_${deletedAt.getTime()}`
     await this.prisma.$transaction([
-      // 软删除用户，墓碑化手机 hash 使同一手机可重新注册
+      // 注销采用软删除和关键标识墓碑化，既保留业务审计关系，又释放手机号/微信重新注册能力。
       this.prisma.user.update({
         where: { id: BigInt(userId) },
         data: {
-          deletedAt: new Date(),
+          deletedAt,
           status: 0,
+          phoneCiphertext: Buffer.alloc(0),
           phoneHash: tombstone,
-          phoneMasked: '***',
+          phoneMasked: '已注销',
+          nickname: '已注销用户',
+          avatar: '',
+          birthday: null,
+          passwordHash: null,
+          realName: null,
+          wechatId: null,
+          email: null,
+          age: null,
+          favoriteColor: null,
+          occupation: null,
+          tags: [],
+          tagIds: [],
+          identity: null,
+          douyinPayCode: null,
         },
       }),
-      // 解绑微信账号（墓碑化 openId hash）
+      // 解绑微信账号，避免同一个微信身份后续仍命中旧账号。
       this.prisma.wechatAccount.updateMany({
         where: { userId: BigInt(userId) },
-        data: { wxOpenIdHash: tombstone, status: 0 },
+        data: {
+          wxOpenIdHash: wxTombstone,
+          wxUnionId: null,
+          wxNickname: null,
+          wxAvatar: null,
+          wxGender: 0,
+          wxCountry: null,
+          wxProvince: null,
+          wxCity: null,
+          status: 0,
+        },
       }),
       // 作废所有 session
       this.prisma.userSession.updateMany({
@@ -105,6 +167,7 @@ export class UserService {
     favoriteColor?: string | null
     occupation?: string | null
     tags: string[]
+    tagIds?: bigint[]
     identity?: string | null
     level: string
     douyinPayCode?: string | null
@@ -127,6 +190,7 @@ export class UserService {
       favoriteColor: user.favoriteColor ?? undefined,
       occupation: user.occupation ?? undefined,
       tags: user.tags,
+      tagIds: user.tagIds?.map(Number) ?? [],
       identity: (user.identity ?? undefined) as User['identity'],
       level: (user.level || 'normal') as User['level'],
       douyinPayCode: user.douyinPayCode ?? undefined,

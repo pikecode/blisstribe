@@ -1,4 +1,4 @@
-import { IsIn, IsString, IsOptional, IsNumber, IsBoolean, IsNotEmpty } from 'class-validator'
+import { IsArray, IsIn, IsInt, IsString, IsOptional, IsNumber, IsBoolean, IsNotEmpty } from 'class-validator'
 
 export class WechatLoginDto {
   @IsString()
@@ -72,6 +72,11 @@ export class RegisterDto {
 
   @IsOptional()
   tags?: string[]
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  tagIds?: number[]
 
   @IsOptional()
   @IsString()

@@ -22,17 +22,20 @@
           </span>
         </div>
         <nav class="layout__nav">
-          <router-link
-            v-for="item in menuItems"
-            :key="item.path"
-            :to="item.path"
-            class="layout__nav-item"
-            :class="{ active: route.path.startsWith(item.path) }"
-            @click="drawerVisible = false"
-          >
-            <el-icon class="layout__nav-icon"><component :is="item.icon" /></el-icon>
-            <span>{{ item.title }}</span>
-          </router-link>
+          <div v-for="section in menuSections" :key="section.title" class="layout__nav-section">
+            <div class="layout__nav-section-title">{{ section.title }}</div>
+            <router-link
+              v-for="item in section.items"
+              :key="item.path"
+              :to="item.path"
+              class="layout__nav-item"
+              :class="{ active: isActiveMenu(item.path) }"
+              @click="drawerVisible = false"
+            >
+              <el-icon class="layout__nav-icon"><component :is="item.icon" /></el-icon>
+              <span>{{ item.title }}</span>
+            </router-link>
+          </div>
         </nav>
       </aside>
     </el-drawer>
@@ -46,16 +49,19 @@
         </span>
       </div>
       <nav class="layout__nav">
-        <router-link
-          v-for="item in menuItems"
-          :key="item.path"
-          :to="item.path"
-          class="layout__nav-item"
-          :class="{ active: route.path.startsWith(item.path) }"
-        >
-          <el-icon class="layout__nav-icon"><component :is="item.icon" /></el-icon>
-          <span>{{ item.title }}</span>
-        </router-link>
+        <div v-for="section in menuSections" :key="section.title" class="layout__nav-section">
+          <div class="layout__nav-section-title">{{ section.title }}</div>
+          <router-link
+            v-for="item in section.items"
+            :key="item.path"
+            :to="item.path"
+            class="layout__nav-item"
+            :class="{ active: isActiveMenu(item.path) }"
+          >
+            <el-icon class="layout__nav-icon"><component :is="item.icon" /></el-icon>
+            <span>{{ item.title }}</span>
+          </router-link>
+        </div>
       </nav>
     </aside>
 
@@ -113,6 +119,19 @@ import {
   Tickets,
   User,
 } from '@element-plus/icons-vue'
+import type { Component } from 'vue'
+
+interface MenuItem {
+  path: string
+  title: string
+  icon: Component
+  desc: string
+}
+
+interface MenuSection {
+  title: string
+  items: MenuItem[]
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -127,22 +146,47 @@ const updateWidth = () => { windowWidth.value = window.innerWidth }
 onMounted(() => window.addEventListener('resize', updateWidth))
 onUnmounted(() => window.removeEventListener('resize', updateWidth))
 
-const menuItems = [
-  { path: '/dashboard', title: '数据看板', icon: DataLine, desc: '查看关键增长指标与注册趋势' },
-  { path: '/users', title: '用户管理', icon: User, desc: '检索用户资料并处理账号状态' },
-  { path: '/invitations', title: '邀请管理', icon: Share, desc: '查看邀请效果、注册记录与奖励链路' },
-  { path: '/partners', title: 'B 入驻审核', icon: OfficeBuilding, desc: '审核经营主体、客户归属与邀请记录' },
-  { path: '/banners', title: 'Banner 管理', icon: Picture, desc: '维护小程序首页展示资源' },
-  { path: '/tags', title: '标签管理', icon: CollectionTag, desc: '维护评估、产品和推荐规则共用标签' },
-  { path: '/products', title: '产品管理', icon: Goods, desc: '维护产品模块、标签、推荐优先级与上下架' },
-  { path: '/assessment-templates', title: '评估管理', icon: EditPen, desc: '维护模块评估题目、选项和标签映射' },
-  { path: '/recommendation-rules', title: '推荐规则', icon: Goods, desc: '配置评估标签命中后的产品加权和推荐理由' },
-  { path: '/product-leads', title: '产品线索', icon: Tickets, desc: '查看用户需求并记录线索跟进状态' },
-  { path: '/admins', title: '管理员与权限', icon: Lock, desc: '管理后台账号、角色与权限' },
-  { path: '/agreements', title: '协议管理', icon: Document, desc: '维护用户协议和隐私政策版本' },
+const menuSections: MenuSection[] = [
+  {
+    title: '运营概览',
+    items: [
+      { path: '/dashboard', title: '数据看板', icon: DataLine, desc: '查看关键增长指标与注册趋势' },
+    ],
+  },
+  {
+    title: '用户与增长',
+    items: [
+      { path: '/users', title: '用户管理', icon: User, desc: '检索用户资料、标签与账号状态' },
+      { path: '/invitations', title: '邀请管理', icon: Share, desc: '查看邀请效果、注册记录与关系链路' },
+      { path: '/partners', title: '服务伙伴审核', icon: OfficeBuilding, desc: '审核经营主体、客户归属与邀请记录' },
+      { path: '/product-leads', title: '咨询线索', icon: Tickets, desc: '查看用户需求并记录线索跟进状态' },
+    ],
+  },
+  {
+    title: '产品与推荐',
+    items: [
+      { path: '/products', title: '产品管理', icon: Goods, desc: '维护产品模块、标签、推荐优先级与上下架' },
+      { path: '/assessment-templates', title: '评估管理', icon: EditPen, desc: '维护模块评估题目、选项和标签映射' },
+      { path: '/recommendation-rules', title: '推荐规则', icon: CollectionTag, desc: '配置评估标签命中后的产品加权和推荐理由' },
+      { path: '/tags', title: '标签字典', icon: CollectionTag, desc: '维护评估、产品和推荐规则共用标签' },
+    ],
+  },
+  {
+    title: '内容与系统',
+    items: [
+      { path: '/banners', title: '首页 Banner', icon: Picture, desc: '维护小程序首页展示资源' },
+      { path: '/agreements', title: '协议管理', icon: Document, desc: '维护用户协议和隐私政策版本' },
+      { path: '/admins', title: '管理员与权限', icon: Lock, desc: '管理后台账号、角色与权限' },
+    ],
+  },
 ]
 
-const currentMenu = computed(() => menuItems.find(item => route.path.startsWith(item.path)))
+const menuItems = computed(() => menuSections.flatMap(section => section.items))
+const currentMenu = computed(() => menuItems.value.find(item => isActiveMenu(item.path)))
+
+const isActiveMenu = (path: string) => {
+  return route.path === path || route.path.startsWith(`${path}/`)
+}
 
 const handleLogout = () => {
   authStore.clear()
@@ -215,11 +259,25 @@ const handleLogout = () => {
 
 .layout__nav {
   flex: 1;
-  padding: 14px 12px;
+  padding: 14px 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.layout__nav-section {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  overflow-y: auto;
+}
+
+.layout__nav-section-title {
+  padding: 8px 12px 5px;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .layout__nav-item {
