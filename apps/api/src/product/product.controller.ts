@@ -3,12 +3,14 @@ import { AdminJwtGuard } from '../common/guards/admin-jwt.guard'
 import { JwtAuthGuard } from '../common/guards/jwt.guard'
 import { CurrentAdmin } from '../common/decorators/current-admin.decorator'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
+import { OptionalJwtGuard } from '../common/guards/optional-jwt.guard'
 import { ProductService } from './product.service'
 import {
   CreateAssessmentTemplateDto,
   CreateProductDto,
   CreateProductLeadDto,
   CreateProductModuleDto,
+  CreateRecommendationEventDto,
   CreateRecommendationRuleDto,
   CreateTagDictionaryDto,
   FollowProductLeadDto,
@@ -94,6 +96,12 @@ export class ProductController {
     @Query('pageSize') pageSize = '20'
   ) {
     return this.productService.listMyLeads(BigInt(user.userId), pageParams(page, pageSize))
+  }
+
+  @UseGuards(OptionalJwtGuard)
+  @Post('events')
+  createEvent(@CurrentUser() user: { userId: string } | null, @Body() dto: CreateRecommendationEventDto) {
+    return this.productService.createRecommendationEvent(user?.userId ? BigInt(user.userId) : null, dto)
   }
 
   @Get(':id')
@@ -253,6 +261,25 @@ export class TagDictionaryAdminController {
 @UseGuards(AdminJwtGuard)
 export class ProductAdminController {
   constructor(private readonly productService: ProductService) {}
+
+  @Get('analytics')
+  analytics(
+    @Query('moduleId') moduleId?: string,
+    @Query('moduleCode') moduleCode?: string,
+    @Query('productType') productType?: string,
+    @Query('recommendationForm') recommendationForm?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    return this.productService.recommendationAnalyticsAdmin({
+      moduleId: moduleId ? BigInt(moduleId) : undefined,
+      moduleCode,
+      productType,
+      recommendationForm,
+      startDate,
+      endDate,
+    })
+  }
 
   @Get()
   list(

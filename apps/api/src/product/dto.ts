@@ -25,6 +25,15 @@ export const PRODUCT_SERVICE_MODES = ['online', 'offline', 'mixed', ''] as const
 export const PRODUCT_STOCK_STATUSES = ['available', 'limited', 'sold_out'] as const
 export const PRODUCT_LEAD_STATUS = ['new', 'contacted', 'qualified', 'converted', 'invalid'] as const
 export const ASSESSMENT_QUESTION_TYPES = ['single'] as const
+export const RECOMMENDATION_EVENT_TYPES = ['impression', 'click', 'lead_submit', 'assessment_submit', 'filter_click'] as const
+export const RECOMMENDATION_FORMS = [
+  'module_featured',
+  'assessment_result',
+  'profile_suggestion',
+  'consultant_recommendation',
+  'campaign_recommendation',
+  'bundle_solution',
+] as const
 
 export class CreateProductModuleDto {
   @IsString()
@@ -695,6 +704,72 @@ export class CreateProductLeadDto {
   @IsString()
   @MaxLength(500)
   message?: string
+}
+
+export class CreateRecommendationEventDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(RECOMMENDATION_EVENT_TYPES)
+  eventType!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  anonymousId?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  moduleId?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  moduleCode?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  productId?: number
+
+  @IsOptional()
+  @IsString()
+  @IsIn(PRODUCT_TYPES)
+  productType?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(RECOMMENDATION_FORMS)
+  recommendationForm?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  sourceScene?: string
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[]
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  tagIds?: number[]
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  score?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  reason?: string
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>
 }
 
 export class FollowProductLeadDto {

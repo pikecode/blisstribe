@@ -43,6 +43,7 @@ import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { productApi, type AssessmentTemplate as RemoteAssessmentTemplate } from '@/api/modules/product'
 import { useHealthAssessment } from '@/composables/useHealthAssessment'
+import { reportProductEvent } from '@/utils/analytics'
 
 interface Option {
   label: string
@@ -289,6 +290,18 @@ function submitAssessment() {
     answers: { ...answers },
     createdAt: new Date().toISOString(),
   }, returnModuleCode)
+  reportProductEvent({
+    eventType: 'assessment_submit',
+    moduleCode: returnModuleCode,
+    recommendationForm: 'assessment_result',
+    sourceScene: 'miniapp_assessment_submit',
+    tags,
+    tagIds,
+    metadata: {
+      assessmentType: assessmentType.value,
+      answers: { ...answers },
+    },
+  })
   uni.redirectTo({ url: `/pages/products/index?moduleCode=${returnModuleCode}&fromAssessment=1` })
 }
 

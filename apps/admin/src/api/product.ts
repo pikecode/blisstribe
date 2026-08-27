@@ -77,6 +77,12 @@ export type ProductType = 'service' | 'physical' | 'package'
 export type ProductServiceMode = 'online' | 'offline' | 'mixed'
 export type ProductStockStatus = 'available' | 'limited' | 'sold_out'
 
+export function productTypeText(type?: string) {
+  if (type === 'physical') return '实物产品'
+  if (type === 'package') return '组合方案'
+  return '服务产品'
+}
+
 export interface ProductLead {
   id: number
   product: { id: number; title: string; coverUrl: string; priceText: string }
@@ -105,6 +111,34 @@ export interface ProductLeadFollowUp {
   note: string
   nextFollowAt: string | null
   createdAt: string
+}
+
+export interface RecommendationOverview {
+  impressions: number
+  clicks: number
+  leads: number
+  assessments: number
+  clickRate: number
+  leadRate: number
+}
+
+export interface RecommendationProductStat extends RecommendationOverview {
+  productId: number
+  product: Product | null
+}
+
+export interface RecommendationTrendItem {
+  date: string
+  impressions: number
+  clicks: number
+  leads: number
+  assessments: number
+}
+
+export interface RecommendationAnalytics {
+  overview: RecommendationOverview
+  productStats: RecommendationProductStat[]
+  trend: RecommendationTrendItem[]
 }
 
 export interface AssessmentOption {
@@ -266,6 +300,16 @@ export const productApi = {
   },
   listProducts(params: { page?: number; pageSize?: number; status?: number | ''; moduleId?: number | ''; productType?: ProductType | ''; keyword?: string }): Promise<ListResult<Product>> {
     return request.get('/admin/products', { params })
+  },
+  analytics(params?: {
+    moduleId?: number | ''
+    moduleCode?: string
+    productType?: ProductType | ''
+    recommendationForm?: string
+    startDate?: string
+    endDate?: string
+  }): Promise<RecommendationAnalytics> {
+    return request.get('/admin/products/analytics', { params })
   },
   createProduct(data: ProductPayload): Promise<Product> {
     return request.post('/admin/products', data)

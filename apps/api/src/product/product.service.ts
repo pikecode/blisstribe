@@ -16,6 +16,7 @@ import { PrismaService } from '../common/prisma.service'
 import { BusinessException } from '../common/interceptors/response.interceptor'
 import {
   PRODUCT_STATUS,
+  type CreateRecommendationEventDto,
   type AssessmentQuestionInputDto,
   type CreateAssessmentTemplateDto,
   type CreateProductDto,
@@ -133,7 +134,7 @@ export class ProductService {
   async createLead(productId: bigint, userId: bigint, dto: CreateProductLeadDto) {
     const product = await this.prisma.product.findFirst({
       where: { id: productId, status: PRODUCT_STATUS.PUBLISHED, deletedAt: null },
-      select: { id: true, moduleId: true },
+      select: { id: true, moduleId: true, productType: true, module: { select: { code: true } } },
     })
     if (!product) throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '产品不存在或未上架')
 
@@ -193,7 +194,107 @@ export class ProductService {
         },
       })
     })
+    await this.createRecommendationEvent(userId, {
+      eventType: 'lead_submit',
+      productId: Number(product.id),
+      moduleId: Number(product.moduleId),
+      moduleCode: product.module.code,
+      productType: product.productType,
+      recommendationForm: dto.sourceScene === 'assessment_result' ? 'assessment_result' : undefined,
+      sourceScene: dto.sourceScene?.trim() || 'miniapp_product_detail',
+      tags: needTagSnapshot.names,
+      tagIds: needTagSnapshot.ids.map(Number),
+      metadata: { leadId: Number(lead.id) },
+    })
     return this.toLeadVO(lead)
+  }
+
+  async createRecommendationEvent(userId: bigint | null, dto: CreateRecommendationEventDto) {
+    const product = dto.productId
+      ? await this.prisma.product.findFirst({
+          where: { id: BigInt(dto.productId), deletedAt: null },
+          select: { id: true, moduleId: true, productType: true, module: { select: { id: true, code: true } } },
+        })
+      : null
+    const module = !product && (dto.moduleId || dto.moduleCode)
+      ? await this.prisma.productModule.findFirst({
+          where: {
+            deletedAt: null,
+            ...(dto.moduleId && { id: BigInt(dto.moduleId) }),
+            ...(dto.moduleCode && { code: dto.moduleCode.trim() }),
+          },
+          select: { id: true, code: true },
+        })
+      : null
+
+    const event = await this.prisma.recommendationEvent.create({
+      data: {
+        userId,
+        anonymousId: dto.anonymousId?.trim() ?? '',
+        moduleId: product?.moduleId ?? module?.id ?? (dto.moduleId ? BigInt(dto.moduleId) : null),
+        moduleCode: product?.module.code ?? module?.code ?? dto.moduleCode?.trim() ?? '',
+        productId: product?.id ?? (dto.productId ? BigInt(dto.productId) : null),
+        productType: product?.productType ?? dto.productType ?? '',
+        recommendationForm: dto.recommendationForm ?? '',
+        eventType: dto.eventType,
+        sourceScene: dto.sourceScene?.trim() ?? '',
+        tags: this.cleanTags(dto.tags ?? []),
+        tagIds: this.cleanTagIds(dto.tagIds ?? []),
+        score: dto.score ?? null,
+        matchReason: dto.reason?.trim() ?? '',
+        metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
+      },
+    })
+    return { id: Number(event.id) }
+  }
+
+  async recommendationAnalyticsAdmin(params: {
+    moduleId?: bigint
+    moduleCode?: string
+    productType?: string
+    recommendationForm?: string
+    startDate?: string
+    endDate?: string
+  }) {
+    const where = this.buildRecommendationEventWhere(params)
+    const productRefs = await this.prisma.recommendationEvent.findMany({
+      where: { ...where, productId: { not: null } },
+      select: { productId: true },
+      distinct: ['productId'],
+      take: 100,
+    })
+    const productIds = productRefs.map((item) => item.productId).filter((id): id is bigint => !!id)
+    const [eventGroups, productGroups, productRows, trendEvents] = await Promise.all([
+      this.prisma.recommendationEvent.groupBy({
+        by: ['eventType'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.recommendationEvent.groupBy({
+        by: ['productId', 'eventType'],
+        where: { ...where, productId: { not: null } },
+        _count: { _all: true },
+      }),
+      this.prisma.product.findMany({
+        where: { id: { in: productIds } },
+        include: { module: true },
+      }),
+      this.prisma.recommendationEvent.findMany({
+        where,
+        select: { createdAt: true, eventType: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ])
+    const overview = this.buildEventOverview(eventGroups)
+    const productMap = new Map(productRows.map((item) => [item.id.toString(), item]))
+    const productStats = this.buildProductEventStats(productGroups, productMap)
+    const trend = this.buildEventTrend(trendEvents)
+
+    return {
+      overview,
+      productStats,
+      trend,
+    }
   }
 
   async listMyLeads(userId: bigint, params: { page: number; pageSize: number }) {
@@ -706,6 +807,106 @@ export class ProductService {
     }
   }
 
+  private buildRecommendationEventWhere(params: {
+    moduleId?: bigint
+    moduleCode?: string
+    productType?: string
+    recommendationForm?: string
+    startDate?: string
+    endDate?: string
+  }): Prisma.RecommendationEventWhereInput {
+    const createdAt: Prisma.DateTimeFilter = {}
+    if (params.startDate) createdAt.gte = new Date(params.startDate)
+    if (params.endDate) {
+      const end = new Date(params.endDate)
+      end.setHours(23, 59, 59, 999)
+      createdAt.lte = end
+    }
+    return {
+      ...(params.moduleId && { moduleId: params.moduleId }),
+      ...(params.moduleCode && { moduleCode: params.moduleCode }),
+      ...(params.productType && { productType: params.productType }),
+      ...(params.recommendationForm && { recommendationForm: params.recommendationForm }),
+      ...(Object.keys(createdAt).length && { createdAt }),
+    }
+  }
+
+  private buildEventOverview(groups: Array<{ eventType: string; _count: { _all: number } }>) {
+    const countOf = (eventType: string) => groups.find((item) => item.eventType === eventType)?._count._all ?? 0
+    const impressions = countOf('impression')
+    const clicks = countOf('click')
+    const leads = countOf('lead_submit')
+    const assessments = countOf('assessment_submit')
+    return {
+      impressions,
+      clicks,
+      leads,
+      assessments,
+      clickRate: this.percent(clicks, impressions),
+      leadRate: this.percent(leads, clicks || impressions),
+    }
+  }
+
+  private buildProductEventStats(
+    groups: Array<{ productId: bigint | null; eventType: string; _count: { _all: number } }>,
+    productMap: Map<string, Product & { module: ProductModule }>
+  ) {
+    const statMap = new Map<string, {
+      productId: number
+      product: Record<string, unknown> | null
+      impressions: number
+      clicks: number
+      leads: number
+      assessments: number
+    }>()
+
+    for (const group of groups) {
+      if (!group.productId) continue
+      const key = group.productId.toString()
+      const product = productMap.get(key)
+      const current = statMap.get(key) ?? {
+        productId: Number(group.productId),
+        product: product ? this.toAdminProductVO(product) : null,
+        impressions: 0,
+        clicks: 0,
+        leads: 0,
+        assessments: 0,
+      }
+      if (group.eventType === 'impression') current.impressions += group._count._all
+      if (group.eventType === 'click') current.clicks += group._count._all
+      if (group.eventType === 'lead_submit') current.leads += group._count._all
+      if (group.eventType === 'assessment_submit') current.assessments += group._count._all
+      statMap.set(key, current)
+    }
+
+    return Array.from(statMap.values())
+      .map((item) => ({
+        ...item,
+        clickRate: this.percent(item.clicks, item.impressions),
+        leadRate: this.percent(item.leads, item.clicks || item.impressions),
+      }))
+      .sort((a, b) => b.leads - a.leads || b.clicks - a.clicks || b.impressions - a.impressions)
+  }
+
+  private buildEventTrend(events: Array<{ createdAt: Date; eventType: string }>) {
+    const trendMap = new Map<string, { date: string; impressions: number; clicks: number; leads: number; assessments: number }>()
+    for (const event of events) {
+      const date = event.createdAt.toISOString().slice(0, 10)
+      const current = trendMap.get(date) ?? { date, impressions: 0, clicks: 0, leads: 0, assessments: 0 }
+      if (event.eventType === 'impression') current.impressions += 1
+      if (event.eventType === 'click') current.clicks += 1
+      if (event.eventType === 'lead_submit') current.leads += 1
+      if (event.eventType === 'assessment_submit') current.assessments += 1
+      trendMap.set(date, current)
+    }
+    return Array.from(trendMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  private percent(numerator: number, denominator: number) {
+    if (!denominator) return 0
+    return Math.round((numerator / denominator) * 10000) / 100
+  }
+
   private buildProductCreateData(
     dto: CreateProductDto,
     tagSnapshot: { ids: bigint[]; names: string[] },
@@ -845,7 +1046,7 @@ export class ProductService {
     userTags: string[],
     userTagIds: bigint[] = [],
     userTagWeights: Map<string, number> = new Map()
-  ) {
+  ): number {
     const tagSet = new Set(userTags)
     const tagIdSet = new Set(userTagIds.map(String))
     const primaryMatches = product.primaryTagIds.filter((tagId) => tagIdSet.has(String(tagId)))
@@ -853,6 +1054,7 @@ export class ProductService {
     const configuredIds = new Set([...product.primaryTagIds, ...product.secondaryTagIds].map(String))
     const matchedById = product.tagIds.filter((tagId) => tagIdSet.has(String(tagId)) && !configuredIds.has(String(tagId)))
     const matchedByName = product.tags.filter((tag) => tagSet.has(tag))
+
     const primaryScore = primaryMatches.reduce((sum, tagId) => sum + this.tagWeight(userTagWeights, tagId) * 20, 0)
     const secondaryScore = secondaryMatches.reduce((sum, tagId) => sum + this.tagWeight(userTagWeights, tagId) * 10, 0)
     const fallbackScore = Math.max(
@@ -860,6 +1062,20 @@ export class ProductService {
       matchedByName.length * 10
     )
     return Math.round(product.priority + primaryScore + secondaryScore + fallbackScore)
+  }
+
+  private getMatchType(
+    product: Pick<Product, 'tagIds' | 'primaryTagIds' | 'secondaryTagIds'>,
+    userTagIds: bigint[],
+  ): 'primary' | 'secondary' | 'fallback' {
+    const tagIdSet = new Set(userTagIds.map(String))
+    const hasPrimaryMatch = product.primaryTagIds.some((tagId) => tagIdSet.has(String(tagId)))
+    if (hasPrimaryMatch) return 'primary'
+
+    const hasSecondaryMatch = product.secondaryTagIds.some((tagId) => tagIdSet.has(String(tagId)))
+    if (hasSecondaryMatch) return 'secondary'
+
+    return 'fallback'
   }
 
   private hasExcludedTagMatch(excludeTagIds: bigint[], userTagIds: bigint[] = []) {

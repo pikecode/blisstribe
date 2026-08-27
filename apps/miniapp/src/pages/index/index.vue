@@ -85,6 +85,7 @@ import { useFreshUserInfo } from '@/composables/useFreshUserInfo'
 import { useHealthAssessment } from '@/composables/useHealthAssessment'
 import { useAssessmentSync } from '@/composables/useAssessmentSync'
 import { storage } from '@/utils/storage'
+import { reportProductEvent, reportProductImpressions } from '@/utils/analytics'
 import AuthPopup from '@/components/business/AuthPopup.vue'
 import ModuleAssessmentList from '@/components/business/ModuleAssessmentList.vue'
 import ProductRecommendList from '@/components/business/ProductRecommendList.vue'
@@ -100,6 +101,7 @@ const assessmentMap = ref<Record<string, boolean>>({})
 const recommendLoading = ref(false)
 const recommendError = ref(false)
 const showAuthPopup = ref(false)
+const homeRecommendationForm = ref<'module_featured' | 'assessment_result' | 'profile_suggestion'>('module_featured')
 const { refreshUserInfo } = useFreshUserInfo()
 const { getAssessment } = useHealthAssessment()
 const { syncLocalAssessments } = useAssessmentSync()
@@ -163,10 +165,21 @@ async function loadRecommendedProducts() {
     const moduleCode = productModules.value[0]?.code || 'health'
     const module = productModules.value.find((item) => item.code === moduleCode)
     const assessment = module?.assessmentEnabled ? getAssessment(moduleCode) : null
+    homeRecommendationForm.value = assessment
+      ? 'assessment_result'
+      : user?.tags?.length || user?.tagIds?.length
+        ? 'profile_suggestion'
+        : 'module_featured'
     recommendedProducts.value = await productApi.recommended({
       moduleCode,
       tags: [...new Set([...(user?.tags || []), ...(assessment?.tags || [])])],
       tagIds: [...new Set([...(user?.tagIds || []), ...(assessment?.tagIds || [])])],
+      limit: 3,
+    })
+    reportProductImpressions(recommendedProducts.value, {
+      recommendationForm: homeRecommendationForm.value,
+      sourceScene: 'miniapp_home_recommend',
+      moduleCode,
       limit: 3,
     })
   } catch {
@@ -181,7 +194,25 @@ const goProducts = () => {
   const moduleCode = productModules.value[0]?.code || 'health'
   uni.navigateTo({ url: `/pages/products/index?moduleCode=${moduleCode}` })
 }
-const goProductDetail = (id: number) => uni.navigateTo({ url: `/pages/products/detail?id=${id}` })
+const goProductDetail = (id: number) => {
+  const product = recommendedProducts.value.find((item) => item.id === id)
+  if (product) {
+    reportProductEvent({
+      eventType: 'click',
+      productId: product.id,
+      moduleId: product.module?.id,
+      moduleCode: product.module?.code,
+      productType: product.productType,
+      recommendationForm: homeRecommendationForm.value,
+      sourceScene: 'miniapp_home_recommend',
+      tags: product.matchedTags?.length ? product.matchedTags : product.tags,
+      tagIds: product.matchedTagIds || product.tagIds || [],
+      score: product.score,
+      reason: product.recommendReason,
+    })
+  }
+  uni.navigateTo({ url: `/pages/products/detail?id=${id}` })
+}
 const goLeadList = () => uni.navigateTo({ url: '/pages/profile/product-leads' })
 const chooseAssessment = () => {
   const modules = productModules.value.filter((item) => item.assessmentEnabled && item.assessmentType)

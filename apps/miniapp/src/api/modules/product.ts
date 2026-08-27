@@ -60,6 +60,30 @@ export interface Product {
 export type ProductType = 'service' | 'physical' | 'package'
 export type ProductServiceMode = 'online' | 'offline' | 'mixed'
 export type ProductStockStatus = 'available' | 'limited' | 'sold_out'
+export type RecommendationEventType = 'impression' | 'click' | 'lead_submit' | 'assessment_submit' | 'filter_click'
+export type RecommendationForm =
+  | 'module_featured'
+  | 'assessment_result'
+  | 'profile_suggestion'
+  | 'consultant_recommendation'
+  | 'campaign_recommendation'
+  | 'bundle_solution'
+
+export interface RecommendationEventPayload {
+  eventType: RecommendationEventType
+  anonymousId?: string
+  moduleId?: number
+  moduleCode?: string
+  productId?: number
+  productType?: ProductType
+  recommendationForm?: RecommendationForm
+  sourceScene?: string
+  tags?: string[]
+  tagIds?: number[]
+  score?: number
+  reason?: string
+  metadata?: Record<string, unknown>
+}
 
 export function productTypeText(type?: string) {
   if (type === 'physical') return '实物产品'
@@ -231,6 +255,13 @@ export const productApi = {
   createLead(id: number, data: { needTags?: string[]; needTagIds?: number[]; message?: string; inviteCode?: string; sourceScene?: string }) {
     return request({
       url: `/products/${id}/leads`,
+      method: 'POST',
+      data,
+    })
+  },
+  reportEvent(data: RecommendationEventPayload): Promise<{ id: number }> {
+    return request<{ id: number }>({
+      url: '/products/events',
       method: 'POST',
       data,
     })

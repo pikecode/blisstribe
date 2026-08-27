@@ -53,5 +53,21 @@
   // 阴影
   --shadow-sm: 0 4rpx 14rpx rgba(31, 41, 55, 0.045);
   --shadow-md: 0 8rpx 24rpx rgba(31, 41, 55, 0.06);
+  --shadow-lg: 0 12rpx 32rpx rgba(31, 41, 55, 0.12);
   --shadow-action: 0 10rpx 22rpx rgba(7, 193, 96, 0.22);
+
+  // 动画
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 400ms;
+  --easing-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --easing-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  // 透明度
+  --opacity-disabled: 0.6;
+  --opacity-hover: 0.08;
+
+  // 间距扩展
+  --space-xxs: 4rpx;
+  --space-2xl: 56rpx;
 }

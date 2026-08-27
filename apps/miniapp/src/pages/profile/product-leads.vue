@@ -150,44 +150,48 @@ onShow(loadLeads)
 .leads {
   min-height: 100vh;
   background: var(--color-bg);
-  padding: 0 28rpx 32rpx;
+  padding: 0 24rpx 40rpx;
 
   &__head {
-    margin: 0 -28rpx 24rpx;
-    padding: 42rpx 32rpx 30rpx;
-    background: linear-gradient(180deg, #ffffff 0%, #f6faf7 100%);
+    margin: 0 -24rpx 32rpx;
+    padding: 48rpx 32rpx 36rpx;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbf9 100%);
     border-bottom: 1rpx solid var(--color-border);
   }
 
   &__eyebrow {
     display: block;
     color: var(--color-primary);
-    font-size: 23rpx;
+    font-size: 22rpx;
     font-weight: 700;
-    line-height: 32rpx;
-    margin-bottom: 8rpx;
+    letter-spacing: 0.5rpx;
+    line-height: 30rpx;
+    margin-bottom: 12rpx;
+    text-transform: uppercase;
   }
 
   &__title {
     display: block;
     color: var(--color-text);
-    font-size: 42rpx;
-    font-weight: 800;
-    line-height: 1.24;
-    margin-bottom: 10rpx;
+    font-size: 44rpx;
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: 12rpx;
+    letter-spacing: -0.5rpx;
   }
 
   &__subtitle {
     display: block;
     color: var(--color-text-secondary);
-    font-size: 25rpx;
-    line-height: 1.5;
+    font-size: 26rpx;
+    line-height: 1.6;
+    max-width: 80%;
   }
 
   &__list {
     display: flex;
     flex-direction: column;
-    gap: 20rpx;
+    gap: 16rpx;
   }
 
   &__state {
@@ -211,38 +215,51 @@ onShow(loadLeads)
 }
 
 .lead-card {
-  padding: 28rpx;
+  padding: 24rpx;
   background: var(--color-bg-white);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
+  border-radius: 16rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+  border: 1rpx solid rgba(0, 0, 0, 0.04);
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.12);
+  }
 
   &__head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 20rpx;
+    gap: 12rpx;
+    margin-bottom: 20rpx;
+    padding-bottom: 18rpx;
+    border-bottom: 1rpx solid rgba(0, 0, 0, 0.04);
   }
 
   &__product {
     display: flex;
     align-items: center;
-    gap: 18rpx;
+    gap: 14rpx;
     flex: 1;
     min-width: 0;
   }
 
   &__cover {
-    width: 96rpx;
-    height: 72rpx;
-    border-radius: 12rpx;
-    background: #e9eef3;
+    width: 80rpx;
+    height: 60rpx;
+    border-radius: 10rpx;
+    background: linear-gradient(135deg, #f0f4f8 0%, #e9eef3 100%);
     flex-shrink: 0;
+    overflow: hidden;
+
     &--empty {
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--color-text-tertiary);
-      font-size: 22rpx;
+      font-size: 19rpx;
+      font-weight: 600;
     }
   }
 
@@ -254,82 +271,129 @@ onShow(loadLeads)
   &__title {
     display: block;
     color: var(--color-text);
-    font-size: 30rpx;
-    font-weight: 600;
-    line-height: 1.35;
+    font-size: 26rpx;
+    font-weight: 700;
+    line-height: 1.32;
+    margin-bottom: 4rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__time {
     display: block;
-    margin-top: 6rpx;
     color: var(--color-text-tertiary);
-    font-size: 22rpx;
+    font-size: 20rpx;
+    line-height: 1.4;
   }
 
   &__status {
     flex-shrink: 0;
-    padding: 8rpx 16rpx;
-    border-radius: 24rpx;
+    padding: 6rpx 12rpx;
+    border-radius: 18rpx;
     background: var(--color-bg-gray);
     color: var(--color-text-secondary);
-    font-size: 22rpx;
-    &--qualified,
-    &--converted {
-      background: var(--color-primary-light);
-      color: var(--color-primary);
-      font-weight: 700;
+    font-size: 20rpx;
+    font-weight: 600;
+    white-space: nowrap;
+
+    &--new {
+      background: #eff6ff;
+      color: #0084ff;
     }
+
+    &--contacted {
+      background: #f0f7ff;
+      color: #0066cc;
+    }
+
+    &--qualified {
+      background: #e6fcf5;
+      color: #07c160;
+    }
+
+    &--converted {
+      background: #d4f5e9;
+      color: #00b96b;
+    }
+
     &--invalid {
-      background: rgba(217, 45, 32, 0.1);
-      color: var(--color-danger);
+      background: #ffe6e6;
+      color: #d92d20;
     }
   }
 
   &__tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 10rpx;
-    margin-top: 22rpx;
+    gap: 8rpx;
+    margin-bottom: 18rpx;
   }
 
   &__tag {
-    padding: 6rpx 14rpx;
-    border-radius: 20rpx;
+    padding: 5rpx 11rpx;
+    border-radius: 16rpx;
     background: var(--color-primary-light);
     color: var(--color-primary);
-    font-size: 22rpx;
+    font-size: 20rpx;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
 
   &__row {
-    margin-top: 20rpx;
+    margin-bottom: 14rpx;
+    display: flex;
+    align-items: flex-start;
+    gap: 12rpx;
+
+    &:last-of-type {
+      margin-bottom: 0;
+    }
   }
 
   &__label {
-    display: block;
-    margin-bottom: 6rpx;
+    flex-shrink: 0;
     color: var(--color-text-tertiary);
-    font-size: 22rpx;
+    font-size: 20rpx;
+    font-weight: 600;
+    min-width: 56rpx;
+    line-height: 1.4;
   }
 
   &__value {
-    display: block;
-    color: #475467;
-    font-size: 26rpx;
-    line-height: 1.6;
+    flex: 1;
+    color: var(--color-text);
+    font-size: 22rpx;
+    line-height: 1.5;
     white-space: pre-wrap;
+    word-break: break-word;
   }
 
   &__timeline {
-    margin-top: 22rpx;
-    padding-top: 18rpx;
-    border-top: 1rpx solid var(--color-border);
+    margin-top: 16rpx;
+    padding-top: 14rpx;
+    border-top: 1rpx solid rgba(0, 0, 0, 0.06);
   }
 
   &__follow {
     position: relative;
-    padding-left: 22rpx;
-    margin-bottom: 18rpx;
-    border-left: 3rpx solid rgba(7, 193, 96, 0.22);
+    padding-left: 18rpx;
+    margin-bottom: 12rpx;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 2rpx;
+      top: 7rpx;
+      width: 6rpx;
+      height: 6rpx;
+      border-radius: 50%;
+      background: var(--color-primary);
+    }
+
     &:last-child {
       margin-bottom: 0;
     }
@@ -338,23 +402,23 @@ onShow(loadLeads)
   &__follow-time {
     display: block;
     color: var(--color-text-tertiary);
-    font-size: 22rpx;
-    margin-bottom: 4rpx;
+    font-size: 19rpx;
+    margin-bottom: 2rpx;
   }
 
   &__follow-text {
     display: block;
     color: var(--color-text);
-    font-size: 24rpx;
+    font-size: 22rpx;
     font-weight: 600;
   }
 
   &__follow-note {
     display: block;
-    margin-top: 4rpx;
+    margin-top: 3rpx;
     color: var(--color-text-secondary);
-    font-size: 23rpx;
-    line-height: 1.5;
+    font-size: 20rpx;
+    line-height: 1.4;
   }
 }
 </style>

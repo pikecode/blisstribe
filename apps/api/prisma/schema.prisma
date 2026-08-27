@@ -40,19 +40,20 @@ model User {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  wechatAccount       WechatAccount?
-  sessions            UserSession[]
-  agreements          UserAgreement[]
-  sentInvitations     MemberInvitation[] @relation("Inviter")
-  receivedInvitations MemberInvitation[] @relation("Invitee")
-  inviterUser         User?              @relation("UserInvitedBy", fields: [invitedBy], references: [id])
-  invitees            User[]             @relation("UserInvitedBy")
-  partnerMembers      PartnerMember[]
-  invitationRecords   InvitationRecord[]
-  customerRelations   CustomerRelation[]
-  relationEvents      RelationEvent[]
-  productLeads        ProductLead[]
-  assessments         UserAssessment[]
+  wechatAccount        WechatAccount?
+  sessions             UserSession[]
+  agreements           UserAgreement[]
+  sentInvitations      MemberInvitation[]    @relation("Inviter")
+  receivedInvitations  MemberInvitation[]    @relation("Invitee")
+  inviterUser          User?                 @relation("UserInvitedBy", fields: [invitedBy], references: [id])
+  invitees             User[]                @relation("UserInvitedBy")
+  partnerMembers       PartnerMember[]
+  invitationRecords    InvitationRecord[]
+  customerRelations    CustomerRelation[]
+  relationEvents       RelationEvent[]
+  productLeads         ProductLead[]
+  assessments          UserAssessment[]
+  recommendationEvents RecommendationEvent[]
 
   @@index([status])
   @@index([createdAt])
@@ -387,10 +388,11 @@ model ProductModule {
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
 
-  products            Product[]
-  assessmentTemplates AssessmentTemplate[]
-  recommendationRules AssessmentRecommendationRule[]
-  tags                TagDictionary[]
+  products             Product[]
+  assessmentTemplates  AssessmentTemplate[]
+  recommendationRules  AssessmentRecommendationRule[]
+  tags                 TagDictionary[]
+  recommendationEvents RecommendationEvent[]
 
   @@index([status, sortOrder])
   @@index([status, showOnHome, sortOrder])
@@ -531,15 +533,57 @@ model Product {
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
-  module              ProductModule                  @relation(fields: [moduleId], references: [id], onDelete: Restrict)
-  leads               ProductLead[]
-  recommendationRules AssessmentRecommendationRule[]
+  module               ProductModule                  @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  leads                ProductLead[]
+  recommendationRules  AssessmentRecommendationRule[]
+  recommendationEvents RecommendationEvent[]
 
   @@index([moduleId, status])
   @@index([productType, status])
   @@index([status, priority, sortOrder])
   @@index([publishedAt])
   @@index([deletedAt])
+}
+
+// 推荐与产品行为事件
+model RecommendationEvent {
+  id                 BigInt   @id @default(autoincrement())
+  userId             BigInt?
+  anonymousId        String   @default("")
+  moduleId           BigInt?
+  moduleCode         String   @default("")
+  productId          BigInt?
+  productType        String   @default("")
+  recommendationForm String   @default("")
+  eventType          String
+  sourceScene        String   @default("")
+  tags               String[]
+  tagIds             BigInt[]
+  score              Int?
+  matchReason        String   @default("") // 推荐理由：为什么推荐这个产品
+  baseScore          Int?     @default(0) // 优先级分数
+  primaryScore       Int?     @default(0) // 强相关标签分数
+  secondaryScore     Int?     @default(0) // 弱相关标签分数
+  fallbackScore      Int?     @default(0) // 通用标签分数
+  ruleBonus          Int?     @default(0) // 规则加成
+  clicked            Boolean  @default(false) // 是否被点击
+  viewDuration       Int? // 浏览时长（秒）
+  converted          Boolean  @default(false) // 是否转化（创建lead）
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now())
+
+  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  module  ProductModule? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  product Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([anonymousId, createdAt])
+  @@index([moduleCode, createdAt])
+  @@index([moduleId, createdAt])
+  @@index([productId, createdAt])
+  @@index([clicked, createdAt])
+  @@index([converted, createdAt])
+  @@index([createdAt])
 }
 
 // 产品咨询或报名线索
@@ -556,6 +600,8 @@ model ProductLead {
   status           String    @default("new") // new/contacted/qualified/converted/invalid
   followUpNote     String    @default("")
   nextFollowAt     DateTime?
+  archived         Boolean   @default(false) // Phase 4: 是否已存档
+  archivedAt       DateTime? // 存档时间
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -569,6 +615,7 @@ model ProductLead {
   @@index([partnerId, createdAt])
   @@index([status, createdAt])
   @@index([status, nextFollowAt])
+  @@index([archived, updatedAt])
 }
 
 // 产品线索跟进记录
@@ -650,4 +697,73 @@ model RolePermission {
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
+}
+
+// ========== Phase 2: 推荐系统新增表 ==========
+
+// 推荐配置（参数化算法）
+model RecommendationConfig {
+  id         BigInt @id @default(autoincrement())
+  moduleCode String @unique
+
+  // 评分权重系数
+  primaryTagWeight   Float @default(20) // 强相关标签系数
+  secondaryTagWeight Float @default(10) // 弱相关标签系数
+  fallbackTagWeight  Float @default(5) // 通用标签系数
+
+  // 标签权重
+  maxUserTagWeight      Float @default(2.0) // 用户标签权重上限
+  maxAssessmentWeight   Float @default(3.0) // 评估标签权重上限
+  assessmentVsUserRatio Float @default(0.7) // 评估权重占比（vs用户0.3）
+
+  // 规则配置
+  enableRuleBoost     Boolean @default(true) // 是否启用规则加成
+  ruleBoostMultiplier Float   @default(1.5) // 规则加成倍数
+
+  // 其他
+  duplicationWindow Int @default(7) // 去重窗口（天）
+  limitPerRequest   Int @default(100) // 单次最多返回
+
+  status    Int      @default(1) // 1启用 0禁用
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// 推荐指标聚合（日度）
+model RecommendationMetrics {
+  id         BigInt   @id @default(autoincrement())
+  moduleCode String
+  date       DateTime // 按天聚合
+
+  // 关键指标
+  impressions     Int   @default(0) // 推荐次数
+  clicks          Int   @default(0) // 点击数
+  ctr             Float @default(0) // 点击率
+  conversions     Int   @default(0) // 转化数
+  conversionRate  Float @default(0) // 转化率
+  avgViewDuration Float @default(0) // 平均浏览时长
+
+  // 分类数据（JSON）
+  byMatchReason Json @default("{}") // 按推荐理由分类
+  bySourceType  Json @default("{}") // 按来源分类
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([moduleCode, date])
+  @@index([moduleCode, date])
+}
+
+// Lead 清理记录
+model ProductLeadCleanup {
+  id          BigInt   @id @default(autoincrement())
+  cleanupType String // "archive" / "delete"
+  leadCount   Int
+  reason      String
+  executedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([cleanupType, executedAt])
 }

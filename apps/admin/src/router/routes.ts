@@ -80,6 +80,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '推荐规则', icon: 'CollectionTag' },
       },
       {
+        path: 'recommendation-analytics',
+        name: 'RecommendationAnalytics',
+        component: () => import('@/views/product/analytics.vue'),
+        meta: { title: '推荐效果', icon: 'TrendCharts' },
+      },
+      {
         path: 'product-leads',
         name: 'ProductLeads',
         component: () => import('@/views/product/leads.vue'),
