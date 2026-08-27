@@ -32,13 +32,15 @@
         </el-table-column>
         <el-table-column label="操作" width="120">
           <template #default="{ row }">
-            <el-button
-              size="small"
-              :type="row.status === 'active' ? 'danger' : 'success'"
-              @click="toggleStatus(row)"
-            >
-              {{ row.status === 'active' ? '禁用' : '启用' }}
-            </el-button>
+            <div class="table-actions">
+              <el-button
+                size="small"
+                :type="row.status === 'active' ? 'danger' : 'success'"
+                @click="toggleStatus(row)"
+              >
+                {{ row.status === 'active' ? '禁用' : '启用' }}
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -82,7 +84,7 @@
         :total="total"
         layout="total, prev, pager, next"
         @current-change="loadList"
-        class="user-mgr__pager"
+        class="page-pager"
       />
     </el-card>
   </div>

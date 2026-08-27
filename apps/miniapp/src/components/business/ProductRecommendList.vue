@@ -25,7 +25,10 @@
         </view>
         <view class="product-recommend-list__main">
           <view class="product-recommend-list__head">
-            <text class="product-recommend-list__module">{{ item.module?.name || '产品' }}</text>
+            <view class="product-recommend-list__badges">
+              <text class="product-recommend-list__module">{{ item.module?.name || '产品' }}</text>
+              <text class="product-recommend-list__type">{{ productTypeText(item.productType) }}</text>
+            </view>
             <text v-if="item.priceText" class="product-recommend-list__price">{{ item.priceText }}</text>
           </view>
           <text class="product-recommend-list__title">{{ item.title }}</text>
@@ -52,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Product } from '@/api/modules/product'
+import { productTypeText, type Product } from '@/api/modules/product'
 
 withDefaults(defineProps<{
   products: Product[]
@@ -132,10 +135,27 @@ defineEmits<{
     margin-bottom: 8rpx;
   }
 
+  &__badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8rpx;
+    min-width: 0;
+  }
+
   &__module {
     color: var(--color-primary);
     font-size: 22rpx;
     font-weight: 600;
+  }
+
+  &__type {
+    padding: 4rpx 10rpx;
+    border-radius: 16rpx;
+    background: var(--color-bg-subtle);
+    color: var(--color-text-secondary);
+    font-size: 20rpx;
+    line-height: 26rpx;
   }
 
   &__price {

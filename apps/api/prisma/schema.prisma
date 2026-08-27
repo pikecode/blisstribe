@@ -30,7 +30,7 @@ model User {
   favoriteColor   String? // 喜欢的颜色
   occupation      String? // 职业
   tags            String[] // 用户自我标签
-  tagIds          BigInt[] @default([]) // 用户自我标签 ID 快照
+  tagIds          BigInt[]  @default([]) // 用户自我标签 ID 快照
   identity        String? // 注册身份: C/B/S
   level           String    @default("normal") // 注册级别
   douyinPayCode   String? // 收款码(抖音)
@@ -499,35 +499,44 @@ model AssessmentRecommendationRule {
 
 // 产品或服务
 model Product {
-  id              BigInt    @id @default(autoincrement())
-  moduleId        BigInt
-  title           String
-  subtitle        String    @default("")
-  coverUrl        String    @default("")
-  priceText       String    @default("")
-  summary         String    @default("")
-  detail          String    @default("")
-  targetUserText  String    @default("")
-  painPointText   String    @default("")
-  serviceProcess  String    @default("")
-  tags            String[]
-  tagIds          BigInt[]
-  primaryTagIds   BigInt[]
-  secondaryTagIds BigInt[]
-  excludeTagIds   BigInt[]
-  priority        Int       @default(0)
-  sortOrder       Int       @default(0)
-  status          Int       @default(0) // 0草稿 1上架 2下架
-  publishedAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  id                  BigInt    @id @default(autoincrement())
+  moduleId            BigInt
+  productType         String    @default("service") // service服务 physical实物 package组合方案
+  title               String
+  subtitle            String    @default("")
+  coverUrl            String    @default("")
+  priceText           String    @default("")
+  summary             String    @default("")
+  detail              String    @default("")
+  targetUserText      String    @default("")
+  painPointText       String    @default("")
+  serviceProcess      String    @default("")
+  serviceMode         String    @default("") // online/offline/mixed
+  serviceDuration     String    @default("")
+  appointmentRequired Boolean   @default(false)
+  specText            String    @default("")
+  deliveryText        String    @default("")
+  afterSaleText       String    @default("")
+  stockStatus         String    @default("available") // available/limited/sold_out
+  tags                String[]
+  tagIds              BigInt[]
+  primaryTagIds       BigInt[]
+  secondaryTagIds     BigInt[]
+  excludeTagIds       BigInt[]
+  priority            Int       @default(0)
+  sortOrder           Int       @default(0)
+  status              Int       @default(0) // 0草稿 1上架 2下架
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
   module              ProductModule                  @relation(fields: [moduleId], references: [id], onDelete: Restrict)
   leads               ProductLead[]
   recommendationRules AssessmentRecommendationRule[]
 
   @@index([moduleId, status])
+  @@index([productType, status])
   @@index([status, priority, sortOrder])
   @@index([publishedAt])
   @@index([deletedAt])

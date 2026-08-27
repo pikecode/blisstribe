@@ -43,6 +43,7 @@ export interface TagDictionaryPayload {
 export interface Product {
   id: number
   module: ProductModule
+  productType: ProductType
   title: string
   subtitle: string
   coverUrl: string
@@ -52,6 +53,13 @@ export interface Product {
   targetUserText: string
   painPointText: string
   serviceProcess: string
+  serviceMode: ProductServiceMode | ''
+  serviceDuration: string
+  appointmentRequired: boolean
+  specText: string
+  deliveryText: string
+  afterSaleText: string
+  stockStatus: ProductStockStatus
   tags: string[]
   tagIds?: number[]
   matchedTagIds?: number[]
@@ -64,6 +72,10 @@ export interface Product {
   createdAt: string
   updatedAt: string
 }
+
+export type ProductType = 'service' | 'physical' | 'package'
+export type ProductServiceMode = 'online' | 'offline' | 'mixed'
+export type ProductStockStatus = 'available' | 'limited' | 'sold_out'
 
 export interface ProductLead {
   id: number
@@ -176,6 +188,7 @@ export interface ListResult<T> {
 
 export interface ProductPayload {
   moduleId: number
+  productType?: ProductType
   title: string
   subtitle?: string
   coverUrl?: string
@@ -185,6 +198,13 @@ export interface ProductPayload {
   targetUserText?: string
   painPointText?: string
   serviceProcess?: string
+  serviceMode?: ProductServiceMode | ''
+  serviceDuration?: string
+  appointmentRequired?: boolean
+  specText?: string
+  deliveryText?: string
+  afterSaleText?: string
+  stockStatus?: ProductStockStatus
   tags?: string[]
   tagIds?: number[]
   primaryTagIds?: number[]
@@ -244,7 +264,7 @@ export const productApi = {
   updateTag(id: number, data: Partial<TagDictionaryPayload>): Promise<TagDictionary> {
     return request.put(`/admin/tags/${id}`, data)
   },
-  listProducts(params: { page?: number; pageSize?: number; status?: number | ''; moduleId?: number | ''; keyword?: string }): Promise<ListResult<Product>> {
+  listProducts(params: { page?: number; pageSize?: number; status?: number | ''; moduleId?: number | ''; productType?: ProductType | ''; keyword?: string }): Promise<ListResult<Product>> {
     return request.get('/admin/products', { params })
   },
   createProduct(data: ProductPayload): Promise<Product> {

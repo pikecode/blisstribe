@@ -20,6 +20,9 @@ export const PRODUCT_STATUS = {
   UNPUBLISHED: 2,
 } as const
 
+export const PRODUCT_TYPES = ['service', 'physical', 'package'] as const
+export const PRODUCT_SERVICE_MODES = ['online', 'offline', 'mixed', ''] as const
+export const PRODUCT_STOCK_STATUSES = ['available', 'limited', 'sold_out'] as const
 export const PRODUCT_LEAD_STATUS = ['new', 'contacted', 'qualified', 'converted', 'invalid'] as const
 export const ASSESSMENT_QUESTION_TYPES = ['single'] as const
 
@@ -118,6 +121,11 @@ export class CreateProductDto {
   @Min(1)
   moduleId!: number
 
+  @IsOptional()
+  @IsString()
+  @IsIn(PRODUCT_TYPES)
+  productType?: string
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
@@ -160,6 +168,40 @@ export class CreateProductDto {
   @IsString()
   @MaxLength(500)
   serviceProcess?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(PRODUCT_SERVICE_MODES)
+  serviceMode?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  serviceDuration?: string
+
+  @IsOptional()
+  @IsBoolean()
+  appointmentRequired?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  specText?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  deliveryText?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  afterSaleText?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(PRODUCT_STOCK_STATUSES)
+  stockStatus?: string
 
   @IsOptional()
   @IsArray()
@@ -205,6 +247,11 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(PRODUCT_TYPES)
+  productType?: string
+
+  @IsOptional()
+  @IsString()
   @MaxLength(80)
   title?: string
 
@@ -245,6 +292,40 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(500)
   serviceProcess?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(PRODUCT_SERVICE_MODES)
+  serviceMode?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  serviceDuration?: string
+
+  @IsOptional()
+  @IsBoolean()
+  appointmentRequired?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  specText?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  deliveryText?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  afterSaleText?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(PRODUCT_STOCK_STATUSES)
+  stockStatus?: string
 
   @IsOptional()
   @IsArray()

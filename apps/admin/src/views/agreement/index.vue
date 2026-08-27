@@ -3,17 +3,21 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <div class="card-header__left">
+          <div>
+            <div class="card-header__title">协议管理</div>
+            <div class="card-header__desc">维护用户协议和隐私政策版本，控制当前生效内容</div>
+          </div>
+          <div class="card-header__actions">
             <el-select v-model="filterType" placeholder="全部类型" clearable style="width: 140px">
               <el-option label="用户协议" value="user" />
               <el-option label="隐私政策" value="privacy" />
             </el-select>
+            <el-button type="primary" @click="openCreate">发布新版本</el-button>
           </div>
-          <el-button type="primary" @click="openCreate">发布新版本</el-button>
         </div>
       </template>
 
-      <el-table :data="list" v-loading="loading" border>
+      <el-table :data="list" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="类型" width="120">
           <template #default="{ row }">
@@ -35,11 +39,13 @@
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openView(row)">查看</el-button>
-            <el-button size="small" type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button size="small" type="success" :disabled="row.isCurrent" @click="setCurrent(row)">
-              设为当前
-            </el-button>
+            <div class="table-actions">
+              <el-button size="small" @click="openView(row)">查看</el-button>
+              <el-button size="small" type="primary" @click="openEdit(row)">编辑</el-button>
+              <el-button size="small" type="success" :disabled="row.isCurrent" @click="setCurrent(row)">
+                设为当前
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -187,7 +193,6 @@ onMounted(loadList)
 </script>
 
 <style scoped>
-.card-header { display: flex; justify-content: space-between; align-items: center; }
 .content-preview {
   white-space: pre-wrap; font-size: 14px; line-height: 1.8;
   max-height: 500px; overflow-y: auto; color: #333;

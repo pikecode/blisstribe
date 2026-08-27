@@ -169,6 +169,7 @@ Product 推荐字段：
 ```text
 id
 moduleId
+productType
 title
 subtitle
 coverUrl
@@ -183,6 +184,35 @@ publishedAt
 createdAt
 updatedAt
 deletedAt
+```
+
+`productType` 用于区分产品形式：
+
+| 类型 | 说明 | 阶段 |
+|------|------|------|
+| service | 服务产品 | 近期实现 |
+| physical | 实物产品 | 近期实现 |
+| package | 组合方案 | 近期实现 |
+| event | 活动产品 | 阶段 5 再扩展 |
+| content | 内容产品 | 后续按业务验证扩展 |
+
+`recommendationForm` 用于区分推荐产品形式，也就是产品被推荐给用户的入口和呈现方式：
+
+| 类型 | 说明 | 阶段 |
+|------|------|------|
+| module_featured | 模块精选推荐 | 近期实现 |
+| assessment_result | 评估结果推荐 | 近期实现 |
+| profile_suggestion | 个人画像推荐 | 近期实现 |
+| consultant_recommendation | 顾问推荐 | 阶段 3 |
+| campaign_recommendation | 活动推荐 | 阶段 5 |
+| bundle_solution | 方案包推荐 | 阶段 5 |
+
+字段边界：
+
+```text
+productType = 产品是什么
+recommendationForm = 产品怎么被推荐出来
+sourceScene = 用户从哪个页面或动作进入
 ```
 
 ProductLead 推荐字段：

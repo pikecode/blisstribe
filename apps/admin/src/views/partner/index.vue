@@ -54,7 +54,7 @@
         </el-table-column>
         <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
-            <div class="partner-actions">
+            <div class="table-actions">
               <el-button size="small" type="primary" plain @click="openDetail(row)">详情</el-button>
               <el-button
                 v-if="row.status === PartnerStatus.PENDING"
@@ -164,7 +164,7 @@
         :total="total"
         layout="total, prev, pager, next"
         @current-change="loadList"
-        class="partner-mgr__pager"
+        class="page-pager"
       />
     </el-card>
 
@@ -702,16 +702,6 @@ onMounted(loadList)
   &--warning { border-color: rgba(217, 119, 6, 0.28); background: #fff8eb; }
   &--success { border-color: rgba(3, 152, 85, 0.24); background: #effaf4; }
   &--danger { border-color: rgba(217, 45, 32, 0.22); background: #fff4f2; }
-}
-
-.partner-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 8px;
-
-  :deep(.el-button + .el-button) {
-    margin-left: 0;
-  }
 }
 
 .partner-drawer__head {

@@ -3,7 +3,10 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>产品线索</span>
+          <div>
+            <div class="card-header__title">咨询线索</div>
+            <div class="card-header__desc">查看用户需求并记录线索跟进状态</div>
+          </div>
           <el-button @click="loadLeads">刷新</el-button>
         </div>
       </template>
@@ -59,8 +62,10 @@
         </el-table-column>
         <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openDetail(row)">详情</el-button>
-            <el-button size="small" type="primary" plain @click="openFollowDialog(row)">跟进</el-button>
+            <div class="table-actions">
+              <el-button size="small" @click="openDetail(row)">详情</el-button>
+              <el-button size="small" type="primary" plain @click="openFollowDialog(row)">跟进</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -270,20 +275,6 @@ onMounted(loadLeads)
 </script>
 
 <style scoped>
-.card-header,
-.page-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.page-toolbar {
-  justify-content: flex-start;
-  margin-bottom: 16px;
-}
-.page-pager {
-  margin-top: 16px;
-}
 .muted {
   color: #909399;
   font-size: 12px;

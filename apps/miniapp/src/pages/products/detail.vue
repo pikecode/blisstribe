@@ -8,7 +8,10 @@
     </view>
 
     <view class="detail__main">
-      <text class="detail__module">{{ product.module.name }}</text>
+      <view class="detail__badges">
+        <text class="detail__module">{{ product.module.name }}</text>
+        <text class="detail__type">{{ productTypeText(product.productType) }}</text>
+      </view>
       <view class="detail__title-row">
         <text class="detail__title">{{ product.title }}</text>
         <text v-if="product.priceText" class="detail__price">{{ product.priceText }}</text>
@@ -27,9 +30,44 @@
       <text class="detail__section-title">解决痛点</text>
       <text class="detail__text">{{ product.painPointText }}</text>
     </view>
-    <view class="detail__section" v-if="product.serviceProcess">
-      <text class="detail__section-title">服务流程</text>
-      <text class="detail__text">{{ product.serviceProcess }}</text>
+    <view class="detail__section" v-if="showServiceSection">
+      <text class="detail__section-title">服务信息</text>
+      <view class="detail__info-list">
+        <view v-if="serviceModeLabel" class="detail__info-item">
+          <text class="detail__info-label">服务方式</text>
+          <text class="detail__info-value">{{ serviceModeLabel }}</text>
+        </view>
+        <view v-if="product.serviceDuration" class="detail__info-item">
+          <text class="detail__info-label">服务周期</text>
+          <text class="detail__info-value">{{ product.serviceDuration }}</text>
+        </view>
+        <view class="detail__info-item">
+          <text class="detail__info-label">预约要求</text>
+          <text class="detail__info-value">{{ product.appointmentRequired ? '需要预约' : '无需预约' }}</text>
+        </view>
+      </view>
+      <text v-if="product.serviceProcess" class="detail__text detail__text--spaced">{{ product.serviceProcess }}</text>
+    </view>
+    <view class="detail__section" v-if="showPhysicalSection">
+      <text class="detail__section-title">实物信息</text>
+      <view class="detail__info-list">
+        <view class="detail__info-item">
+          <text class="detail__info-label">库存状态</text>
+          <text class="detail__info-value">{{ stockStatusText(product.stockStatus) }}</text>
+        </view>
+        <view v-if="product.specText" class="detail__info-item">
+          <text class="detail__info-label">规格说明</text>
+          <text class="detail__info-value">{{ product.specText }}</text>
+        </view>
+        <view v-if="product.deliveryText" class="detail__info-item">
+          <text class="detail__info-label">配送说明</text>
+          <text class="detail__info-value">{{ product.deliveryText }}</text>
+        </view>
+        <view v-if="product.afterSaleText" class="detail__info-item">
+          <text class="detail__info-label">售后说明</text>
+          <text class="detail__info-value">{{ product.afterSaleText }}</text>
+        </view>
+      </view>
     </view>
     <view class="detail__section" v-if="product.detail">
       <text class="detail__section-title">产品详情</text>
@@ -93,7 +131,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { productApi, type Product } from '@/api/modules/product'
+import { productApi, productLeadActionText, productTypeText, serviceModeText, stockStatusText, type Product } from '@/api/modules/product'
 import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
 import { useFreshUserInfo } from '@/composables/useFreshUserInfo'
@@ -116,11 +154,14 @@ const assessmentTags = ref<string[]>([])
 const assessmentSummary = ref('')
 const userTags = computed(() => userStore.userInfo?.tags || [])
 const hasSubmitted = computed(() => product.value ? submittedProductIds.value.includes(product.value.id) : false)
+const showServiceSection = computed(() => product.value?.productType === 'service' || product.value?.productType === 'package')
+const showPhysicalSection = computed(() => product.value?.productType === 'physical' || product.value?.productType === 'package')
+const serviceModeLabel = computed(() => serviceModeText(product.value?.serviceMode))
 const { refreshUserInfo } = useFreshUserInfo()
 const { getAssessment } = useHealthAssessment()
 const submitButtonText = computed(() => {
   if (submitting.value) return '提交中...'
-  return hasSubmitted.value ? '已提交需求' : '我想了解'
+  return hasSubmitted.value ? '已提交需求' : productLeadActionText(product.value?.productType)
 })
 
 const needTagOptions = ['健康养生', '运动健身', '睡眠改善', '体重管理', '家庭健康', '到店体验']
@@ -236,13 +277,28 @@ onLoad((options) => {
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
   }
+  &__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10rpx;
+    margin-bottom: 12rpx;
+  }
   &__module {
     display: inline-flex;
-    margin-bottom: 12rpx;
     padding: 7rpx 16rpx;
     border-radius: var(--radius-round);
     background: var(--color-primary-light);
     color: var(--color-primary);
+    font-size: 22rpx;
+    font-weight: 700;
+    line-height: 30rpx;
+  }
+  &__type {
+    display: inline-flex;
+    padding: 7rpx 16rpx;
+    border-radius: var(--radius-round);
+    background: var(--color-bg-subtle);
+    color: var(--color-text-secondary);
     font-size: 22rpx;
     font-weight: 700;
     line-height: 30rpx;
@@ -273,6 +329,35 @@ onLoad((options) => {
     color: var(--color-text-secondary);
     font-size: 26rpx;
     line-height: 1.7;
+    white-space: pre-wrap;
+  }
+  &__text--spaced {
+    margin-top: 18rpx;
+  }
+  &__info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+  }
+  &__info-item {
+    display: flex;
+    gap: 18rpx;
+    padding: 18rpx 20rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-subtle);
+  }
+  &__info-label {
+    width: 128rpx;
+    flex-shrink: 0;
+    color: var(--color-text-tertiary);
+    font-size: 24rpx;
+    line-height: 1.5;
+  }
+  &__info-value {
+    flex: 1;
+    color: var(--color-text);
+    font-size: 25rpx;
+    line-height: 1.5;
     white-space: pre-wrap;
   }
   &__tags,

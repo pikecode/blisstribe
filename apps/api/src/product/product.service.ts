@@ -66,8 +66,8 @@ export class ProductService {
     return template ? this.toAssessmentTemplateVO(template) : null
   }
 
-  async listPublic(params: { moduleCode?: string; tags?: string[]; page: number; pageSize: number }) {
-    const where = await this.buildPublicProductWhere(params.moduleCode)
+  async listPublic(params: { moduleCode?: string; productType?: string; tags?: string[]; page: number; pageSize: number }) {
+    const where = await this.buildPublicProductWhere(params.moduleCode, params.productType)
     const [rows, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
@@ -82,7 +82,7 @@ export class ProductService {
     return { list: rows.map((p) => this.toPublicProductVO(p, tags)), total, page: params.page, pageSize: params.pageSize }
   }
 
-  async recommended(userId: bigint | null, params: { moduleCode?: string; tags?: string[]; tagIds?: number[]; limit: number }) {
+  async recommended(userId: bigint | null, params: { moduleCode?: string; productType?: string; tags?: string[]; tagIds?: number[]; limit: number }) {
     const user = userId
       ? await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null }, select: { tags: true, tagIds: true } })
       : null
@@ -96,7 +96,7 @@ export class ProductService {
     const inputTags = this.cleanTags([...(user?.tags ?? []), ...(assessment?.tags ?? []), ...(params.tags ?? [])])
     const inputTagIds = this.cleanTagIds([...(user?.tagIds ?? []), ...(assessment?.tagIds ?? []), ...(params.tagIds ?? []), ...queryTagIds])
     const inputTagWeights = this.normalizeTagWeights(assessment?.tagWeights, inputTagIds)
-    const where = await this.buildPublicProductWhere(params.moduleCode)
+    const where = await this.buildPublicProductWhere(params.moduleCode, params.productType)
     const products = await this.prisma.product.findMany({
       where,
       include: { module: true },
@@ -503,11 +503,12 @@ export class ProductService {
     return this.toTagVO(row)
   }
 
-  async listProductsAdmin(params: { page: number; pageSize: number; status?: number; moduleId?: bigint; keyword?: string }) {
+  async listProductsAdmin(params: { page: number; pageSize: number; status?: number; moduleId?: bigint; productType?: string; keyword?: string }) {
     const where: Prisma.ProductWhereInput = {
       deletedAt: null,
       ...(params.status !== undefined && !Number.isNaN(params.status) && { status: params.status }),
       ...(params.moduleId && { moduleId: params.moduleId }),
+      ...(params.productType && { productType: params.productType }),
       ...(params.keyword && {
         OR: [
           { title: { contains: params.keyword } },
@@ -692,10 +693,11 @@ export class ProductService {
     return { list: rows.map((r) => this.toLeadVO(r)), total, page: params.page, pageSize: params.pageSize }
   }
 
-  private async buildPublicProductWhere(moduleCode?: string): Promise<Prisma.ProductWhereInput> {
+  private async buildPublicProductWhere(moduleCode?: string, productType?: string): Promise<Prisma.ProductWhereInput> {
     return {
       status: PRODUCT_STATUS.PUBLISHED,
       deletedAt: null,
+      ...(productType && { productType }),
       module: {
         status: 1,
         deletedAt: null,
@@ -711,6 +713,7 @@ export class ProductService {
   ): Prisma.ProductUncheckedCreateInput {
     return {
       moduleId: BigInt(dto.moduleId),
+      productType: dto.productType ?? 'service',
       title: dto.title.trim(),
       subtitle: dto.subtitle?.trim() ?? '',
       coverUrl: dto.coverUrl ?? '',
@@ -720,6 +723,13 @@ export class ProductService {
       targetUserText: dto.targetUserText?.trim() ?? '',
       painPointText: dto.painPointText?.trim() ?? '',
       serviceProcess: dto.serviceProcess?.trim() ?? '',
+      serviceMode: dto.serviceMode?.trim() ?? '',
+      serviceDuration: dto.serviceDuration?.trim() ?? '',
+      appointmentRequired: dto.appointmentRequired ?? false,
+      specText: dto.specText?.trim() ?? '',
+      deliveryText: dto.deliveryText?.trim() ?? '',
+      afterSaleText: dto.afterSaleText?.trim() ?? '',
+      stockStatus: dto.stockStatus ?? 'available',
       tags: tagSnapshot.names,
       tagIds: tagSnapshot.ids,
       primaryTagIds: recommendationConfig?.primaryTagIds ?? tagSnapshot.ids,
@@ -737,6 +747,7 @@ export class ProductService {
   ): Prisma.ProductUncheckedUpdateInput {
     return {
       ...(dto.moduleId !== undefined && { moduleId: BigInt(dto.moduleId) }),
+      ...(dto.productType !== undefined && { productType: dto.productType }),
       ...(dto.title !== undefined && { title: dto.title.trim() }),
       ...(dto.subtitle !== undefined && { subtitle: dto.subtitle.trim() }),
       ...(dto.coverUrl !== undefined && { coverUrl: dto.coverUrl }),
@@ -746,6 +757,13 @@ export class ProductService {
       ...(dto.targetUserText !== undefined && { targetUserText: dto.targetUserText.trim() }),
       ...(dto.painPointText !== undefined && { painPointText: dto.painPointText.trim() }),
       ...(dto.serviceProcess !== undefined && { serviceProcess: dto.serviceProcess.trim() }),
+      ...(dto.serviceMode !== undefined && { serviceMode: dto.serviceMode.trim() }),
+      ...(dto.serviceDuration !== undefined && { serviceDuration: dto.serviceDuration.trim() }),
+      ...(dto.appointmentRequired !== undefined && { appointmentRequired: dto.appointmentRequired }),
+      ...(dto.specText !== undefined && { specText: dto.specText.trim() }),
+      ...(dto.deliveryText !== undefined && { deliveryText: dto.deliveryText.trim() }),
+      ...(dto.afterSaleText !== undefined && { afterSaleText: dto.afterSaleText.trim() }),
+      ...(dto.stockStatus !== undefined && { stockStatus: dto.stockStatus }),
       ...(tagSnapshot !== undefined && { tags: tagSnapshot.names, tagIds: tagSnapshot.ids }),
       ...(recommendationConfig?.primaryTagIds !== undefined && { primaryTagIds: recommendationConfig.primaryTagIds }),
       ...(recommendationConfig?.secondaryTagIds !== undefined && { secondaryTagIds: recommendationConfig.secondaryTagIds }),
@@ -1111,6 +1129,7 @@ export class ProductService {
     return {
       id: Number(product.id),
       module: this.toModuleVO(product.module),
+      productType: product.productType,
       title: product.title,
       subtitle: product.subtitle,
       coverUrl: product.coverUrl,
@@ -1119,6 +1138,13 @@ export class ProductService {
       targetUserText: product.targetUserText,
       painPointText: product.painPointText,
       serviceProcess: product.serviceProcess,
+      serviceMode: product.serviceMode,
+      serviceDuration: product.serviceDuration,
+      appointmentRequired: product.appointmentRequired,
+      specText: product.specText,
+      deliveryText: product.deliveryText,
+      afterSaleText: product.afterSaleText,
+      stockStatus: product.stockStatus,
       tags: product.tags,
       tagIds: product.tagIds.map(Number),
       primaryTagIds: product.primaryTagIds.map(Number),

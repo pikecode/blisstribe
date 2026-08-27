@@ -31,6 +31,7 @@ export interface TagDictionary {
 export interface Product {
   id: number
   module: ProductModule
+  productType: ProductType
   title: string
   subtitle: string
   coverUrl: string
@@ -40,6 +41,13 @@ export interface Product {
   targetUserText: string
   painPointText: string
   serviceProcess: string
+  serviceMode: ProductServiceMode | ''
+  serviceDuration: string
+  appointmentRequired: boolean
+  specText: string
+  deliveryText: string
+  afterSaleText: string
+  stockStatus: ProductStockStatus
   tags: string[]
   tagIds?: number[]
   matchedTagIds?: number[]
@@ -47,6 +55,35 @@ export interface Product {
   recommendReason: string
   score: number
   publishedAt: string | null
+}
+
+export type ProductType = 'service' | 'physical' | 'package'
+export type ProductServiceMode = 'online' | 'offline' | 'mixed'
+export type ProductStockStatus = 'available' | 'limited' | 'sold_out'
+
+export function productTypeText(type?: string) {
+  if (type === 'physical') return '实物产品'
+  if (type === 'package') return '组合方案'
+  return '服务产品'
+}
+
+export function serviceModeText(mode?: string) {
+  if (mode === 'online') return '线上服务'
+  if (mode === 'offline') return '到店服务'
+  if (mode === 'mixed') return '线上 + 到店'
+  return ''
+}
+
+export function stockStatusText(status?: string) {
+  if (status === 'limited') return '库存紧张'
+  if (status === 'sold_out') return '暂不可售'
+  return '正常供应'
+}
+
+export function productLeadActionText(type?: string) {
+  if (type === 'physical') return '咨询购买'
+  if (type === 'package') return '咨询方案'
+  return '我想了解'
 }
 
 export interface ProductListResult {
@@ -152,10 +189,11 @@ export const productApi = {
       method: 'GET',
     })
   },
-  recommended(params?: { moduleCode?: string; tags?: string[]; tagIds?: number[]; limit?: number }): Promise<Product[]> {
+  recommended(params?: { moduleCode?: string; productType?: ProductType; tags?: string[]; tagIds?: number[]; limit?: number }): Promise<Product[]> {
     return request<Product[]>({
       url: withQuery('/products/recommended', {
         moduleCode: params?.moduleCode,
+        productType: params?.productType,
         tags: params?.tags?.join(','),
         tagIds: params?.tagIds?.join(','),
         limit: params?.limit,
@@ -163,10 +201,11 @@ export const productApi = {
       method: 'GET',
     })
   },
-  list(params?: { moduleCode?: string; tags?: string[]; page?: number; pageSize?: number }): Promise<ProductListResult> {
+  list(params?: { moduleCode?: string; productType?: ProductType; tags?: string[]; page?: number; pageSize?: number }): Promise<ProductListResult> {
     return request<ProductListResult>({
       url: withQuery('/products', {
         moduleCode: params?.moduleCode,
+        productType: params?.productType,
         tags: params?.tags?.join(','),
         page: params?.page,
         pageSize: params?.pageSize,

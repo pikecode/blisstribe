@@ -3,7 +3,10 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>评估模板管理</span>
+          <div>
+            <div class="card-header__title">评估管理</div>
+            <div class="card-header__desc">维护模块评估题目、选项和标签映射</div>
+          </div>
           <el-button type="primary" @click="openDialog()">新增模板</el-button>
         </div>
       </template>
@@ -43,10 +46,12 @@
         </el-table-column>
         <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openDialog(row)">编辑</el-button>
-            <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
-              {{ row.status === 1 ? '停用' : '启用' }}
-            </el-button>
+            <div class="table-actions">
+              <el-button size="small" @click="openDialog(row)">编辑</el-button>
+              <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
+                {{ row.status === 1 ? '停用' : '启用' }}
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -360,12 +365,6 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
 .page-alert {
   margin-bottom: 16px;
 }

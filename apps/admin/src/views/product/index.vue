@@ -3,7 +3,10 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>产品管理</span>
+          <div>
+            <div class="card-header__title">产品管理</div>
+            <div class="card-header__desc">维护服务模块、产品标签、推荐优先级和上下架状态</div>
+          </div>
           <div>
             <el-button @click="openModuleDialog()">新增模块</el-button>
             <el-button type="primary" @click="openProductDialog()">新增产品</el-button>
@@ -17,6 +20,9 @@
             <el-input v-model="keyword" placeholder="搜索标题/简介" clearable style="width: 240px" @keyup.enter="handleSearch" />
             <el-select v-model="moduleId" placeholder="全部模块" clearable style="width: 160px">
               <el-option v-for="item in modules" :key="item.id" :label="item.name" :value="item.id" />
+            </el-select>
+            <el-select v-model="productType" placeholder="全部类型" clearable style="width: 140px">
+              <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
             <el-select v-model="status" placeholder="全部状态" clearable style="width: 140px">
               <el-option label="草稿" :value="0" />
@@ -33,14 +39,19 @@
                 <div class="product-info">
                   <el-image v-if="row.coverUrl" :src="row.coverUrl" class="product-cover" fit="cover" />
                   <div>
-                    <div class="product-title">{{ row.title }}</div>
-                    <div class="product-subtitle">{{ row.subtitle || row.summary || '-' }}</div>
+                    <div class="table-title">{{ row.title }}</div>
+                    <div class="table-subtitle">{{ row.subtitle || row.summary || '-' }}</div>
                   </div>
                 </div>
               </template>
             </el-table-column>
             <el-table-column label="模块" width="110">
               <template #default="{ row }">{{ row.module?.name || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="类型" width="110">
+              <template #default="{ row }">
+                <el-tag :type="productTypeTagType(row.productType)">{{ productTypeText(row.productType) }}</el-tag>
+              </template>
             </el-table-column>
             <el-table-column prop="priceText" label="价格" width="120" />
             <el-table-column label="标签" min-width="180">
@@ -58,9 +69,11 @@
             </el-table-column>
             <el-table-column label="操作" width="230" fixed="right">
               <template #default="{ row }">
-                <el-button size="small" @click="openProductDialog(row)">编辑</el-button>
-                <el-button v-if="row.status !== 1" size="small" type="success" @click="publish(row)">上架</el-button>
-                <el-button v-else size="small" type="warning" @click="unpublish(row)">下架</el-button>
+                <div class="table-actions">
+                  <el-button size="small" @click="openProductDialog(row)">编辑</el-button>
+                  <el-button v-if="row.status !== 1" size="small" type="success" @click="publish(row)">上架</el-button>
+                  <el-button v-else size="small" type="warning" @click="unpublish(row)">下架</el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -101,7 +114,9 @@
             </el-table-column>
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
-                <el-button size="small" @click="openModuleDialog(row)">编辑</el-button>
+                <div class="table-actions">
+                  <el-button size="small" @click="openModuleDialog(row)">编辑</el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -115,6 +130,13 @@
           <el-select v-model="productForm.moduleId" placeholder="请选择模块" style="width: 100%">
             <el-option v-for="item in activeModules" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="产品类型" prop="productType">
+          <el-radio-group v-model="productForm.productType">
+            <el-radio-button v-for="item in productTypeOptions" :key="item.value" :label="item.value">
+              {{ item.label }}
+            </el-radio-button>
+          </el-radio-group>
         </el-form-item>
         <el-form-item label="标题" prop="title">
           <el-input v-model="productForm.title" />
@@ -175,9 +197,44 @@
         <el-form-item label="解决痛点">
           <el-input v-model="productForm.painPointText" type="textarea" :rows="2" />
         </el-form-item>
-        <el-form-item label="服务流程">
-          <el-input v-model="productForm.serviceProcess" type="textarea" :rows="2" />
-        </el-form-item>
+        <template v-if="showServiceFields">
+          <el-divider content-position="left">服务信息</el-divider>
+          <el-form-item label="服务方式">
+            <el-select v-model="productForm.serviceMode" placeholder="请选择服务方式" clearable style="width: 100%">
+              <el-option label="线上服务" value="online" />
+              <el-option label="到店服务" value="offline" />
+              <el-option label="线上 + 到店" value="mixed" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="服务周期">
+            <el-input v-model="productForm.serviceDuration" placeholder="例如：1次咨询 / 7天跟进 / 30天方案" />
+          </el-form-item>
+          <el-form-item label="是否预约">
+            <el-switch v-model="productForm.appointmentRequired" active-text="需要" inactive-text="不需要" />
+          </el-form-item>
+          <el-form-item label="服务流程">
+            <el-input v-model="productForm.serviceProcess" type="textarea" :rows="2" />
+          </el-form-item>
+        </template>
+        <template v-if="showPhysicalFields">
+          <el-divider content-position="left">实物信息</el-divider>
+          <el-form-item label="规格说明">
+            <el-input v-model="productForm.specText" type="textarea" :rows="2" placeholder="例如：30包/盒，适合日常补充" />
+          </el-form-item>
+          <el-form-item label="配送说明">
+            <el-input v-model="productForm.deliveryText" type="textarea" :rows="2" placeholder="例如：下单后由顾问确认配送方式" />
+          </el-form-item>
+          <el-form-item label="售后说明">
+            <el-input v-model="productForm.afterSaleText" type="textarea" :rows="2" placeholder="例如：未拆封可沟通售后处理" />
+          </el-form-item>
+          <el-form-item label="库存状态">
+            <el-select v-model="productForm.stockStatus" style="width: 100%">
+              <el-option label="正常供应" value="available" />
+              <el-option label="库存紧张" value="limited" />
+              <el-option label="暂不可售" value="sold_out" />
+            </el-select>
+          </el-form-item>
+        </template>
         <el-form-item label="详情">
           <el-input v-model="productForm.detail" type="textarea" :rows="5" />
         </el-form-item>
@@ -240,7 +297,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance } from 'element-plus'
-import { productApi, type Product, type ProductModule, type ProductModulePayload, type ProductPayload, type TagDictionary } from '@/api/product'
+import { productApi, type Product, type ProductModule, type ProductModulePayload, type ProductPayload, type ProductType, type TagDictionary } from '@/api/product'
 import { buildTagOptionGroups, mapTagNamesToIds, tagOptionLabel } from '@/utils/tags'
 
 const activeTab = ref('products')
@@ -255,6 +312,7 @@ const total = ref(0)
 const keyword = ref('')
 const moduleId = ref<number | ''>('')
 const status = ref<number | ''>('')
+const productType = ref<ProductType | ''>('')
 
 const productDialogVisible = ref(false)
 const moduleDialogVisible = ref(false)
@@ -264,6 +322,7 @@ const productFormRef = ref<FormInstance>()
 
 const defaultProductForm = (): ProductPayload => ({
   moduleId: modules.value[0]?.id ?? 0,
+  productType: 'service',
   title: '',
   subtitle: '',
   coverUrl: '',
@@ -273,6 +332,13 @@ const defaultProductForm = (): ProductPayload => ({
   targetUserText: '',
   painPointText: '',
   serviceProcess: '',
+  serviceMode: '',
+  serviceDuration: '',
+  appointmentRequired: false,
+  specText: '',
+  deliveryText: '',
+  afterSaleText: '',
+  stockStatus: 'available',
   tags: [],
   tagIds: [],
   primaryTagIds: [],
@@ -298,10 +364,19 @@ const moduleForm = reactive<ProductModulePayload>(defaultModuleForm())
 
 const productRules = {
   moduleId: [{ required: true, message: '请选择模块', trigger: 'change' }],
+  productType: [{ required: true, message: '请选择产品类型', trigger: 'change' }],
   title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
 }
 
+const productTypeOptions: Array<{ label: string; value: ProductType }> = [
+  { label: '服务产品', value: 'service' },
+  { label: '实物产品', value: 'physical' },
+  { label: '组合方案', value: 'package' },
+]
+
 const activeModules = computed(() => modules.value.filter((item) => item.status === 1))
+const showServiceFields = computed(() => productForm.productType === 'service' || productForm.productType === 'package')
+const showPhysicalFields = computed(() => productForm.productType === 'physical' || productForm.productType === 'package')
 const selectableTags = computed(() => tags.value.filter((item) => (
   item.status === 1 && (!item.moduleId || item.moduleId === productForm.moduleId)
 )))
@@ -317,6 +392,16 @@ function productStatusText(value: number) {
 
 function productStatusType(value: number) {
   return value === 1 ? 'success' : value === 2 ? 'warning' : 'info'
+}
+
+function productTypeText(value?: string) {
+  return productTypeOptions.find((item) => item.value === value)?.label || '服务产品'
+}
+
+function productTypeTagType(value?: string) {
+  if (value === 'physical') return 'warning'
+  if (value === 'package') return 'success'
+  return 'info'
 }
 
 async function loadModules() {
@@ -335,6 +420,7 @@ async function loadProducts() {
       pageSize: pageSize.value,
       keyword: keyword.value || undefined,
       moduleId: moduleId.value,
+      productType: productType.value,
       status: status.value,
     })
     products.value = res.list
@@ -352,6 +438,7 @@ function handleSearch() {
 function resetSearch() {
   keyword.value = ''
   moduleId.value = ''
+  productType.value = ''
   status.value = ''
   handleSearch()
 }
@@ -365,6 +452,7 @@ function openProductDialog(row?: Product) {
   assignProductForm(row
     ? {
         moduleId: row.module.id,
+        productType: row.productType || 'service',
         title: row.title,
         subtitle: row.subtitle,
         coverUrl: row.coverUrl,
@@ -374,6 +462,13 @@ function openProductDialog(row?: Product) {
         targetUserText: row.targetUserText,
         painPointText: row.painPointText,
         serviceProcess: row.serviceProcess,
+        serviceMode: row.serviceMode || '',
+        serviceDuration: row.serviceDuration || '',
+        appointmentRequired: row.appointmentRequired || false,
+        specText: row.specText || '',
+        deliveryText: row.deliveryText || '',
+        afterSaleText: row.afterSaleText || '',
+        stockStatus: row.stockStatus || 'available',
         tags: row.tags,
         tagIds: row.tagIds?.length ? row.tagIds : mapTagNamesToIds(row.tags, tags.value),
         primaryTagIds: row.primaryTagIds?.length ? row.primaryTagIds : (row.tagIds?.length ? row.tagIds : mapTagNamesToIds(row.tags, tags.value)),
@@ -473,20 +568,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.card-header,
-.page-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.page-toolbar {
-  justify-content: flex-start;
-  margin-bottom: 16px;
-}
-.page-pager {
-  margin-top: 16px;
-}
 .product-info {
   display: flex;
   align-items: center;
@@ -495,17 +576,9 @@ onMounted(async () => {
 .product-cover {
   width: 72px;
   height: 48px;
-  border-radius: 4px;
+  border-radius: 6px;
   flex-shrink: 0;
-}
-.product-title {
-  font-weight: 600;
-  color: #1f2937;
-}
-.product-subtitle {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #909399;
+  background: #f1f5f9;
 }
 .tag-item {
   margin: 2px 4px 2px 0;

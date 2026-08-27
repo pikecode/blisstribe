@@ -201,23 +201,25 @@ const handleLogout = () => {
   display: flex;
   height: 100vh;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(246, 244, 241, 0) 240px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(245, 247, 248, 0) 260px),
     $color-bg;
 }
 
 /* ── 侧边栏 ── */
 .layout__sidebar {
-  width: 248px;
+  width: 256px;
   flex-shrink: 0;
-  background: $color-sidebar;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(20, 184, 166, 0.08) 0%, rgba(17, 24, 39, 0) 220px),
+    $color-sidebar;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   color: #fff;
 }
 
 .layout__brand {
-  height: 72px;
+  height: 76px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -228,7 +230,7 @@ const handleLogout = () => {
 .layout__brand-icon {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #c26a11 0%, #e9b35d 100%);
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -236,7 +238,7 @@ const handleLogout = () => {
   color: #fff;
   font-weight: bold;
   font-size: 16px;
-  box-shadow: 0 8px 24px rgba(194, 106, 17, 0.28);
+  box-shadow: 0 10px 26px rgba(20, 184, 166, 0.22);
 }
 
 .layout__brand-text {
@@ -273,10 +275,11 @@ const handleLogout = () => {
 }
 
 .layout__nav-section-title {
-  padding: 8px 12px 5px;
-  color: rgba(255, 255, 255, 0.38);
-  font-size: 12px;
+  padding: 8px 12px 6px;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.04em;
   line-height: 1;
 }
 
@@ -287,20 +290,20 @@ const handleLogout = () => {
   padding: 11px 14px;
   min-height: 42px;
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.68);
+  color: rgba(255, 255, 255, 0.70);
   font-size: 14px;
   text-decoration: none;
   transition: background 0.16s, color 0.16s, transform 0.16s;
 }
 
 .layout__nav-item:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 
 .layout__nav-item.active {
-  background: #fff;
-  color: $color-primary;
+  background: rgba(255, 255, 255, 0.96);
+  color: $color-primary-dark;
   font-weight: 600;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
   transform: translateX(2px);
@@ -320,27 +323,27 @@ const handleLogout = () => {
 }
 
 .layout__header {
-  min-height: 72px;
-  background: rgba(255, 255, 255, 0.88);
+  min-height: 82px;
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid $color-border;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 28px;
+  padding: 16px 30px;
   flex-shrink: 0;
 }
 
 .layout__page-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   color: $color-text;
   margin: 0;
   line-height: 1.2;
 }
 
 .layout__page-desc {
-  margin: 6px 0 0;
+  margin: 7px 0 0;
   color: $color-text-tertiary;
   font-size: 13px;
   line-height: 1.3;
@@ -371,7 +374,7 @@ const handleLogout = () => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #211b16 0%, #c26a11 100%);
+  background: linear-gradient(135deg, #111827 0%, #0f766e 100%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -389,7 +392,7 @@ const handleLogout = () => {
 .layout__main {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 28px 32px;
+  padding: 26px 30px 34px;
   max-width: 1480px;
   width: 100%;
   margin: 0 auto;

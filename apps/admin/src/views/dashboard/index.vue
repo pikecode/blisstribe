@@ -2,8 +2,9 @@
   <div class="dashboard">
     <div class="dashboard__section-head">
       <div>
-        <div class="dashboard__eyebrow">OVERVIEW</div>
+        <div class="dashboard__eyebrow">运营概览</div>
         <h2 class="dashboard__title">核心运营指标</h2>
+        <p class="dashboard__desc">关注用户增长、活跃状态和账号风险，帮助判断当前运营质量。</p>
       </div>
     </div>
 
@@ -48,9 +49,9 @@ const chartRef = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
 
 const statCards = ref([
-  { label: '总用户数', value: 0, icon: User, color: '#c26a11' },
+  { label: '总用户数', value: 0, icon: User, color: '#0f766e' },
   { label: '活跃用户', value: 0, icon: CircleCheck, color: '#039855' },
-  { label: '今日新增', value: 0, icon: TrendCharts, color: '#1570ef' },
+  { label: '今日新增', value: 0, icon: TrendCharts, color: '#2563eb' },
   { label: '已禁用', value: 0, icon: Remove, color: '#d92d20' },
 ])
 
@@ -67,16 +68,16 @@ const loadTrend = async () => {
   if (!chartRef.value) return
   chart = echarts.init(chartRef.value)
   chart.setOption({
-    tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: '#e4dfd8', textStyle: { color: '#171412' }, extraCssText: 'box-shadow: 0 8px 30px rgba(23,20,18,.12); border-radius: 8px;' },
+    tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: '#e5e7eb', textStyle: { color: '#111827' }, extraCssText: 'box-shadow: 0 8px 30px rgba(17,24,39,.12); border-radius: 8px;' },
     grid: { top: 20, right: 20, bottom: 30, left: 48 },
-    xAxis: { type: 'category', data: data.map(d => d.date), axisTick: { show: false }, axisLine: { lineStyle: { color: '#e4dfd8' } }, axisLabel: { color: '#8f8981', fontSize: 12 } },
-    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#ece7df', type: 'dashed' } }, axisLabel: { color: '#8f8981', fontSize: 12 } },
+    xAxis: { type: 'category', data: data.map(d => d.date), axisTick: { show: false }, axisLine: { lineStyle: { color: '#e5e7eb' } }, axisLabel: { color: '#8a94a6', fontSize: 12 } },
+    yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#edf2f7', type: 'dashed' } }, axisLabel: { color: '#8a94a6', fontSize: 12 } },
     series: [{
       data: data.map(d => d.count), type: 'line', smooth: true,
       symbol: 'circle', symbolSize: 6,
-      lineStyle: { color: '#c26a11', width: 2 },
-      itemStyle: { color: '#c26a11' },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(194,106,17,0.16)' }, { offset: 1, color: 'rgba(194,106,17,0)' }]) },
+      lineStyle: { color: '#0f766e', width: 2 },
+      itemStyle: { color: '#0f766e' },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(15,118,110,0.16)' }, { offset: 1, color: 'rgba(15,118,110,0)' }]) },
     }],
   })
 }
@@ -99,21 +100,28 @@ onUnmounted(() => {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: 18px;
   }
 
   &__eyebrow {
-    color: #8f8981;
-    font-size: 11px;
+    color: #0f766e;
+    font-size: 12px;
     font-weight: 800;
-    letter-spacing: 0.12em;
+    letter-spacing: 0;
   }
 
   &__title {
     margin: 4px 0 0;
-    font-size: 18px;
-    color: #171412;
+    font-size: 20px;
+    color: #111827;
     line-height: 1.2;
+  }
+
+  &__desc {
+    margin: 7px 0 0;
+    color: #8a94a6;
+    font-size: 13px;
+    line-height: 1.5;
   }
 
   &__stats {
@@ -127,8 +135,8 @@ onUnmounted(() => {
     background: #fff;
     border-radius: 12px;
     padding: 24px 24px 18px;
-    border: 1px solid #e4dfd8;
-    box-shadow: 0 1px 2px rgba(23, 20, 18, 0.04);
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
   }
 
   &__chart-header {
@@ -138,15 +146,13 @@ onUnmounted(() => {
   &__chart-title {
     font-size: 15px;
     font-weight: 700;
-    color: #171412;
+    color: #111827;
   }
 
   &__chart-sub {
     font-size: 11px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #8f8981;
+    color: #8a94a6;
     margin-top: 2px;
   }
 
@@ -157,7 +163,7 @@ onUnmounted(() => {
   background: #fff;
   border-radius: 12px;
   padding: 20px 18px 20px 22px;
-  border: 1px solid #e4dfd8;
+  border: 1px solid #e5e7eb;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -167,8 +173,8 @@ onUnmounted(() => {
   min-height: 118px;
 
   &:hover {
-    box-shadow: 0 10px 28px rgba(23, 20, 18, 0.08);
-    border-color: color-mix(in srgb, var(--accent) 36%, #e4dfd8);
+    box-shadow: 0 10px 28px rgba(17, 24, 39, 0.08);
+    border-color: color-mix(in srgb, var(--accent) 36%, #e5e7eb);
     transform: translateY(-1px);
   }
 
@@ -190,7 +196,7 @@ onUnmounted(() => {
   &__value {
     font-size: 32px;
     font-weight: 800;
-    color: #171412;
+    color: #111827;
     line-height: 1;
     margin-bottom: 6px;
     font-variant-numeric: tabular-nums;
@@ -199,9 +205,7 @@ onUnmounted(() => {
   &__label {
     font-size: 11px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #8f8981;
+    color: #8a94a6;
   }
 
   &__glyph {

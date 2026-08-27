@@ -3,12 +3,15 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>Banner管理</span>
+          <div>
+            <div class="card-header__title">首页 Banner</div>
+            <div class="card-header__desc">维护小程序首页展示资源、排序和上下线状态</div>
+          </div>
           <el-button type="primary" @click="openDialog()">新增Banner</el-button>
         </div>
       </template>
 
-      <el-table :data="tableData" border style="width: 100%">
+      <el-table :data="tableData" stripe style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" width="150" />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -39,15 +42,17 @@
         </el-table-column>
         <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openDialog(row)">编辑</el-button>
-            <el-button
-              size="small"
-              :type="row.status === 1 ? 'warning' : 'success'"
-              @click="toggleStatus(row)"
-            >
-              {{ row.status === 1 ? '下线' : '上线' }}
-            </el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <div class="table-actions">
+              <el-button size="small" @click="openDialog(row)">编辑</el-button>
+              <el-button
+                size="small"
+                :type="row.status === 1 ? 'warning' : 'success'"
+                @click="toggleStatus(row)"
+              >
+                {{ row.status === 1 ? '下线' : '上线' }}
+              </el-button>
+              <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -262,11 +267,6 @@ onMounted(fetchData)
 </script>
 
 <style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 .banner-preview {
   display: flex;
   align-items: center;

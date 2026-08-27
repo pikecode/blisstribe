@@ -44,12 +44,14 @@ export class ProductController {
   @Get('recommended')
   recommended(
     @Query('moduleCode') moduleCode?: string,
+    @Query('productType') productType?: string,
     @Query('tags') tags?: string,
     @Query('tagIds') tagIds?: string,
     @Query('limit') limit = '10'
   ) {
     return this.productService.recommended(null, {
       moduleCode,
+      productType,
       tags: parseTags(tags),
       tagIds: parseTagIds(tagIds),
       limit: Number(limit) || 10,
@@ -59,12 +61,14 @@ export class ProductController {
   @Get()
   list(
     @Query('moduleCode') moduleCode?: string,
+    @Query('productType') productType?: string,
     @Query('tags') tags?: string,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '20'
   ) {
     return this.productService.listPublic({
       moduleCode,
+      productType,
       tags: parseTags(tags),
       ...pageParams(page, pageSize),
     })
@@ -256,12 +260,14 @@ export class ProductAdminController {
     @Query('pageSize') pageSize = '20',
     @Query('status') status?: string,
     @Query('moduleId') moduleId?: string,
+    @Query('productType') productType?: string,
     @Query('keyword') keyword?: string
   ) {
     return this.productService.listProductsAdmin({
       ...pageParams(page, pageSize),
       status: status === undefined || status === '' ? undefined : Number(status),
       moduleId: moduleId ? BigInt(moduleId) : undefined,
+      productType,
       keyword,
     })
   }

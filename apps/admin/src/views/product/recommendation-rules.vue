@@ -3,7 +3,10 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>推荐规则管理</span>
+          <div>
+            <div class="card-header__title">推荐规则</div>
+            <div class="card-header__desc">配置评估标签命中后的产品加权和推荐理由</div>
+          </div>
           <el-button type="primary" @click="openDialog()">新增规则</el-button>
         </div>
       </template>
@@ -54,10 +57,12 @@
         </el-table-column>
         <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openDialog(row)">编辑</el-button>
-            <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
-              {{ row.status === 1 ? '停用' : '启用' }}
-            </el-button>
+            <div class="table-actions">
+              <el-button size="small" @click="openDialog(row)">编辑</el-button>
+              <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
+                {{ row.status === 1 ? '停用' : '启用' }}
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -255,17 +260,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.card-header,
-.page-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.page-toolbar {
-  justify-content: flex-start;
-  margin-bottom: 16px;
-}
 .page-alert {
   margin-bottom: 16px;
 }

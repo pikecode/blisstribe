@@ -1,8 +1,8 @@
 <template>
   <view class="products">
     <view class="products__head">
-      <text class="products__eyebrow">服务推荐</text>
-      <text class="products__title">专属{{ currentModule?.name || '服务' }}推荐</text>
+      <text class="products__eyebrow">产品推荐</text>
+      <text class="products__title">专属{{ currentModule?.name || '产品' }}推荐</text>
       <text class="products__subtitle">{{ canUseAssessment && assessment ? '已根据需求评估优先匹配产品' : '按你的标签优先展示更匹配的产品' }}</text>
       <view v-if="canUseAssessment && assessment" class="products__assessment">
         <text class="products__assessment-title">需求评估</text>
@@ -22,8 +22,19 @@
         <text>做一次{{ currentModule?.name || '' }}需求评估</text>
       </view>
       <view class="products__meta">
-        <text>{{ products.length }} 个服务</text>
+        <text>{{ products.length }} 个产品</text>
         <text>{{ effectiveTags.length ? `${effectiveTags.length} 个匹配标签` : '暂无匹配标签' }}</text>
+      </view>
+      <view class="products__type-tabs">
+        <text
+          v-for="item in productTypeTabs"
+          :key="item.value || 'all'"
+          class="products__type-tab"
+          :class="{ active: selectedProductType === item.value }"
+          @tap="changeProductType(item.value)"
+        >
+          {{ item.label }}
+        </text>
       </view>
       <view v-if="moduleCode === 'health'" class="products__scenes">
         <text
@@ -58,6 +69,7 @@
             <text class="product-card__title">{{ item.title }}</text>
             <text v-if="item.priceText" class="product-card__price">{{ item.priceText }}</text>
           </view>
+          <text class="product-card__type">{{ productTypeText(item.productType) }}</text>
           <text class="product-card__summary">{{ item.summary || item.subtitle }}</text>
           <view class="product-card__tags">
             <text v-for="tag in item.tags.slice(0, 4)" :key="tag" class="product-card__tag" :class="{ matched: item.matchedTags.includes(tag) }">
@@ -80,7 +92,7 @@ import { computed, ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
-import { productApi, type Product, type ProductModule } from '@/api/modules/product'
+import { productApi, productTypeText, type Product, type ProductModule, type ProductType } from '@/api/modules/product'
 import { useFreshUserInfo } from '@/composables/useFreshUserInfo'
 import { useHealthAssessment, type HealthAssessment } from '@/composables/useHealthAssessment'
 
@@ -92,6 +104,7 @@ const loadError = ref(false)
 const moduleCode = ref('health')
 const currentModule = ref<ProductModule | null>(null)
 const selectedSceneTags = ref<string[]>([])
+const selectedProductType = ref<ProductType | ''>('')
 const assessment = ref<HealthAssessment | null>(null)
 const userTags = computed(() => userStore.userInfo?.tags || [])
 const canUseAssessment = computed(() => !!currentModule.value?.assessmentEnabled && !!currentModule.value.assessmentType)
@@ -106,6 +119,12 @@ const { refreshUserInfo } = useFreshUserInfo()
 const { getAssessment, clearAssessment } = useHealthAssessment()
 
 const sceneTags = ['睡眠改善', '体重管理', '家庭健康', '运动健身', '营养咨询']
+const productTypeTabs: Array<{ label: string; value: ProductType | '' }> = [
+  { label: '全部', value: '' },
+  { label: '服务', value: 'service' },
+  { label: '实物', value: 'physical' },
+  { label: '组合', value: 'package' },
+]
 
 async function loadCurrentModule() {
   try {
@@ -125,6 +144,7 @@ async function loadProducts() {
     assessment.value = canUseAssessment.value ? getAssessment(moduleCode.value) : null
     products.value = await productApi.recommended({
       moduleCode: moduleCode.value,
+      productType: selectedProductType.value || undefined,
       tags: effectiveTags.value,
       limit: 20,
     })
@@ -146,6 +166,11 @@ function toggleSceneTag(tag: string) {
   const index = selectedSceneTags.value.indexOf(tag)
   if (index >= 0) selectedSceneTags.value.splice(index, 1)
   else selectedSceneTags.value = [tag]
+  loadProducts()
+}
+
+function changeProductType(type: ProductType | '') {
+  selectedProductType.value = type
   loadProducts()
 }
 
@@ -270,6 +295,27 @@ onShow(loadProducts)
     color: var(--color-text-tertiary);
     font-size: 23rpx;
   }
+  &__type-tabs {
+    display: flex;
+    gap: 12rpx;
+    margin-top: 24rpx;
+    overflow-x: auto;
+  }
+  &__type-tab {
+    flex-shrink: 0;
+    padding: 12rpx 22rpx;
+    border-radius: 30rpx;
+    background: var(--color-bg-white);
+    color: var(--color-text-secondary);
+    font-size: 24rpx;
+    font-weight: 600;
+    border: 1rpx solid var(--color-border);
+    &.active {
+      color: #fff;
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+    }
+  }
   &__scenes {
     display: flex;
     flex-wrap: wrap;
@@ -356,6 +402,16 @@ onShow(loadProducts)
     color: #f97316;
     font-size: 26rpx;
     font-weight: 600;
+  }
+  &__type {
+    display: inline-flex;
+    margin-bottom: 10rpx;
+    padding: 5rpx 12rpx;
+    border-radius: 18rpx;
+    background: var(--color-bg-subtle);
+    color: var(--color-text-secondary);
+    font-size: 21rpx;
+    line-height: 28rpx;
   }
   &__summary {
     display: block;
