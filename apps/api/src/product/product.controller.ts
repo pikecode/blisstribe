@@ -7,6 +7,7 @@ import { OptionalJwtGuard } from '../common/guards/optional-jwt.guard'
 import { ProductService } from './product.service'
 import {
   CreateAssessmentTemplateDto,
+  ConfirmProductLeadContactDto,
   CreateProductDto,
   CreateProductLeadDto,
   CreateProductModuleDto,
@@ -96,6 +97,22 @@ export class ProductController {
     @Query('pageSize') pageSize = '20'
   ) {
     return this.productService.listMyLeads(BigInt(user.userId), pageParams(page, pageSize))
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('my-leads/:id')
+  myLeadDetail(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.productService.detailMyLead(BigInt(id), BigInt(user.userId))
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('my-leads/:id/confirm-contact')
+  confirmMyLeadContact(
+    @CurrentUser() user: { userId: string },
+    @Param('id') id: string,
+    @Body() dto: ConfirmProductLeadContactDto
+  ) {
+    return this.productService.confirmMyLeadContact(BigInt(id), BigInt(user.userId), dto)
   }
 
   @UseGuards(OptionalJwtGuard)

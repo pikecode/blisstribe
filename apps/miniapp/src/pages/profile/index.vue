@@ -404,9 +404,12 @@ function goPartner(): void {
 function leadStatusText(status: string): string {
   const map: Record<string, string> = {
     pending: '待跟进',
-    contacted: '已联系',
-    converted: '已转化',
-    closed: '已关闭',
+    new: '已提交',
+    contacted: '跟进中',
+    qualified: '方案确认中',
+    converted: '已完成',
+    invalid: '已结束',
+    closed: '已结束',
   }
   return map[status] || status
 }

@@ -16,7 +16,7 @@
     </view>
 
     <view v-else-if="leads.length" class="leads__list">
-      <view v-for="item in leads" :key="item.id" class="lead-card" @tap="goProduct(item.product.id)">
+      <view v-for="item in leads" :key="item.id" class="lead-card" @tap="goLeadDetail(item.id)">
         <view class="lead-card__head">
           <view class="lead-card__product">
             <image v-if="item.product.coverUrl" :src="item.product.coverUrl" class="lead-card__cover" mode="aspectFill" />
@@ -85,12 +85,12 @@ const loading = ref(false)
 const loadError = ref(false)
 
 const statusMap: Record<string, string> = {
-  created: '线索创建',
+  created: '已创建',
   new: '已提交',
-  contacted: '已联系',
-  qualified: '有效线索',
-  converted: '已转化',
-  invalid: '已关闭',
+  contacted: '跟进中',
+  qualified: '方案确认中',
+  converted: '已完成',
+  invalid: '已结束',
 }
 
 function statusText(status: string) {
@@ -99,7 +99,7 @@ function statusText(status: string) {
 
 function followStatusText(fromStatus: string, toStatus: string) {
   if (fromStatus === 'created') return statusText(toStatus)
-  return `${statusText(fromStatus)}变更为${statusText(toStatus)}`
+  return `进展更新为${statusText(toStatus)}`
 }
 
 function formatDate(value: string) {
@@ -139,8 +139,8 @@ function goProducts() {
   uni.navigateTo({ url: '/pages/products/index' })
 }
 
-function goProduct(id: number) {
-  uni.navigateTo({ url: `/pages/products/detail?id=${id}` })
+function goLeadDetail(id: number) {
+  uni.navigateTo({ url: `/pages/profile/product-lead-detail?id=${id}` })
 }
 
 onShow(loadLeads)

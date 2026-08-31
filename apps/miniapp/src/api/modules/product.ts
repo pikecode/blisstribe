@@ -252,6 +252,19 @@ export const productApi = {
       method: 'GET',
     })
   },
+  myLeadDetail(id: number): Promise<ProductLead> {
+    return request<ProductLead>({
+      url: `/products/my-leads/${id}`,
+      method: 'GET',
+    })
+  },
+  confirmLeadContact(id: number, data?: { note?: string }): Promise<ProductLead> {
+    return request<ProductLead>({
+      url: `/products/my-leads/${id}/confirm-contact`,
+      method: 'POST',
+      data: data || {},
+    })
+  },
   createLead(id: number, data: { needTags?: string[]; needTagIds?: number[]; message?: string; inviteCode?: string; sourceScene?: string }) {
     return request({
       url: `/products/${id}/leads`,

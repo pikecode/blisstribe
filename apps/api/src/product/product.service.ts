@@ -16,6 +16,7 @@ import { PrismaService } from '../common/prisma.service'
 import { BusinessException } from '../common/interceptors/response.interceptor'
 import {
   PRODUCT_STATUS,
+  type ConfirmProductLeadContactDto,
   type CreateRecommendationEventDto,
   type AssessmentQuestionInputDto,
   type CreateAssessmentTemplateDto,
@@ -313,6 +314,62 @@ export class ProductService {
       this.prisma.productLead.count({ where }),
     ])
     return { list: rows.map((r) => this.toLeadVO(r)), total, page: params.page, pageSize: params.pageSize }
+  }
+
+  async detailMyLead(id: bigint, userId: bigint) {
+    const lead = await this.prisma.productLead.findFirst({
+      where: { id, userId },
+      include: {
+        ...this.leadInclude(),
+        followUps: { orderBy: { createdAt: 'desc' } },
+      },
+    })
+    if (!lead) throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '咨询记录不存在')
+    return this.toLeadVO(lead)
+  }
+
+  async confirmMyLeadContact(id: bigint, userId: bigint, dto: ConfirmProductLeadContactDto) {
+    const existing = await this.prisma.productLead.findFirst({
+      where: { id, userId },
+      include: { followUps: { where: { operatorType: 'user' }, orderBy: { createdAt: 'desc' }, take: 1 } },
+    })
+    if (!existing) throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '咨询记录不存在')
+    if (existing.status === 'converted' || existing.status === 'invalid') {
+      throw new BusinessException(ErrorCode.PARAMS_INVALID, '当前咨询记录已结束，不能确认沟通')
+    }
+    if (existing.followUps.length > 0) {
+      return this.detailMyLead(id, userId)
+    }
+
+    const nextStatus = existing.status === 'new' ? 'contacted' : existing.status
+    const note = dto.note?.trim() || '用户确认已沟通'
+    const lead = await this.prisma.$transaction(async (tx) => {
+      await tx.productLead.update({
+        where: { id },
+        data: {
+          status: nextStatus,
+          followUpNote: note,
+        },
+      })
+      await tx.productLeadFollowUp.create({
+        data: {
+          leadId: id,
+          operatorId: userId,
+          operatorType: 'user',
+          fromStatus: existing.status,
+          toStatus: nextStatus,
+          note,
+        },
+      })
+      return tx.productLead.findUniqueOrThrow({
+        where: { id },
+        include: {
+          ...this.leadInclude(),
+          followUps: { orderBy: { createdAt: 'desc' } },
+        },
+      })
+    })
+    return this.toLeadVO(lead)
   }
 
   async listMyAssessments(userId: bigint) {

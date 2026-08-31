@@ -692,7 +692,7 @@ model ProductLeadFollowUp {
   id           BigInt    @id @default(autoincrement())
   leadId       BigInt
   operatorId   BigInt?
-  operatorType String    @default("admin") // admin/partner/system
+  operatorType String    @default("admin") // admin/partner/system/user
   fromStatus   String
   toStatus     String
   note         String    @default("")

@@ -308,10 +308,10 @@ function hasAssessment(moduleCode: string) {
 function leadStatusText(status: string) {
   const map: Record<string, string> = {
     new: '已提交',
-    contacted: '已联系',
-    qualified: '有效线索',
-    converted: '已转化',
-    invalid: '已关闭',
+    contacted: '跟进中',
+    qualified: '方案确认中',
+    converted: '已完成',
+    invalid: '已结束',
   }
   return map[status] || status
 }

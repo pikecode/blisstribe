@@ -787,6 +787,13 @@ export class FollowProductLeadDto {
   nextFollowAt?: string
 }
 
+export class ConfirmProductLeadContactDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  note?: string
+}
+
 export class SyncAssessmentItemDto {
   @IsString()
   @IsNotEmpty()

@@ -58,6 +58,12 @@
       }
     },
     {
+      "path": "pages/profile/product-lead-detail",
+      "style": {
+        "navigationBarTitleText": "咨询详情"
+      }
+    },
+    {
       "path": "pages/profile/activity-registrations",
       "style": {
         "navigationBarTitleText": "我的活动"
