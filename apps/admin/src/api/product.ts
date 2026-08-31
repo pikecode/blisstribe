@@ -113,6 +113,16 @@ export interface ProductLeadFollowUp {
   createdAt: string
 }
 
+export interface ProductLeadSummary {
+  total: number
+  active: number
+  today: number
+  overdue: number
+  upcoming: number
+  converted: number
+  invalid: number
+}
+
 export interface RecommendationOverview {
   impressions: number
   clicks: number
@@ -333,6 +343,9 @@ export const productApi = {
     keyword?: string
   }): Promise<ListResult<ProductLead>> {
     return request.get('/admin/product-leads', { params })
+  },
+  leadSummary(): Promise<ProductLeadSummary> {
+    return request.get('/admin/product-leads/summary')
   },
   detailLead(id: number): Promise<ProductLead> {
     return request.get(`/admin/product-leads/${id}`)

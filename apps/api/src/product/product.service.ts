@@ -723,6 +723,50 @@ export class ProductService {
     return { list: rows.map((r) => this.toLeadVO(r)), total, page: params.page, pageSize: params.pageSize }
   }
 
+  async leadSummaryAdmin() {
+    const now = new Date()
+    const todayStart = new Date(now)
+    todayStart.setHours(0, 0, 0, 0)
+    const tomorrowStart = new Date(todayStart)
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+    const activeStatusWhere = { status: { in: [...ACTIVE_LEAD_STATUSES] } }
+
+    const [
+      total,
+      active,
+      today,
+      overdue,
+      upcoming,
+      converted,
+      invalid,
+    ] = await Promise.all([
+      this.prisma.productLead.count(),
+      this.prisma.productLead.count({ where: activeStatusWhere }),
+      this.prisma.productLead.count({
+        where: {
+          ...activeStatusWhere,
+          nextFollowAt: { gte: todayStart, lt: tomorrowStart },
+        },
+      }),
+      this.prisma.productLead.count({
+        where: {
+          ...activeStatusWhere,
+          nextFollowAt: { lt: now },
+        },
+      }),
+      this.prisma.productLead.count({
+        where: {
+          ...activeStatusWhere,
+          nextFollowAt: { gte: tomorrowStart },
+        },
+      }),
+      this.prisma.productLead.count({ where: { status: 'converted' } }),
+      this.prisma.productLead.count({ where: { status: 'invalid' } }),
+    ])
+
+    return { total, active, today, overdue, upcoming, converted, invalid }
+  }
+
   async detailLeadAdmin(id: bigint) {
     const lead = await this.prisma.productLead.findUnique({
       where: { id },

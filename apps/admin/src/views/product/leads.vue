@@ -7,9 +7,24 @@
             <div class="card-header__title">咨询线索</div>
             <div class="card-header__desc">查看用户需求并记录线索跟进状态</div>
           </div>
-          <el-button @click="loadLeads">刷新</el-button>
+          <el-button @click="loadAll">刷新</el-button>
         </div>
       </template>
+
+      <div class="lead-summary">
+        <button
+          v-for="item in summaryCards"
+          :key="item.key"
+          type="button"
+          class="summary-card"
+          :class="[`summary-card--${item.tone}`, { 'summary-card--active': item.active }]"
+          @click="applySummaryFilter(item)"
+        >
+          <span class="summary-card__label">{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+          <span class="summary-card__desc">{{ item.desc }}</span>
+        </button>
+      </div>
 
       <div class="page-toolbar">
         <el-input v-model="keyword" placeholder="搜索产品/用户/留言" clearable style="width: 220px" @keyup.enter="handleSearch" />
@@ -54,7 +69,7 @@
         </el-table-column>
         <el-table-column label="下次跟进" width="180">
           <template #default="{ row }">
-            <span :class="{ overdue: isOverdue(row.nextFollowAt) }">{{ row.nextFollowAt ? formatDate(row.nextFollowAt) : '-' }}</span>
+            <span :class="{ overdue: isOverdue(row.nextFollowAt, row.status) }">{{ row.nextFollowAt ? formatDate(row.nextFollowAt) : '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="创建时间" width="180">
@@ -128,7 +143,7 @@
             <span>来源</span>
             <strong>{{ detailLead.sourceScene || '-' }}</strong>
             <span>下次跟进</span>
-            <strong :class="{ overdue: isOverdue(detailLead.nextFollowAt) }">
+            <strong :class="{ overdue: isOverdue(detailLead.nextFollowAt, detailLead.status) }">
               {{ detailLead.nextFollowAt ? formatDate(detailLead.nextFollowAt) : '-' }}
             </strong>
           </div>
@@ -165,11 +180,20 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { productApi, type ProductLead } from '@/api/product'
+import { productApi, type ProductLead, type ProductLeadSummary } from '@/api/product'
 
 const leads = ref<ProductLead[]>([])
+const summary = ref<ProductLeadSummary>({
+  total: 0,
+  active: 0,
+  today: 0,
+  overdue: 0,
+  upcoming: 0,
+  converted: 0,
+  invalid: 0,
+})
 const loading = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
@@ -208,12 +232,71 @@ function statusType(value: string) {
   return 'info'
 }
 
+const summaryCards = computed(() => [
+  {
+    key: 'active',
+    label: '活跃线索',
+    value: summary.value.active,
+    desc: '新线索/已联系/有效线索',
+    tone: 'primary',
+    status: '',
+    followScope: '',
+    active: !status.value && !followScope.value,
+  },
+  {
+    key: 'overdue',
+    label: '已逾期',
+    value: summary.value.overdue,
+    desc: '需要优先处理',
+    tone: 'danger',
+    status: '',
+    followScope: 'overdue',
+    active: followScope.value === 'overdue',
+  },
+  {
+    key: 'today',
+    label: '今日跟进',
+    value: summary.value.today,
+    desc: '当天计划跟进',
+    tone: 'warning',
+    status: '',
+    followScope: 'today',
+    active: followScope.value === 'today',
+  },
+  {
+    key: 'converted',
+    label: '已转化',
+    value: summary.value.converted,
+    desc: '已形成有效转化',
+    tone: 'success',
+    status: 'converted',
+    followScope: '',
+    active: status.value === 'converted',
+  },
+  {
+    key: 'invalid',
+    label: '无效线索',
+    value: summary.value.invalid,
+    desc: '需复盘来源质量',
+    tone: 'muted',
+    status: 'invalid',
+    followScope: '',
+    active: status.value === 'invalid',
+  },
+])
+
 function formatDate(value: string) {
   return value ? new Date(value).toLocaleString() : '-'
 }
 
-function isOverdue(value: string | null) {
-  return value ? new Date(value).getTime() < Date.now() : false
+function isOverdue(value: string | null, leadStatus?: string) {
+  if (!value) return false
+  if (leadStatus === 'converted' || leadStatus === 'invalid') return false
+  return new Date(value).getTime() < Date.now()
+}
+
+async function loadSummary() {
+  summary.value = await productApi.leadSummary()
 }
 
 async function loadLeads() {
@@ -233,9 +316,20 @@ async function loadLeads() {
   }
 }
 
+async function loadAll() {
+  await Promise.all([loadSummary(), loadLeads()])
+}
+
 function handleSearch() {
   page.value = 1
   loadLeads()
+}
+
+function applySummaryFilter(item: { status: string; followScope: string }) {
+  status.value = item.status
+  followScope.value = item.followScope
+  keyword.value = ''
+  handleSearch()
 }
 
 function resetSearch() {
@@ -268,10 +362,10 @@ async function submitFollow() {
   if (detailLead.value?.id === updated.id) detailLead.value = updated
   ElMessage.success('跟进状态已更新')
   followDialogVisible.value = false
-  await loadLeads()
+  await loadAll()
 }
 
-onMounted(loadLeads)
+onMounted(loadAll)
 </script>
 
 <style scoped>
@@ -285,6 +379,60 @@ onMounted(loadLeads)
 }
 .tag-item {
   margin: 2px 4px 2px 0;
+}
+.lead-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.summary-card {
+  min-height: 92px;
+  padding: 14px 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.summary-card:hover,
+.summary-card--active {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgb(31 41 55 / 8%);
+}
+.summary-card__label,
+.summary-card__desc {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+}
+.summary-card strong {
+  display: block;
+  margin: 6px 0 4px;
+  color: #1f2937;
+  font-size: 26px;
+  line-height: 1;
+}
+.summary-card--primary.summary-card--active,
+.summary-card--primary:hover {
+  border-color: #409eff;
+}
+.summary-card--danger.summary-card--active,
+.summary-card--danger:hover {
+  border-color: #f56c6c;
+}
+.summary-card--warning.summary-card--active,
+.summary-card--warning:hover {
+  border-color: #e6a23c;
+}
+.summary-card--success.summary-card--active,
+.summary-card--success:hover {
+  border-color: #67c23a;
+}
+.summary-card--muted.summary-card--active,
+.summary-card--muted:hover {
+  border-color: #909399;
 }
 .lead-detail {
   padding-right: 8px;
@@ -331,5 +479,10 @@ onMounted(loadLeads)
   margin-bottom: 4px;
   color: #303133;
   font-weight: 500;
+}
+@media (max-width: 1200px) {
+  .lead-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>

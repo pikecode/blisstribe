@@ -345,6 +345,11 @@ export class ProductLeadAdminController {
     })
   }
 
+  @Get('summary')
+  summary() {
+    return this.productService.leadSummaryAdmin()
+  }
+
   @Get(':id')
   detail(@Param('id') id: string) {
     return this.productService.detailLeadAdmin(BigInt(id))

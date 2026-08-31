@@ -98,5 +98,8 @@ assert_code_200 "推荐事件上报" "$event_response"
 analytics_response="$(request GET "$API_BASE_URL/admin/products/analytics" "" "$token")"
 assert_code_200 "后台推荐分析" "$analytics_response"
 
+lead_summary_response="$(request GET "$API_BASE_URL/admin/product-leads/summary" "" "$token")"
+assert_code_200 "线索跟进摘要" "$lead_summary_response"
+
 echo ""
 pass "本地冒烟验收通过"
