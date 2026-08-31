@@ -68,6 +68,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '产品管理', icon: 'Goods' },
       },
       {
+        path: 'activities',
+        name: 'Activities',
+        component: () => import('@/views/activity/index.vue'),
+        meta: { title: '活动管理', icon: 'Calendar' },
+      },
+      {
+        path: 'activity-registrations',
+        name: 'ActivityRegistrations',
+        component: () => import('@/views/activity/registrations.vue'),
+        meta: { title: '活动报名', icon: 'Tickets' },
+      },
+      {
         path: 'assessment-templates',
         name: 'AssessmentTemplates',
         component: () => import('@/views/product/assessment.vue'),
