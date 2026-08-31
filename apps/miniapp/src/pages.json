@@ -58,6 +58,12 @@
       }
     },
     {
+      "path": "pages/profile/activity-registrations",
+      "style": {
+        "navigationBarTitleText": "我的活动"
+      }
+    },
+    {
       "path": "pages/invite/invite",
       "style": {
         "navigationBarTitleText": "邀请好友"
@@ -79,6 +85,18 @@
       "path": "pages/products/detail",
       "style": {
         "navigationBarTitleText": "产品详情"
+      }
+    },
+    {
+      "path": "pages/activities/index",
+      "style": {
+        "navigationBarTitleText": "活动"
+      }
+    },
+    {
+      "path": "pages/activities/detail",
+      "style": {
+        "navigationBarTitleText": "活动详情"
       }
     },
     {

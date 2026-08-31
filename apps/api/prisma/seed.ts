@@ -1085,7 +1085,154 @@ async function main(): Promise<void> {
       ],
     })
   }
+  async function upsertActivity(item: {
+    moduleId: bigint
+    title: string
+    subtitle: string
+    coverUrl: string
+    activityType: string
+    startOffsetDays: number
+    durationHours: number
+    registrationStartOffsetDays?: number
+    registrationEndOffsetDays: number
+    locationText: string
+    capacity?: number
+    targetUserText: string
+    highlights: string[]
+    detail: string
+    tags: string[]
+    relatedProductTitles: string[]
+    priority: number
+    sortOrder: number
+  }) {
+    const relatedProducts = await prisma.product.findMany({
+      where: {
+        moduleId: item.moduleId,
+        title: { in: item.relatedProductTitles },
+        deletedAt: null,
+      },
+      select: { id: true },
+    })
+    const startAt = new Date(Date.now() + item.startOffsetDays * 24 * 60 * 60 * 1000)
+    const endAt = new Date(startAt.getTime() + item.durationHours * 60 * 60 * 1000)
+    const registrationStartAt = item.registrationStartOffsetDays === undefined
+      ? null
+      : new Date(Date.now() + item.registrationStartOffsetDays * 24 * 60 * 60 * 1000)
+    const registrationEndAt = new Date(Date.now() + item.registrationEndOffsetDays * 24 * 60 * 60 * 1000)
+    const existing = await prisma.activity.findFirst({
+      where: { moduleId: item.moduleId, title: item.title, deletedAt: null },
+      select: { id: true },
+    })
+    const data = {
+      moduleId: item.moduleId,
+      title: item.title,
+      subtitle: item.subtitle,
+      coverUrl: item.coverUrl,
+      activityType: item.activityType,
+      startAt,
+      endAt,
+      registrationStartAt,
+      registrationEndAt,
+      locationText: item.locationText,
+      capacity: item.capacity ?? null,
+      targetUserText: item.targetUserText,
+      highlights: item.highlights,
+      detail: item.detail,
+      tags: item.tags,
+      tagIds: await tagIdsByNames(item.tags, item.moduleId),
+      relatedProductIds: relatedProducts.map((product) => product.id),
+      priority: item.priority,
+      sortOrder: item.sortOrder,
+      status: 1,
+      publishedAt: new Date(),
+    }
+    if (existing) await prisma.activity.update({ where: { id: existing.id }, data })
+    else await prisma.activity.create({ data })
+  }
+
+  const activitySeeds = [
+    {
+      moduleId: healthModule.id,
+      title: '睡眠改善公开课',
+      subtitle: '从作息、压力和饮食三个角度找到可执行入口',
+      coverUrl: '/static/images/covers/product-sleep.svg',
+      activityType: 'online',
+      startOffsetDays: 3,
+      durationHours: 1.5,
+      registrationEndOffsetDays: 2,
+      locationText: '线上直播间，报名后通知',
+      capacity: 80,
+      targetUserText: '入睡慢、浅睡、早醒或长期熬夜的人群。',
+      highlights: ['睡眠自查', '作息建议', '线上答疑'],
+      detail: '本活动用于帮助用户低门槛了解睡眠改善方法，适合和睡眠质量改善计划、职场压力恢复方案联动。',
+      tags: ['睡眠改善', '健康养生', '线上咨询'],
+      relatedProductTitles: ['睡眠质量改善计划', '职场压力恢复方案'],
+      priority: 80,
+      sortOrder: 0,
+    },
+    {
+      moduleId: healthModule.id,
+      title: '轻体管理体验说明会',
+      subtitle: '了解饮食记录、运动计划和习惯复盘怎么组合',
+      coverUrl: '/static/images/covers/product-weight.svg',
+      activityType: 'mixed',
+      startOffsetDays: 7,
+      durationHours: 2,
+      registrationEndOffsetDays: 6,
+      locationText: '线上说明 + 到店体验名额',
+      capacity: 30,
+      targetUserText: '关注体重管理、饮食结构和运动习惯的人群。',
+      highlights: ['方案拆解', '体验名额', '顾问答疑'],
+      detail: '活动重点解释轻体管理体验营适合什么用户、需要投入多少时间，以及如何做后续咨询。',
+      tags: ['体重管理', '运动健身', '低价体验'],
+      relatedProductTitles: ['轻体管理体验营', '营养咨询入门课'],
+      priority: 70,
+      sortOrder: 1,
+    },
+    {
+      moduleId: beautyModule.id,
+      title: '皮肤状态初筛日',
+      subtitle: '先判断肤质和基础护理方向，再选择服务',
+      coverUrl: '/static/images/covers/product-beauty.svg',
+      activityType: 'offline',
+      startOffsetDays: 10,
+      durationHours: 4,
+      registrationEndOffsetDays: 9,
+      locationText: '杭州线下体验点',
+      capacity: 20,
+      targetUserText: '想改善皮肤状态但不确定服务选择的人群。',
+      highlights: ['肤质初筛', '护理建议', '到店体验'],
+      detail: '美学模块活动用于承接皮肤管理标签用户，报名后由运营确认到店时间。',
+      tags: ['皮肤管理', '到店体验', '免费评估'],
+      relatedProductTitles: ['皮肤状态基础评估'],
+      priority: 60,
+      sortOrder: 2,
+    },
+    {
+      moduleId: emotionModule.id,
+      title: '压力情绪轻量练习营',
+      subtitle: '用一周时间观察压力来源和恢复动作',
+      coverUrl: '/static/images/covers/product-emotion.svg',
+      activityType: 'online',
+      startOffsetDays: -10,
+      durationHours: 2,
+      registrationEndOffsetDays: -11,
+      locationText: '线上回放已结束',
+      targetUserText: '压力较高、睡眠受影响、希望先轻量了解的人群。',
+      highlights: ['压力记录', '练习方法', '回放复盘'],
+      detail: '已结束活动用于验证小程序已结束筛选和后台历史活动状态。',
+      tags: ['压力管理', '情绪支持', '社群陪伴'],
+      relatedProductTitles: ['压力情绪梳理咨询', '压力恢复陪伴组合'],
+      priority: 20,
+      sortOrder: 3,
+    },
+  ]
+  for (const item of activitySeeds) {
+    await upsertActivity(item)
+  }
+
   console.log('产品推荐示例数据已就绪')
+  console.log('活动报名示例数据已就绪')
 }
 
 main()

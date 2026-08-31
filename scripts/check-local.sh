@@ -13,6 +13,7 @@
 # - 推荐列表
 # - 推荐事件上报
 # - 后台推荐分析
+# - 活动列表和后台报名列表
 
 set -euo pipefail
 
@@ -100,6 +101,23 @@ assert_code_200 "后台推荐分析" "$analytics_response"
 
 lead_summary_response="$(request GET "$API_BASE_URL/admin/product-leads/summary" "" "$token")"
 assert_code_200 "线索跟进摘要" "$lead_summary_response"
+
+activities_response="$(request GET "$API_BASE_URL/activities?statusScope=registering&page=1&pageSize=2")"
+assert_code_200 "活动列表" "$activities_response"
+activity_id="$(printf '%s' "$activities_response" | json_get 'r.data && r.data.list && r.data.list[0] && r.data.list[0].id')" || fail "活动列表为空"
+pass "样例活动 ID: $activity_id"
+
+recommended_activities_response="$(request GET "$API_BASE_URL/activities/recommended?moduleCode=health&limit=2")"
+assert_code_200 "推荐活动列表" "$recommended_activities_response"
+recommended_activity_count="$(printf '%s' "$recommended_activities_response" | json_get 'Array.isArray(r.data) ? r.data.length : 0')"
+[ "$recommended_activity_count" -gt 0 ] || fail "推荐活动列表为空"
+pass "推荐活动数量: $recommended_activity_count"
+
+admin_activities_response="$(request GET "$API_BASE_URL/admin/activities?page=1&pageSize=2" "" "$token")"
+assert_code_200 "后台活动列表" "$admin_activities_response"
+
+activity_registrations_response="$(request GET "$API_BASE_URL/admin/activity-registrations?page=1&pageSize=2" "" "$token")"
+assert_code_200 "后台活动报名列表" "$activity_registrations_response"
 
 echo ""
 pass "本地冒烟验收通过"

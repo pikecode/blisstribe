@@ -69,6 +69,31 @@
       />
     </view>
 
+    <view class="index__section">
+      <view class="app-section-head">
+        <view>
+          <text class="app-section-title">近期活动</text>
+          <text class="app-section-desc">先参与活动，再了解合适服务</text>
+        </view>
+        <text class="app-link-text" @tap="goActivities">全部活动</text>
+      </view>
+      <view v-if="activityLoading" class="index__activity-state">活动加载中</view>
+      <view v-else-if="recommendedActivities.length" class="index__activity-list">
+        <view v-for="item in recommendedActivities" :key="item.id" class="index__activity" @tap="goActivityDetail(item.id)">
+          <image v-if="item.coverUrl" :src="item.coverUrl" class="index__activity-cover" mode="aspectFill" />
+          <view class="index__activity-main">
+            <view class="index__activity-top">
+              <text>{{ item.module.name }}</text>
+              <text>{{ activityRegistrationStateText(item.registrationStatus) }}</text>
+            </view>
+            <text class="index__activity-title">{{ item.title }}</text>
+            <text class="index__activity-desc">{{ formatDate(item.startAt) }} · {{ item.locationText || '线上参与' }}</text>
+          </view>
+        </view>
+      </view>
+      <view v-else class="index__activity-state">暂无可报名活动</view>
+    </view>
+
   </view>
 
   <AuthPopup :visible="showAuthPopup" @close="showAuthPopup = false" />
@@ -81,6 +106,7 @@ import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
 import { bannerApi, type Banner } from '@/api/modules/banner'
 import { productApi, type Product, type ProductLead, type ProductModule } from '@/api/modules/product'
+import { activityApi, activityRegistrationStateText, type Activity } from '@/api/modules/activity'
 import { useFreshUserInfo } from '@/composables/useFreshUserInfo'
 import { useHealthAssessment } from '@/composables/useHealthAssessment'
 import { useAssessmentSync } from '@/composables/useAssessmentSync'
@@ -96,10 +122,12 @@ const isLogin = computed(() => authStore.isLogin)
 const banners = ref<Banner[]>([])
 const productModules = ref<ProductModule[]>([])
 const recommendedProducts = ref<Product[]>([])
+const recommendedActivities = ref<Activity[]>([])
 const recentLead = ref<ProductLead | null>(null)
 const assessmentMap = ref<Record<string, boolean>>({})
 const recommendLoading = ref(false)
 const recommendError = ref(false)
+const activityLoading = ref(false)
 const showAuthPopup = ref(false)
 const homeRecommendationForm = ref<'module_featured' | 'assessment_result' | 'profile_suggestion'>('module_featured')
 const { refreshUserInfo } = useFreshUserInfo()
@@ -190,6 +218,18 @@ async function loadRecommendedProducts() {
   }
 }
 
+async function loadRecommendedActivities() {
+  activityLoading.value = true
+  try {
+    const moduleCode = productModules.value[0]?.code || undefined
+    recommendedActivities.value = await activityApi.recommended({ moduleCode, limit: 3 })
+  } catch {
+    recommendedActivities.value = []
+  } finally {
+    activityLoading.value = false
+  }
+}
+
 const goProducts = () => {
   const moduleCode = productModules.value[0]?.code || 'health'
   uni.navigateTo({ url: `/pages/products/index?moduleCode=${moduleCode}` })
@@ -214,6 +254,11 @@ const goProductDetail = (id: number) => {
   uni.navigateTo({ url: `/pages/products/detail?id=${id}` })
 }
 const goLeadList = () => uni.navigateTo({ url: '/pages/profile/product-leads' })
+const goActivities = () => {
+  const moduleCode = productModules.value[0]?.code
+  uni.navigateTo({ url: `/pages/activities/index${moduleCode ? `?moduleCode=${moduleCode}` : ''}` })
+}
+const goActivityDetail = (id: number) => uni.navigateTo({ url: `/pages/activities/detail?id=${id}` })
 const chooseAssessment = () => {
   const modules = productModules.value.filter((item) => item.assessmentEnabled && item.assessmentType)
   if (modules.length === 0) {
@@ -289,6 +334,7 @@ onShow(async () => {
   await loadProductModules()
   syncLocalAssessments()
   loadRecommendedProducts()
+  loadRecommendedActivities()
   loadRecentLead()
 })
 </script>
@@ -440,6 +486,78 @@ onShow(async () => {
 
   &__section {
     margin: 0 28rpx 34rpx;
+  }
+
+  &__activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18rpx;
+  }
+
+  &__activity,
+  &__activity-state {
+    background: var(--color-bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &__activity {
+    display: flex;
+    gap: 18rpx;
+    padding: 20rpx;
+  }
+
+  &__activity-cover {
+    width: 136rpx;
+    height: 104rpx;
+    border-radius: 14rpx;
+    background: #eef2f1;
+    flex: 0 0 auto;
+  }
+
+  &__activity-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__activity-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12rpx;
+    color: var(--color-primary);
+    font-size: 22rpx;
+    font-weight: 700;
+    line-height: 30rpx;
+  }
+
+  &__activity-title {
+    display: block;
+    margin-top: 8rpx;
+    color: var(--color-text);
+    font-size: 28rpx;
+    font-weight: 800;
+    line-height: 38rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__activity-desc {
+    display: block;
+    margin-top: 6rpx;
+    color: var(--color-text-secondary);
+    font-size: 23rpx;
+    line-height: 32rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__activity-state {
+    padding: 32rpx 24rpx;
+    color: var(--color-text-secondary);
+    font-size: 25rpx;
+    text-align: center;
   }
 }
 </style>

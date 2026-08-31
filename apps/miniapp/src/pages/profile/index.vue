@@ -34,9 +34,9 @@
         <text class="profile__metric-value">{{ leadCountText }}</text>
         <text class="profile__metric-label">咨询记录</text>
       </view>
-      <view class="profile__metric" @tap="goEdit">
-        <text class="profile__metric-value">{{ profileCompletion }}%</text>
-        <text class="profile__metric-label">资料完整度</text>
+      <view class="profile__metric" @tap="goActivityRegistrations">
+        <text class="profile__metric-value">{{ activityCountText }}</text>
+        <text class="profile__metric-label">活动报名</text>
       </view>
     </view>
 
@@ -115,6 +115,13 @@
         </view>
         <text class="profile__chevron">›</text>
       </view>
+      <view class="profile__menu-item" @tap="goActivityRegistrations">
+        <view>
+          <text class="profile__menu-title">我的活动</text>
+          <text class="profile__menu-desc">查看报名、确认和参与记录</text>
+        </view>
+        <text class="profile__chevron">›</text>
+      </view>
     </view>
 
     <view v-if="isLogin" class="profile__actions">
@@ -150,6 +157,7 @@ import {
   type UserAssessment,
 } from '@/api/modules/product'
 import { partnerApi } from '@/api/modules/partner'
+import { activityApi } from '@/api/modules/activity'
 import type { Partner } from '@blisstribe/shared'
 import AuthPopup from '@/components/business/AuthPopup.vue'
 import ModuleAssessmentList from '@/components/business/ModuleAssessmentList.vue'
@@ -178,6 +186,7 @@ const remoteAssessments = ref<UserAssessment[]>([])
 const recommendedProducts = ref<Product[]>([])
 const recentLead = ref<ProductLead | null>(null)
 const leadTotal = ref(0)
+const activityTotal = ref(0)
 const partner = ref<Partner | null>(null)
 const recommendLoading = ref(false)
 
@@ -187,19 +196,6 @@ const localAssessments = computed(() => modules.value
   .map((item) => getAssessment(item.code))
   .filter((item): item is HealthAssessment => !!item))
 
-const profileCompletion = computed(() => {
-  const user = userStore.userInfo
-  if (!user) return 0
-  const checks = [
-    !!user.nickname,
-    !!user.avatar,
-    !!user.phone,
-    !!user.gender,
-    !!user.tags?.length,
-  ]
-  return Math.round((checks.filter(Boolean).length / checks.length) * 100)
-})
-
 const assessmentCount = computed(() => {
   const codes = new Set<string>()
   localAssessments.value.forEach((item) => codes.add(item.moduleCode || 'health'))
@@ -208,6 +204,7 @@ const assessmentCount = computed(() => {
 })
 
 const leadCountText = computed(() => (leadTotal.value > 99 ? '99+' : String(leadTotal.value)))
+const activityCountText = computed(() => (activityTotal.value > 99 ? '99+' : String(activityTotal.value)))
 
 const partnerEntryText = computed(() => {
   if (!isLogin.value || !partner.value) return '申请成为服务伙伴'
@@ -246,6 +243,7 @@ async function loadProfileData(): Promise<void> {
     remoteAssessments.value = []
     recentLead.value = null
     leadTotal.value = 0
+    activityTotal.value = 0
     partner.value = null
     await loadRecommendedProducts()
     return
@@ -253,7 +251,7 @@ async function loadProfileData(): Promise<void> {
 
   await syncLocalAssessments(true)
   await refreshUserInfo()
-  await Promise.all([loadAssessments(), loadLeads(), loadPartner()])
+  await Promise.all([loadAssessments(), loadLeads(), loadActivityRegistrations(), loadPartner()])
   await loadRecommendedProducts()
 }
 
@@ -273,6 +271,15 @@ async function loadLeads(): Promise<void> {
   } catch {
     recentLead.value = null
     leadTotal.value = 0
+  }
+}
+
+async function loadActivityRegistrations(): Promise<void> {
+  try {
+    const result = await activityApi.myRegistrations({ page: 1, pageSize: 1 })
+    activityTotal.value = result.total
+  } catch {
+    activityTotal.value = 0
   }
 }
 
@@ -383,6 +390,10 @@ function goProductLeads(): void {
   requireLogin(() => uni.navigateTo({ url: '/pages/profile/product-leads' }))
 }
 
+function goActivityRegistrations(): void {
+  requireLogin(() => uni.navigateTo({ url: '/pages/profile/activity-registrations' }))
+}
+
 function goPartner(): void {
   requireLogin(() => {
     const url = partner.value && partner.value.status !== 2 ? '/pages/partner/dashboard' : '/pages/partner/apply'
@@ -413,6 +424,7 @@ async function handleLogout(): Promise<void> {
   remoteAssessments.value = []
   recentLead.value = null
   leadTotal.value = 0
+  activityTotal.value = 0
   partner.value = null
   await loadRecommendedProducts()
 }
