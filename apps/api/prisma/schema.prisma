@@ -40,20 +40,21 @@ model User {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  wechatAccount        WechatAccount?
-  sessions             UserSession[]
-  agreements           UserAgreement[]
-  sentInvitations      MemberInvitation[]    @relation("Inviter")
-  receivedInvitations  MemberInvitation[]    @relation("Invitee")
-  inviterUser          User?                 @relation("UserInvitedBy", fields: [invitedBy], references: [id])
-  invitees             User[]                @relation("UserInvitedBy")
-  partnerMembers       PartnerMember[]
-  invitationRecords    InvitationRecord[]
-  customerRelations    CustomerRelation[]
-  relationEvents       RelationEvent[]
-  productLeads         ProductLead[]
-  assessments          UserAssessment[]
-  recommendationEvents RecommendationEvent[]
+  wechatAccount         WechatAccount?
+  sessions              UserSession[]
+  agreements            UserAgreement[]
+  sentInvitations       MemberInvitation[]     @relation("Inviter")
+  receivedInvitations   MemberInvitation[]     @relation("Invitee")
+  inviterUser           User?                  @relation("UserInvitedBy", fields: [invitedBy], references: [id])
+  invitees              User[]                 @relation("UserInvitedBy")
+  partnerMembers        PartnerMember[]
+  invitationRecords     InvitationRecord[]
+  customerRelations     CustomerRelation[]
+  relationEvents        RelationEvent[]
+  productLeads          ProductLead[]
+  assessments           UserAssessment[]
+  recommendationEvents  RecommendationEvent[]
+  activityRegistrations ActivityRegistration[]
 
   @@index([status])
   @@index([createdAt])
@@ -214,11 +215,12 @@ model Partner {
   updatedAt              DateTime  @updatedAt
   deletedAt              DateTime?
 
-  members           PartnerMember[]
-  invitationRecords InvitationRecord[]
-  customerRelations CustomerRelation[]
-  relationEvents    RelationEvent[]
-  productLeads      ProductLead[]
+  members               PartnerMember[]
+  invitationRecords     InvitationRecord[]
+  customerRelations     CustomerRelation[]
+  relationEvents        RelationEvent[]
+  productLeads          ProductLead[]
+  activityRegistrations ActivityRegistration[]
 
   @@index([status, auditStatus])
   @@index([type])
@@ -393,9 +395,76 @@ model ProductModule {
   recommendationRules  AssessmentRecommendationRule[]
   tags                 TagDictionary[]
   recommendationEvents RecommendationEvent[]
+  activities           Activity[]
 
   @@index([status, sortOrder])
   @@index([status, showOnHome, sortOrder])
+}
+
+// 活动
+model Activity {
+  id                  BigInt    @id @default(autoincrement())
+  moduleId            BigInt
+  title               String
+  subtitle            String    @default("")
+  coverUrl            String    @default("")
+  activityType        String    @default("online") // online/offline/mixed
+  startAt             DateTime
+  endAt               DateTime
+  registrationStartAt DateTime?
+  registrationEndAt   DateTime
+  locationText        String    @default("")
+  capacity            Int?
+  targetUserText      String    @default("")
+  highlights          String[]
+  detail              String    @default("")
+  tags                String[]
+  tagIds              BigInt[]
+  relatedProductIds   BigInt[]
+  priority            Int       @default(0)
+  sortOrder           Int       @default(0)
+  status              Int       @default(0) // 0草稿 1发布 2下线
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  module        ProductModule          @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  registrations ActivityRegistration[]
+
+  @@index([moduleId, status])
+  @@index([activityType, status])
+  @@index([status, startAt])
+  @@index([registrationEndAt])
+  @@index([deletedAt])
+}
+
+// 活动报名
+model ActivityRegistration {
+  id               BigInt   @id @default(autoincrement())
+  activityId       BigInt
+  userId           BigInt
+  partnerId        BigInt?
+  sourceInviteCode String?
+  sourceScene      String   @default("miniapp")
+  name             String   @default("")
+  phoneMasked      String   @default("")
+  message          String   @default("")
+  status           String   @default("registered") // registered/confirmed/attended/cancelled/invalid
+  followUpNote     String   @default("")
+  cancelReason     String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner  Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+
+  @@unique([activityId, userId])
+  @@index([activityId, status])
+  @@index([userId, createdAt])
+  @@index([partnerId, createdAt])
+  @@index([status, createdAt])
 }
 
 // 标签字典

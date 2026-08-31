@@ -14,6 +14,7 @@ import { BannerModule } from './banner/banner.module'
 import { MiniappModule } from './miniapp/miniapp.module'
 import { PartnerModule } from './partner/partner.module'
 import { ProductModule } from './product/product.module'
+import { ActivityModule } from './activity/activity.module'
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ProductModule } from './product/product.module'
     MiniappModule,
     PartnerModule,
     ProductModule,
+    ActivityModule,
   ],
 })
 export class AppModule {}
