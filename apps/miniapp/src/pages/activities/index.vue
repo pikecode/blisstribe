@@ -58,15 +58,16 @@ import { onLoad, onShow } from '@dcloudio/uni-app'
 import { activityApi, activityDisplayRegistrationText, activityTypeText, type Activity } from '@/api/modules/activity'
 import { productApi, type ProductModule } from '@/api/modules/product'
 
-type StatusScope = 'registering' | 'upcoming' | 'ended'
+type StatusScope = '' | 'registering' | 'upcoming' | 'ended'
 
 const activities = ref<Activity[]>([])
 const currentModule = ref<ProductModule | null>(null)
 const loading = ref(false)
 const loadError = ref(false)
 const moduleCode = ref('')
-const statusScope = ref<StatusScope>('registering')
+const statusScope = ref<StatusScope>('')
 const statusTabs: Array<{ label: string; value: StatusScope }> = [
+  { label: '全部', value: '' },
   { label: '报名中', value: 'registering' },
   { label: '即将开始', value: 'upcoming' },
   { label: '已结束', value: 'ended' },
@@ -91,7 +92,7 @@ async function loadActivities() {
   try {
     activities.value = (await activityApi.list({
       moduleCode: moduleCode.value || undefined,
-      statusScope: statusScope.value,
+      statusScope: statusScope.value || undefined,
       page: 1,
       pageSize: 20,
     })).list

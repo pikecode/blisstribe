@@ -125,7 +125,7 @@
               </el-radio-group>
             </el-form-item>
             <el-form-item label="地点/入口">
-              <el-input v-model="form.locationText" maxlength="200" placeholder="线下地址或线上入口说明" />
+              <el-input v-model="form.locationText" maxlength="200" :placeholder="locationPlaceholder" />
             </el-form-item>
             <el-form-item label="活动时间" prop="activityTimeRange">
               <el-date-picker
@@ -250,6 +250,11 @@ const defaultForm = (): ActivityForm => ({
 const form = reactive<ActivityForm>(defaultForm())
 const activeModules = computed(() => modules.value.filter((item) => item.status === 1))
 const selectableProducts = computed(() => products.value.filter((item) => !form.moduleId || item.module?.id === form.moduleId))
+const locationPlaceholder = computed(() => {
+  if (form.activityType === 'offline') return '填写门店地址、集合地点或详细到场说明'
+  if (form.activityType === 'mixed') return '填写线下地址和线上参与入口说明'
+  return '填写直播间、会议链接或报名后通知说明'
+})
 const groupedTags = computed(() => {
   const currentModuleId = form.moduleId || null
   const options = tags.value.filter((item) => item.status === 1 && (!item.moduleId || item.moduleId === currentModuleId))
@@ -344,6 +349,34 @@ function handleModuleChange() {
   form.relatedProductIds = form.relatedProductIds?.filter((id) => validProductIds.has(id)) ?? []
 }
 
+function validateActivityTimeline() {
+  const [startAt, endAt] = form.activityTimeRange
+  const [registrationStartAt, registrationEndAt] = form.registrationTimeRange
+  const activityStart = new Date(startAt).getTime()
+  const activityEnd = new Date(endAt).getTime()
+  const registrationStart = registrationStartAt ? new Date(registrationStartAt).getTime() : 0
+  const registrationEnd = new Date(registrationEndAt).getTime()
+
+  activeFormTab.value = 'basic'
+  if (!Number.isFinite(activityStart) || !Number.isFinite(activityEnd) || activityEnd <= activityStart) {
+    ElMessage.error('活动结束时间必须晚于开始时间')
+    return false
+  }
+  if (!Number.isFinite(registrationEnd)) {
+    ElMessage.error('请选择报名截止时间')
+    return false
+  }
+  if (registrationStartAt && (!Number.isFinite(registrationStart) || registrationEnd <= registrationStart)) {
+    ElMessage.error('报名截止时间必须晚于报名开始时间')
+    return false
+  }
+  if (registrationEnd > activityEnd) {
+    ElMessage.error('报名截止时间不能晚于活动结束时间')
+    return false
+  }
+  return true
+}
+
 async function submit() {
   try {
     await formRef.value?.validate()
@@ -353,6 +386,7 @@ async function submit() {
   }
   const [startAt, endAt] = form.activityTimeRange
   const [registrationStartAt, registrationEndAt] = form.registrationTimeRange
+  if (!validateActivityTimeline()) return
   submitting.value = true
   try {
     const payload: ActivityPayload = {
