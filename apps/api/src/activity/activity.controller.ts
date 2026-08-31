@@ -28,8 +28,10 @@ function parseId(id?: string) {
 export class ActivityController {
   constructor(private readonly activityService: ActivityService) {}
 
+  @UseGuards(OptionalJwtGuard)
   @Get()
   list(
+    @CurrentUser() user: { userId: string } | null,
     @Query('moduleCode') moduleCode?: string,
     @Query('activityType') activityType?: string,
     @Query('statusScope') statusScope?: string,
@@ -40,16 +42,23 @@ export class ActivityController {
       moduleCode,
       activityType,
       statusScope,
+      userId: user?.userId ? BigInt(user.userId) : undefined,
       ...pageParams(page, pageSize),
     })
   }
 
+  @UseGuards(OptionalJwtGuard)
   @Get('recommended')
   recommended(
+    @CurrentUser() user: { userId: string } | null,
     @Query('moduleCode') moduleCode?: string,
     @Query('limit') limit = '3'
   ) {
-    return this.activityService.recommended({ moduleCode, limit: Number(limit) || 3 })
+    return this.activityService.recommended({
+      moduleCode,
+      userId: user?.userId ? BigInt(user.userId) : undefined,
+      limit: Number(limit) || 3,
+    })
   }
 
   @UseGuards(JwtAuthGuard)

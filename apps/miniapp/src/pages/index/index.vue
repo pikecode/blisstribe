@@ -84,7 +84,7 @@
           <view class="index__activity-main">
             <view class="index__activity-top">
               <text>{{ item.module.name }}</text>
-              <text>{{ activityRegistrationStateText(item.registrationStatus) }}</text>
+              <text>{{ activityDisplayRegistrationText(item) }}</text>
             </view>
             <text class="index__activity-title">{{ item.title }}</text>
             <text class="index__activity-desc">{{ formatDate(item.startAt) }} · {{ item.locationText || '线上参与' }}</text>
@@ -106,7 +106,7 @@ import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
 import { bannerApi, type Banner } from '@/api/modules/banner'
 import { productApi, type Product, type ProductLead, type ProductModule } from '@/api/modules/product'
-import { activityApi, activityRegistrationStateText, type Activity } from '@/api/modules/activity'
+import { activityApi, activityDisplayRegistrationText, type Activity } from '@/api/modules/activity'
 import { useFreshUserInfo } from '@/composables/useFreshUserInfo'
 import { useHealthAssessment } from '@/composables/useHealthAssessment'
 import { useAssessmentSync } from '@/composables/useAssessmentSync'

@@ -40,7 +40,7 @@
           <text class="activity-card__desc">{{ item.subtitle || item.targetUserText }}</text>
           <view class="activity-card__info">
             <text>{{ formatDate(item.startAt) }}</text>
-            <text>{{ activityRegistrationStateText(item.registrationStatus) }}</text>
+            <text>{{ activityDisplayRegistrationText(item) }}</text>
           </view>
           <view class="activity-card__foot">
             <text>已报名 {{ item.registeredCount }}{{ item.capacity ? `/${item.capacity}` : '' }}</text>
@@ -55,7 +55,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { activityApi, activityRegistrationStateText, activityTypeText, type Activity } from '@/api/modules/activity'
+import { activityApi, activityDisplayRegistrationText, activityTypeText, type Activity } from '@/api/modules/activity'
 import { productApi, type ProductModule } from '@/api/modules/product'
 
 type StatusScope = 'registering' | 'upcoming' | 'ended'

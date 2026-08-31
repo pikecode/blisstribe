@@ -41,6 +41,7 @@ export class ActivityService {
     moduleCode?: string
     activityType?: string
     statusScope?: string
+    userId?: bigint
     page: number
     pageSize: number
   }) {
@@ -55,17 +56,21 @@ export class ActivityService {
       }),
       this.prisma.activity.count({ where }),
     ])
-    const counts = await this.registrationCounts(rows.map((row) => row.id))
+    const activityIds = rows.map((row) => row.id)
+    const [counts, registrationMap] = await Promise.all([
+      this.registrationCounts(activityIds),
+      this.registrationsByActivityIds(activityIds, params.userId),
+    ])
 
     return {
-      list: rows.map((row) => this.toActivityVO(row, counts.get(row.id) ?? 0)),
+      list: rows.map((row) => this.toActivityVO(row, counts.get(row.id) ?? 0, registrationMap.get(row.id) ?? null)),
       total,
       page: params.page,
       pageSize: params.pageSize,
     }
   }
 
-  async recommended(params: { moduleCode?: string; limit: number }) {
+  async recommended(params: { moduleCode?: string; userId?: bigint; limit: number }) {
     const now = new Date()
     const where = this.buildPublicActivityWhere({
       moduleCode: params.moduleCode,
@@ -80,8 +85,12 @@ export class ActivityService {
       orderBy: [{ priority: 'desc' }, { sortOrder: 'asc' }, { startAt: 'asc' }],
       take: Math.min(params.limit, 20),
     })
-    const counts = await this.registrationCounts(rows.map((row) => row.id))
-    return rows.map((row) => this.toActivityVO(row, counts.get(row.id) ?? 0))
+    const activityIds = rows.map((row) => row.id)
+    const [counts, registrationMap] = await Promise.all([
+      this.registrationCounts(activityIds),
+      this.registrationsByActivityIds(activityIds, params.userId),
+    ])
+    return rows.map((row) => this.toActivityVO(row, counts.get(row.id) ?? 0, registrationMap.get(row.id) ?? null))
   }
 
   async detailPublic(id: bigint, userId: bigint | null) {
@@ -573,6 +582,14 @@ export class ActivityService {
       _count: { _all: true },
     })
     return new Map(rows.map((row) => [row.activityId, row._count._all]))
+  }
+
+  private async registrationsByActivityIds(activityIds: bigint[], userId?: bigint) {
+    if (!activityIds.length || !userId) return new Map<bigint, ActivityRegistration>()
+    const rows = await this.prisma.activityRegistration.findMany({
+      where: { activityId: { in: activityIds }, userId },
+    })
+    return new Map(rows.map((row) => [row.activityId, row]))
   }
 
   private registrationInclude() {

@@ -1,4 +1,5 @@
 import { request } from '@/api/request'
+import { storage } from '@/utils/storage'
 import type { Product, ProductModule } from './product'
 
 export type ActivityType = 'online' | 'offline' | 'mixed'
@@ -67,6 +68,9 @@ export interface ActivityListResult {
   pageSize: number
 }
 
+const LOCAL_REGISTERED_ACTIVITY_IDS_KEY = 'registeredActivityIds'
+const ACTIVE_ACTIVITY_REGISTRATION_STATUSES = ['registered', 'confirmed', 'attended']
+
 function withQuery(url: string, params: Record<string, string | number | undefined>) {
   const query = Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== '')
@@ -101,6 +105,35 @@ export function activityRegistrationStateText(value?: string) {
     ended: '已结束',
   }
   return value ? map[value] || value : '-'
+}
+
+export function isActiveActivityRegistrationStatus(value?: string) {
+  return !!value && ACTIVE_ACTIVITY_REGISTRATION_STATUSES.includes(value)
+}
+
+export function markLocalActivityRegistered(activityId: number) {
+  const ids = storage.get<number[]>(LOCAL_REGISTERED_ACTIVITY_IDS_KEY) || []
+  storage.set(LOCAL_REGISTERED_ACTIVITY_IDS_KEY, [...new Set([...ids, activityId])], { expireSeconds: 30 * 24 * 3600 })
+}
+
+export function removeLocalActivityRegistered(activityId: number) {
+  const ids = storage.get<number[]>(LOCAL_REGISTERED_ACTIVITY_IDS_KEY) || []
+  storage.set(LOCAL_REGISTERED_ACTIVITY_IDS_KEY, ids.filter((id) => id !== activityId), { expireSeconds: 30 * 24 * 3600 })
+}
+
+export function isLocalActivityRegistered(activityId?: number) {
+  if (!activityId) return false
+  return (storage.get<number[]>(LOCAL_REGISTERED_ACTIVITY_IDS_KEY) || []).includes(activityId)
+}
+
+export function activityDisplayRegistrationText(activity?: Pick<Activity, 'id' | 'registrationStatus' | 'myRegistration'> | null) {
+  const myStatus = activity?.myRegistration?.status
+  if (isActiveActivityRegistrationStatus(myStatus)) {
+    return activityRegistrationStatusText(myStatus)
+  }
+  if (myStatus) return activityRegistrationStatusText(myStatus)
+  if (isLocalActivityRegistered(activity?.id)) return '已报名'
+  return activityRegistrationStateText(activity?.registrationStatus)
 }
 
 export const activityApi = {
@@ -151,6 +184,9 @@ export const activityApi = {
       url: `/activities/${id}/registrations`,
       method: 'POST',
       data,
+    }).then((registration) => {
+      if (isActiveActivityRegistrationStatus(registration.status)) markLocalActivityRegistered(id)
+      return registration
     })
   },
   cancelRegistration(id: number, data?: { cancelReason?: string }): Promise<ActivityRegistration> {
@@ -158,6 +194,9 @@ export const activityApi = {
       url: `/activities/${id}/registrations/cancel`,
       method: 'POST',
       data,
+    }).then((registration) => {
+      removeLocalActivityRegistered(id)
+      return registration
     })
   },
 }
