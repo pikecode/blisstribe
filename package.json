@@ -16,6 +16,7 @@
     "dev": "concurrently -n api,admin -c green,blue \"pnpm dev:api\" \"pnpm dev:admin\"",
     "start": "concurrently -n api,admin -c green,blue \"pnpm --filter @blisstribe/api start\" \"pnpm --filter @blisstribe/admin preview\"",
     "type-check": "pnpm -r type-check",
+    "check:local": "./scripts/check-local.sh",
     "db:generate": "pnpm --filter @blisstribe/api prisma:generate",
     "db:migrate": "pnpm --filter @blisstribe/api prisma:migrate",
     "deploy:acr": "./scripts/deploy-acr.sh",
