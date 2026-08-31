@@ -54,6 +54,24 @@ export class UploadController {
   }
 
   @UseGuards(AdminJwtGuard)
+  @Post('cover')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+          return cb(new BadRequestException('仅支持 jpg/png/webp 格式'), false)
+        }
+        cb(null, true)
+      },
+    })
+  )
+  async uploadCover(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('请上传文件')
+    return this.uploadService.saveCover(file)
+  }
+
+  @UseGuards(AdminJwtGuard)
   @Delete('file')
   deleteFile(@Query('url') url: string) {
     if (!url) throw new BadRequestException('url required')

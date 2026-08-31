@@ -192,8 +192,8 @@
             <el-form-item label="副标题">
               <el-input v-model="productForm.subtitle" />
             </el-form-item>
-            <el-form-item label="封面地址">
-              <el-input v-model="productForm.coverUrl" placeholder="可填图片 URL" />
+            <el-form-item label="产品封面">
+              <AdminCoverUpload v-model="productForm.coverUrl" tip="支持 jpg/png/webp，建议使用产品实拍或服务场景横图，文件不超过 5MB" />
             </el-form-item>
             <el-form-item label="价格文案">
               <el-input v-model="productForm.priceText" placeholder="例如：199元起 / 到店咨询" />
@@ -327,8 +327,8 @@
         <el-form-item label="图标文案">
           <el-input v-model="moduleForm.icon" maxlength="20" placeholder="如 健康 / 美学 / 亲子" />
         </el-form-item>
-        <el-form-item label="封面地址">
-          <el-input v-model="moduleForm.coverUrl" placeholder="可填图片 URL，暂用于后续展示扩展" />
+        <el-form-item label="模块封面">
+          <AdminCoverUpload v-model="moduleForm.coverUrl" tip="支持 jpg/png/webp，建议使用能代表模块主题的横图，文件不超过 5MB" />
         </el-form-item>
         <el-form-item label="说明">
           <el-input v-model="moduleForm.description" />
@@ -370,6 +370,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance } from 'element-plus'
 import { productApi, type Product, type ProductModule, type ProductModulePayload, type ProductPayload, type ProductType, type TagDictionary } from '@/api/product'
 import { buildTagOptionGroups, mapTagNamesToIds, tagOptionLabel } from '@/utils/tags'
+import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
 
 const activeTab = ref('products')
 const modules = ref<ProductModule[]>([])

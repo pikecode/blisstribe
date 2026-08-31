@@ -101,7 +101,7 @@
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑活动' : '新增活动'" width="820px" :close-on-click-modal="false">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-tabs>
+        <el-tabs v-model="activeFormTab">
           <el-tab-pane label="基础信息" name="basic">
             <el-form-item label="所属模块" prop="moduleId">
               <el-select v-model="form.moduleId" placeholder="请选择模块" style="width: 100%" @change="handleModuleChange">
@@ -114,8 +114,8 @@
             <el-form-item label="副标题">
               <el-input v-model="form.subtitle" maxlength="120" />
             </el-form-item>
-            <el-form-item label="封面地址">
-              <el-input v-model="form.coverUrl" maxlength="300" />
+            <el-form-item label="活动封面">
+              <AdminCoverUpload v-model="form.coverUrl" tip="支持 jpg/png/webp，建议使用 16:9 横图，文件不超过 5MB" />
             </el-form-item>
             <el-form-item label="活动形式">
               <el-radio-group v-model="form.activityType">
@@ -202,6 +202,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { activityApi, activityStatusText, activityTypeText, type Activity, type ActivityPayload, type ActivityType } from '@/api/activity'
 import { productApi, type Product, type ProductModule, type TagDictionary } from '@/api/product'
+import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
 
 type ActivityForm = Omit<ActivityPayload, 'startAt' | 'endAt' | 'registrationStartAt' | 'registrationEndAt'> & {
   activityTimeRange: string[]
@@ -216,6 +217,7 @@ const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
+const activeFormTab = ref('basic')
 const formRef = ref<FormInstance>()
 const page = ref(1)
 const pageSize = ref(20)
@@ -310,6 +312,7 @@ function resetSearch() {
 
 function openDialog(row?: Activity) {
   editingId.value = row?.id ?? null
+  activeFormTab.value = 'basic'
   Object.assign(form, row
     ? {
         moduleId: row.moduleId,
@@ -342,7 +345,12 @@ function handleModuleChange() {
 }
 
 async function submit() {
-  await formRef.value?.validate()
+  try {
+    await formRef.value?.validate()
+  } catch (error) {
+    activeFormTab.value = 'basic'
+    throw error
+  }
   const [startAt, endAt] = form.activityTimeRange
   const [registrationStartAt, registrationEndAt] = form.registrationTimeRange
   submitting.value = true

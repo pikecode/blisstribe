@@ -221,8 +221,7 @@ async function loadRecommendedProducts() {
 async function loadRecommendedActivities() {
   activityLoading.value = true
   try {
-    const moduleCode = productModules.value[0]?.code || undefined
-    recommendedActivities.value = await activityApi.recommended({ moduleCode, limit: 3 })
+    recommendedActivities.value = await activityApi.recommended({ limit: 3 })
   } catch {
     recommendedActivities.value = []
   } finally {
@@ -255,8 +254,7 @@ const goProductDetail = (id: number) => {
 }
 const goLeadList = () => uni.navigateTo({ url: '/pages/profile/product-leads' })
 const goActivities = () => {
-  const moduleCode = productModules.value[0]?.code
-  uni.navigateTo({ url: `/pages/activities/index${moduleCode ? `?moduleCode=${moduleCode}` : ''}` })
+  uni.navigateTo({ url: '/pages/activities/index' })
 }
 const goActivityDetail = (id: number) => uni.navigateTo({ url: `/pages/activities/detail?id=${id}` })
 const chooseAssessment = () => {
