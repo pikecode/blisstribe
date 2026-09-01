@@ -456,7 +456,6 @@ model Venue {
   latitude           Decimal?  @db.Decimal(10, 7)
   longitude          Decimal?  @db.Decimal(10, 7)
   capacity           Int?
-  facilities         String[]
   description        String    @default("")
   contactName        String    @default("")
   contactPhoneMasked String    @default("")
@@ -469,11 +468,43 @@ model Venue {
   images       VenueImage[]
   availability VenueAvailability[]
   blockedSlots VenueBlockedSlot[]
+  facilities   VenueFacilityOnVenue[]
   activities   Activity[]
 
   @@index([status, sortOrder])
   @@index([city, district])
   @@index([deletedAt])
+}
+
+// 场地设施字典
+model VenueFacility {
+  id          BigInt    @id @default(autoincrement())
+  name        String    @unique
+  description String    @default("")
+  status      Int       @default(1) // 0停用 1启用
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  venues VenueFacilityOnVenue[]
+
+  @@index([status, sortOrder])
+  @@index([deletedAt])
+}
+
+// 场地与设施关联
+model VenueFacilityOnVenue {
+  venueId    BigInt
+  facilityId BigInt
+  sortOrder  Int    @default(0)
+
+  venue    Venue         @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  facility VenueFacility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+
+  @@id([venueId, facilityId])
+  @@index([facilityId])
+  @@index([venueId, sortOrder])
 }
 
 // 场地图片

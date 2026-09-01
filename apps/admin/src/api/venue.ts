@@ -33,6 +33,7 @@ export interface Venue {
   latitude: number | null
   longitude: number | null
   capacity: number | null
+  facilityIds: number[]
   facilities: string[]
   description: string
   contactName: string
@@ -47,6 +48,18 @@ export interface Venue {
 }
 
 export type VenuePayload = Omit<Venue, 'id' | 'createdAt' | 'updatedAt'>
+
+export interface VenueFacility {
+  id: number
+  name: string
+  description: string
+  status: number
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type VenueFacilityPayload = Omit<VenueFacility, 'id' | 'createdAt' | 'updatedAt'>
 
 export function weekdayText(value: number) {
   return ['一', '二', '三', '四', '五', '六', '日'][value - 1] ? `周${['一', '二', '三', '四', '五', '六', '日'][value - 1]}` : '-'
@@ -64,5 +77,14 @@ export const venueApi = {
   },
   update(id: number, data: Partial<VenuePayload>): Promise<Venue> {
     return request.put(`/admin/venues/${id}`, data)
+  },
+  listFacilities(params?: { status?: number | ''; keyword?: string }): Promise<VenueFacility[]> {
+    return request.get('/admin/venue-facilities', { params })
+  },
+  createFacility(data: VenueFacilityPayload): Promise<VenueFacility> {
+    return request.post('/admin/venue-facilities', data)
+  },
+  updateFacility(id: number, data: Partial<VenueFacilityPayload>): Promise<VenueFacility> {
+    return request.put(`/admin/venue-facilities/${id}`, data)
   },
 }

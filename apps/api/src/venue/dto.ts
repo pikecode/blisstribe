@@ -64,6 +64,51 @@ export class VenueBlockedSlotInputDto {
   reason?: string
 }
 
+export class CreateVenueFacilityDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  name!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  description?: string
+
+  @IsOptional()
+  @IsInt()
+  @IsIn([0, 1])
+  status?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number
+}
+
+export class UpdateVenueFacilityDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  name?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  description?: string
+
+  @IsOptional()
+  @IsInt()
+  @IsIn([0, 1])
+  status?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number
+}
+
 export class CreateVenueDto {
   @IsString()
   @IsNotEmpty()
@@ -112,6 +157,11 @@ export class CreateVenueDto {
   @IsArray()
   @IsString({ each: true })
   facilities?: string[]
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  facilityIds?: number[]
 
   @IsOptional()
   @IsString()

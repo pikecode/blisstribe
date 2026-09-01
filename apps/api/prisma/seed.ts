@@ -1098,6 +1098,7 @@ async function main(): Promise<void> {
     })
   }
   async function upsertVenue() {
+    const facilityNames = ['投影', '茶水', '咨询室', '停车位']
     const existing = await prisma.venue.findFirst({
       where: { name: '杭州线下体验点', deletedAt: null },
       select: { id: true },
@@ -1110,7 +1111,6 @@ async function main(): Promise<void> {
       city: '杭州',
       district: '西湖区',
       capacity: 40,
-      facilities: ['投影', '茶水', '咨询室', '停车位'],
       description: '用于本地验收的默认线下场地，可承接健康、美学和家庭类小型活动。',
       contactName: '运营值班',
       contactPhoneMasked: '0571****8888',
@@ -1120,6 +1120,20 @@ async function main(): Promise<void> {
     const venue = existing
       ? await prisma.venue.update({ where: { id: existing.id }, data })
       : await prisma.venue.create({ data })
+    const facilities = await Promise.all(
+      facilityNames.map((name, index) =>
+        prisma.venueFacility.upsert({
+          where: { name },
+          update: { status: 1, sortOrder: index },
+          create: { name, status: 1, sortOrder: index },
+        })
+      )
+    )
+    await prisma.venueFacilityOnVenue.deleteMany({ where: { venueId: venue.id } })
+    await prisma.venueFacilityOnVenue.createMany({
+      data: facilities.map((facility, index) => ({ venueId: venue.id, facilityId: facility.id, sortOrder: index })),
+      skipDuplicates: true,
+    })
     await prisma.venueImage.deleteMany({ where: { venueId: venue.id } })
     await prisma.venueImage.createMany({
       data: [
@@ -1142,6 +1156,7 @@ async function main(): Promise<void> {
   }
 
   const demoVenue = await upsertVenue()
+  const demoVenueFacilities = ['投影', '茶水', '咨询室', '停车位']
 
   async function upsertActivity(item: {
     moduleId: bigint
@@ -1204,7 +1219,7 @@ async function main(): Promise<void> {
             city: demoVenue.city,
             district: demoVenue.district,
             capacity: demoVenue.capacity,
-            facilities: demoVenue.facilities,
+            facilities: demoVenueFacilities,
           }
         : {},
       capacity: item.capacity ?? null,

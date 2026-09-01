@@ -7,7 +7,10 @@
             <div class="card-header__title">场地管理</div>
             <div class="card-header__desc">维护活动场地、图片、可用时间和临时不可用时间</div>
           </div>
-          <el-button type="primary" @click="openDialog()">新增场地</el-button>
+          <div class="card-header__actions">
+            <el-button @click="facilityDialogVisible = true">设施字典</el-button>
+            <el-button type="primary" @click="openDialog()">新增场地</el-button>
+          </div>
         </div>
       </template>
 
@@ -114,8 +117,8 @@
               </div>
             </el-form-item>
             <el-form-item label="设施">
-              <el-select v-model="form.facilities" multiple allow-create filterable default-first-option style="width: 100%">
-                <el-option v-for="item in form.facilities" :key="item" :label="item" :value="item" />
+              <el-select v-model="form.facilityIds" multiple filterable placeholder="请选择设施" style="width: 100%">
+                <el-option v-for="item in activeFacilities" :key="item.id" :label="item.name" :value="item.id" />
               </el-select>
             </el-form-item>
             <el-form-item label="联系人">
@@ -175,14 +178,60 @@
         <el-button type="primary" :loading="submitting" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="facilityDialogVisible" title="设施字典" width="720px" :close-on-click-modal="false">
+      <div class="facility-toolbar">
+        <el-input v-model="facilityKeyword" placeholder="搜索设施" clearable style="width: 220px" @keyup.enter="loadFacilities" />
+        <el-button type="primary" @click="openFacilityDialog()">新增设施</el-button>
+      </div>
+      <el-table :data="facilities" v-loading="facilityLoading" stripe>
+        <el-table-column label="设施名称" prop="name" min-width="140" />
+        <el-table-column label="说明" prop="description" min-width="180" show-overflow-tooltip />
+        <el-table-column label="排序" prop="sortOrder" width="90" />
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="openFacilityDialog(row)">编辑</el-button>
+            <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" plain @click="toggleFacilityStatus(row)">
+              {{ row.status === 1 ? '停用' : '启用' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
+    <el-dialog v-model="facilityFormVisible" :title="facilityEditingId ? '编辑设施' : '新增设施'" width="480px" :close-on-click-modal="false">
+      <el-form ref="facilityFormRef" :model="facilityForm" :rules="facilityRules" label-width="84px">
+        <el-form-item label="设施名称" prop="name">
+          <el-input v-model="facilityForm.name" maxlength="40" />
+        </el-form-item>
+        <el-form-item label="说明">
+          <el-input v-model="facilityForm.description" type="textarea" :rows="3" maxlength="160" />
+        </el-form-item>
+        <el-form-item label="排序/状态">
+          <div class="inline-fields">
+            <el-input-number v-model="facilityForm.sortOrder" :min="0" placeholder="排序" />
+            <el-switch v-model="facilityForm.status" :active-value="1" :inactive-value="0" active-text="启用" inactive-text="停用" />
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="facilityFormVisible = false">取消</el-button>
+        <el-button type="primary" :loading="facilitySubmitting" @click="submitFacility">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { venueApi, weekdayText, type Venue, type VenuePayload } from '@/api/venue'
+import { venueApi, weekdayText, type Venue, type VenueFacility, type VenueFacilityPayload, type VenuePayload } from '@/api/venue'
 import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
 
 const weekdays = [
@@ -196,18 +245,26 @@ const weekdays = [
 ]
 
 const venues = ref<Venue[]>([])
+const facilities = ref<VenueFacility[]>([])
 const loading = ref(false)
+const facilityLoading = ref(false)
 const submitting = ref(false)
+const facilitySubmitting = ref(false)
 const dialogVisible = ref(false)
+const facilityDialogVisible = ref(false)
+const facilityFormVisible = ref(false)
 const editingId = ref<number | null>(null)
+const facilityEditingId = ref<number | null>(null)
 const activeTab = ref('basic')
 const formRef = ref<FormInstance>()
+const facilityFormRef = ref<FormInstance>()
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const keyword = ref('')
 const city = ref('')
 const status = ref<number | ''>('')
+const facilityKeyword = ref('')
 
 const defaultForm = (): VenuePayload => ({
   name: '',
@@ -219,6 +276,7 @@ const defaultForm = (): VenuePayload => ({
   latitude: null,
   longitude: null,
   capacity: null,
+  facilityIds: [],
   facilities: [],
   description: '',
   contactName: '',
@@ -237,8 +295,18 @@ const defaultForm = (): VenuePayload => ({
 })
 
 const form = reactive<VenuePayload>(defaultForm())
+const facilityForm = reactive<VenueFacilityPayload>({
+  name: '',
+  description: '',
+  status: 1,
+  sortOrder: 0,
+})
+const activeFacilities = computed(() => facilities.value.filter((item) => item.status === 1))
 const rules: FormRules<VenuePayload> = {
   name: [{ required: true, message: '请填写场地名称', trigger: 'blur' }],
+}
+const facilityRules: FormRules<VenueFacilityPayload> = {
+  name: [{ required: true, message: '请填写设施名称', trigger: 'blur' }],
 }
 
 async function loadVenues() {
@@ -255,6 +323,15 @@ async function loadVenues() {
     total.value = result.total
   } finally {
     loading.value = false
+  }
+}
+
+async function loadFacilities() {
+  facilityLoading.value = true
+  try {
+    facilities.value = await venueApi.listFacilities({ keyword: facilityKeyword.value || undefined })
+  } finally {
+    facilityLoading.value = false
   }
 }
 
@@ -283,6 +360,7 @@ function openDialog(row?: Venue) {
     latitude: row.latitude,
     longitude: row.longitude,
     capacity: row.capacity,
+    facilityIds: [...row.facilityIds],
     facilities: [...row.facilities],
     description: row.description,
     contactName: row.contactName,
@@ -295,6 +373,23 @@ function openDialog(row?: Venue) {
   } : defaultForm())
   dialogVisible.value = true
   formRef.value?.clearValidate()
+}
+
+function openFacilityDialog(row?: VenueFacility) {
+  facilityEditingId.value = row?.id ?? null
+  Object.assign(facilityForm, row ? {
+    name: row.name,
+    description: row.description,
+    status: row.status,
+    sortOrder: row.sortOrder,
+  } : {
+    name: '',
+    description: '',
+    status: 1,
+    sortOrder: facilities.value.length,
+  })
+  facilityFormVisible.value = true
+  facilityFormRef.value?.clearValidate()
 }
 
 function addAvailability() {
@@ -315,7 +410,7 @@ async function submit() {
   try {
     const payload: VenuePayload = {
       ...form,
-      facilities: form.facilities.map((item) => item.trim()).filter(Boolean),
+      facilities: [],
       images: form.images.filter((item) => item.imageUrl.trim()),
       blockedSlots: form.blockedSlots.filter((item) => item.startAt && item.endAt),
     }
@@ -333,22 +428,69 @@ async function submit() {
   }
 }
 
+async function submitFacility() {
+  await facilityFormRef.value?.validate()
+  facilitySubmitting.value = true
+  try {
+    const payload = {
+      ...facilityForm,
+      name: facilityForm.name.trim(),
+      description: facilityForm.description?.trim(),
+    }
+    if (facilityEditingId.value) {
+      await venueApi.updateFacility(facilityEditingId.value, payload)
+      ElMessage.success('设施已更新')
+    } else {
+      await venueApi.createFacility(payload)
+      ElMessage.success('设施已创建')
+    }
+    facilityFormVisible.value = false
+    await loadFacilities()
+  } finally {
+    facilitySubmitting.value = false
+  }
+}
+
 async function toggleStatus(row: Venue) {
-  await venueApi.update(row.id, { ...row, status: row.status === 1 ? 0 : 1 })
+  await venueApi.update(row.id, {
+    ...row,
+    facilityIds: row.facilityIds,
+    facilities: [],
+    images: row.images.map((item) => ({ imageUrl: item.imageUrl, sortOrder: item.sortOrder })),
+    availability: row.availability.map((item) => ({ weekday: item.weekday, startTime: item.startTime, endTime: item.endTime, status: item.status })),
+    blockedSlots: row.blockedSlots.map((item) => ({ startAt: item.startAt, endAt: item.endAt, reason: item.reason })),
+    status: row.status === 1 ? 0 : 1,
+  })
   ElMessage.success(row.status === 1 ? '场地已停用' : '场地已启用')
   await loadVenues()
 }
 
-onMounted(loadVenues)
+async function toggleFacilityStatus(row: VenueFacility) {
+  await venueApi.updateFacility(row.id, { status: row.status === 1 ? 0 : 1 })
+  ElMessage.success(row.status === 1 ? '设施已停用' : '设施已启用')
+  await loadFacilities()
+  await loadVenues()
+}
+
+onMounted(async () => {
+  await Promise.all([loadVenues(), loadFacilities()])
+})
 </script>
 
 <style scoped>
 .venue-info,
 .inline-fields,
-.array-row {
+.array-row,
+.card-header__actions,
+.facility-toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.facility-toolbar {
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
 .venue-cover {

@@ -15,7 +15,7 @@
 # - 后台推荐分析
 # - 活动列表和后台报名列表
 # - 活动事件上报和统一分析口径
-# - 场地列表和活动场地关联
+# - 场地设施字典、场地列表和活动场地关联
 
 set -euo pipefail
 
@@ -109,6 +109,15 @@ assert_code_200 "后台场地列表" "$venues_response"
 venue_count="$(printf '%s' "$venues_response" | json_get 'r.data && r.data.list ? r.data.list.length : 0')"
 [ "$venue_count" -gt 0 ] || fail "后台场地列表为空，请先执行 prisma seed"
 pass "场地数量: $venue_count"
+venue_facility_id_count="$(printf '%s' "$venues_response" | json_get 'r.data && r.data.list && r.data.list[0] && Array.isArray(r.data.list[0].facilityIds) ? r.data.list[0].facilityIds.length : 0')"
+[ "$venue_facility_id_count" -gt 0 ] || fail "后台场地列表缺少 facilityIds"
+pass "场地关联设施数量: $venue_facility_id_count"
+
+venue_facilities_response="$(request GET "$API_BASE_URL/admin/venue-facilities" "" "$token")"
+assert_code_200 "后台场地设施字典" "$venue_facilities_response"
+venue_facility_count="$(printf '%s' "$venue_facilities_response" | json_get 'Array.isArray(r.data) ? r.data.length : 0')"
+[ "$venue_facility_count" -gt 0 ] || fail "后台场地设施字典为空，请先执行 prisma seed"
+pass "场地设施字典数量: $venue_facility_count"
 
 public_venues_response="$(request GET "$API_BASE_URL/venues")"
 assert_code_200 "公开场地列表" "$public_venues_response"

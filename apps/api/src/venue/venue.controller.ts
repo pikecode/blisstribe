@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common'
 import { AdminJwtGuard } from '../common/guards/admin-jwt.guard'
-import { CreateVenueDto, UpdateVenueDto } from './dto'
+import { CreateVenueDto, CreateVenueFacilityDto, UpdateVenueDto, UpdateVenueFacilityDto } from './dto'
 import { VenueService } from './venue.service'
 
 function pageParams(page = '1', pageSize = '20') {
@@ -49,5 +49,29 @@ export class VenueAdminController {
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateVenueDto) {
     return this.venueService.update(BigInt(id), dto)
+  }
+}
+
+@Controller('admin/venue-facilities')
+@UseGuards(AdminJwtGuard)
+export class VenueFacilityAdminController {
+  constructor(private readonly venueService: VenueService) {}
+
+  @Get()
+  list(@Query('status') status?: string, @Query('keyword') keyword?: string) {
+    return this.venueService.listFacilities({
+      status: status === undefined || status === '' ? undefined : Number(status),
+      keyword,
+    })
+  }
+
+  @Post()
+  create(@Body() dto: CreateVenueFacilityDto) {
+    return this.venueService.createFacility(dto)
+  }
+
+  @Put(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateVenueFacilityDto) {
+    return this.venueService.updateFacility(BigInt(id), dto)
   }
 }

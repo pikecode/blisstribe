@@ -1,14 +1,22 @@
 import { Injectable } from '@nestjs/common'
 import { ErrorCode } from '@blisstribe/shared'
-import { Prisma, type Venue, type VenueAvailability, type VenueBlockedSlot, type VenueImage } from '@prisma/client'
+import { Prisma, type Venue, type VenueAvailability, type VenueBlockedSlot, type VenueFacility, type VenueFacilityOnVenue, type VenueImage } from '@prisma/client'
 import { PrismaService } from '../common/prisma.service'
 import { BusinessException } from '../common/interceptors/response.interceptor'
-import { type CreateVenueDto, VENUE_STATUS, type VenueAvailabilityInputDto, type VenueBlockedSlotInputDto } from './dto'
+import {
+  type CreateVenueDto,
+  type CreateVenueFacilityDto,
+  type UpdateVenueFacilityDto,
+  VENUE_STATUS,
+  type VenueAvailabilityInputDto,
+  type VenueBlockedSlotInputDto,
+} from './dto'
 
 type VenueWithRelations = Venue & {
   images: VenueImage[]
   availability: VenueAvailability[]
   blockedSlots: VenueBlockedSlot[]
+  facilities: Array<VenueFacilityOnVenue & { facility: VenueFacility }>
 }
 
 @Injectable()
@@ -62,9 +70,12 @@ export class VenueService {
 
   async create(dto: CreateVenueDto) {
     this.validateTimeRules(dto.availability ?? [], dto.blockedSlots ?? [])
-    const venue = await this.prisma.venue.create({
-      data: this.buildCreateData(dto),
-      include: this.include(),
+    const venue = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.venue.create({
+        data: this.buildCreateData(dto),
+      })
+      await this.replaceVenueFacilities(tx, created.id, dto)
+      return tx.venue.findUniqueOrThrow({ where: { id: created.id }, include: this.include() })
     })
     return this.toVO(venue)
   }
@@ -79,6 +90,7 @@ export class VenueService {
         where: { id },
         data: this.buildUpdateData(dto),
       })
+      await this.replaceVenueFacilities(tx, id, dto)
       if (dto.images !== undefined) {
         await tx.venueImage.deleteMany({ where: { venueId: id } })
         if (dto.images.length) {
@@ -106,6 +118,58 @@ export class VenueService {
       return tx.venue.findUniqueOrThrow({ where: { id }, include: this.include() })
     })
     return this.toVO(venue)
+  }
+
+  async listFacilities(params: { status?: number; keyword?: string }) {
+    const rows = await this.prisma.venueFacility.findMany({
+      where: {
+        deletedAt: null,
+        ...(params.status !== undefined && !Number.isNaN(params.status) && { status: params.status }),
+        ...(params.keyword && {
+          OR: [
+            { name: { contains: params.keyword.trim() } },
+            { description: { contains: params.keyword.trim() } },
+          ],
+        }),
+      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    })
+    return rows.map((row) => this.toFacilityVO(row))
+  }
+
+  async createFacility(dto: CreateVenueFacilityDto) {
+    const name = dto.name.trim()
+    const existing = await this.prisma.venueFacility.findFirst({ where: { name, deletedAt: null } })
+    if (existing) throw new BusinessException(ErrorCode.PARAMS_INVALID, '设施名称已存在')
+    const row = await this.prisma.venueFacility.create({
+      data: {
+        name,
+        description: dto.description?.trim() ?? '',
+        status: dto.status ?? VENUE_STATUS.ENABLED,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    })
+    return this.toFacilityVO(row)
+  }
+
+  async updateFacility(id: bigint, dto: UpdateVenueFacilityDto) {
+    const existing = await this.prisma.venueFacility.findFirst({ where: { id, deletedAt: null } })
+    if (!existing) throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '设施不存在')
+    if (dto.name !== undefined) {
+      const name = dto.name.trim()
+      const duplicate = await this.prisma.venueFacility.findFirst({ where: { name, deletedAt: null, id: { not: id } } })
+      if (duplicate) throw new BusinessException(ErrorCode.PARAMS_INVALID, '设施名称已存在')
+    }
+    const row = await this.prisma.venueFacility.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name.trim() }),
+        ...(dto.description !== undefined && { description: dto.description.trim() }),
+        ...(dto.status !== undefined && { status: dto.status }),
+        ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
+      },
+    })
+    return this.toFacilityVO(row)
   }
 
   async ensureAvailableForActivity(params: {
@@ -141,7 +205,7 @@ export class VenueService {
       city: venue.city,
       district: venue.district,
       capacity: venue.capacity,
-      facilities: venue.facilities,
+      facilities: this.facilityNames(venue),
     }
   }
 
@@ -169,7 +233,6 @@ export class VenueService {
       latitude: this.decimalOrNull(dto.latitude),
       longitude: this.decimalOrNull(dto.longitude),
       capacity: dto.capacity ?? null,
-      facilities: this.cleanStrings(dto.facilities ?? []),
       description: dto.description?.trim() ?? '',
       contactName: dto.contactName?.trim() ?? '',
       contactPhoneMasked: dto.contactPhoneMasked?.trim() ?? '',
@@ -257,6 +320,31 @@ export class VenueService {
     return [...new Set(items.map((item) => item.trim()).filter(Boolean))]
   }
 
+  private async replaceVenueFacilities(tx: Prisma.TransactionClient, venueId: bigint, dto: CreateVenueDto) {
+    if (dto.facilityIds === undefined && dto.facilities === undefined) return
+    const facilityIds = await this.resolveFacilityIds(tx, dto)
+    await tx.venueFacilityOnVenue.deleteMany({ where: { venueId } })
+    if (!facilityIds.length) return
+    await tx.venueFacilityOnVenue.createMany({
+      data: facilityIds.map((facilityId, index) => ({ venueId, facilityId, sortOrder: index })),
+      skipDuplicates: true,
+    })
+  }
+
+  private async resolveFacilityIds(tx: Prisma.TransactionClient, dto: CreateVenueDto) {
+    const ids = [...new Set((dto.facilityIds ?? []).map((id) => BigInt(id)))]
+    const names = this.cleanStrings(dto.facilities ?? [])
+    for (const name of names) {
+      const row = await tx.venueFacility.upsert({
+        where: { name },
+        update: {},
+        create: { name },
+      })
+      ids.push(row.id)
+    }
+    return [...new Set(ids)]
+  }
+
   private decimalOrNull(value?: number | string | null) {
     if (value === undefined || value === null || value === '') return null
     return new Prisma.Decimal(value)
@@ -285,7 +373,32 @@ export class VenueService {
       images: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
       availability: { orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }] },
       blockedSlots: { orderBy: { startAt: 'asc' } },
+      facilities: { include: { facility: true }, orderBy: [{ sortOrder: 'asc' }] },
     } satisfies Prisma.VenueInclude
+  }
+
+  private facilityNames(venue: Pick<VenueWithRelations, 'facilities'>) {
+    return venue.facilities
+      .filter((item) => item.facility.status === VENUE_STATUS.ENABLED && !item.facility.deletedAt)
+      .map((item) => item.facility.name)
+  }
+
+  private facilityIds(venue: Pick<VenueWithRelations, 'facilities'>) {
+    return venue.facilities
+      .filter((item) => !item.facility.deletedAt)
+      .map((item) => Number(item.facilityId))
+  }
+
+  private toFacilityVO(facility: VenueFacility) {
+    return {
+      id: Number(facility.id),
+      name: facility.name,
+      description: facility.description,
+      status: facility.status,
+      sortOrder: facility.sortOrder,
+      createdAt: facility.createdAt.toISOString(),
+      updatedAt: facility.updatedAt.toISOString(),
+    }
   }
 
   private toVO(venue: VenueWithRelations) {
@@ -300,7 +413,8 @@ export class VenueService {
       latitude: venue.latitude ? Number(venue.latitude) : null,
       longitude: venue.longitude ? Number(venue.longitude) : null,
       capacity: venue.capacity,
-      facilities: venue.facilities,
+      facilityIds: this.facilityIds(venue),
+      facilities: this.facilityNames(venue),
       description: venue.description,
       contactName: venue.contactName,
       contactPhoneMasked: venue.contactPhoneMasked,

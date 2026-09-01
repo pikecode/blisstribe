@@ -50,6 +50,8 @@
 
 ```text
 Venue 场地基础资料
+VenueFacility 场地设施字典
+VenueFacilityOnVenue 场地与设施关联
 VenueImage 场地图片
 VenueAvailability 每周可用时间
 VenueBlockedSlot 临时不可用时间
@@ -63,6 +65,8 @@ Activity.venueSnapshot
 ```
 
 `venueSnapshot` 用于保留活动发布或保存时的场地快照，避免场地资料修改后影响历史活动展示。
+
+设施采用字典表而不是 `Venue` 内部字符串数组。原因是设施需要跨场地复用、统一启停和排序；场地只保存关联关系，接口层继续输出 `facilities: string[]` 供小程序和活动预览展示，后台编辑使用 `facilityIds` 保存关联。
 
 ## 4. 业务规则
 
@@ -90,7 +94,8 @@ Activity.venueSnapshot
 页面能力：
 
 - 场地列表：名称、城市区域、容量、状态、排序、封面。
-- 场地编辑：基础信息、封面、多图、设施、描述、联系人。
+- 设施字典：维护设施名称、说明、状态和排序。
+- 场地编辑：基础信息、封面、多图、设施关联、描述、联系人。
 - 可用时间：按星期维护 `HH:mm-HH:mm`。
 - 不可用时间：维护开始时间、结束时间、原因。
 - 状态管理：启用/停用。
@@ -119,4 +124,4 @@ Activity.venueSnapshot
 - KISS：只做场地维护、活动选择和基础时间校验，不做完整预约系统。
 - YAGNI：暂缓计费、审批、日历拖拽、外部预约入口。
 - SOLID：`VenueModule` 负责场地资料和时间规则，`ActivityModule` 只负责活动选择与冲突校验调用。
-- DRY：场地图片、地址、容量、设施集中维护，活动通过 `venueId` 复用，并通过 `venueSnapshot` 保留历史展示口径。
+- DRY：场地图片、地址、容量集中维护；设施通过 `VenueFacility` 字典复用，活动通过 `venueId` 复用场地，并通过 `venueSnapshot` 保留历史展示口径。

@@ -8,6 +8,8 @@ import {
   type ProductModule,
   type User,
   type Venue,
+  type VenueFacility,
+  type VenueFacilityOnVenue,
 } from '@prisma/client'
 import { ErrorCode } from '@blisstribe/shared'
 import { BusinessException } from '../common/interceptors/response.interceptor'
@@ -26,7 +28,8 @@ import {
   type UpdateActivityRegistrationStatusDto,
 } from './dto'
 
-type ActivityWithModule = Activity & { module: ProductModule; venue: Venue | null }
+type ActivityVenue = Venue & { facilities: Array<VenueFacilityOnVenue & { facility: VenueFacility }> }
+type ActivityWithModule = Activity & { module: ProductModule; venue: ActivityVenue | null }
 type ActivityRegistrationWithRelations = ActivityRegistration & {
   activity: ActivityWithModule
   user: Pick<User, 'id' | 'nickname' | 'avatar' | 'phoneMasked'>
@@ -661,7 +664,14 @@ export class ActivityService {
   }
 
   private activityInclude() {
-    return { module: true, venue: true } satisfies Prisma.ActivityInclude
+    return {
+      module: true,
+      venue: {
+        include: {
+          facilities: { include: { facility: true }, orderBy: [{ sortOrder: 'asc' }] },
+        },
+      },
+    } satisfies Prisma.ActivityInclude
   }
 
   private toActivityVO(
@@ -691,7 +701,9 @@ export class ActivityService {
             city: activity.venue.city,
             district: activity.venue.district,
             capacity: activity.venue.capacity,
-            facilities: activity.venue.facilities,
+            facilities: activity.venue.facilities
+              .filter((item) => item.facility.status === 1 && !item.facility.deletedAt)
+              .map((item) => item.facility.name),
           }
         : null,
       title: activity.title,
