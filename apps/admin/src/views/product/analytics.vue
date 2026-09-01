@@ -5,7 +5,7 @@
         <div class="card-header">
           <div>
             <div class="card-header__title">推荐效果</div>
-            <div class="card-header__desc">查看产品推荐从曝光、点击到线索的转化闭环</div>
+            <div class="card-header__desc">查看产品、活动从曝光、点击到线索或报名的转化闭环</div>
           </div>
           <el-button @click="loadAnalytics">刷新</el-button>
         </div>
@@ -67,6 +67,32 @@
         </el-table-column>
       </el-table>
 
+      <div class="section-title">活动报名排行</div>
+      <el-table :data="analytics.activityStats" v-loading="loading" stripe>
+        <el-table-column label="活动" min-width="220">
+          <template #default="{ row }">
+            <div class="product-title">{{ row.activity?.title || `活动 #${row.activityId}` }}</div>
+            <div class="muted">{{ row.activity?.module?.name || '-' }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="impressions" label="曝光" width="100" sortable />
+        <el-table-column prop="clicks" label="点击" width="100" sortable />
+        <el-table-column prop="registrations" label="报名" width="100" sortable />
+        <el-table-column prop="cancels" label="取消" width="100" sortable />
+        <el-table-column label="报名率" width="110" sortable prop="registrationRate">
+          <template #default="{ row }">{{ row.registrationRate }}%</template>
+        </el-table-column>
+      </el-table>
+
+      <div class="section-title">来源场景转化</div>
+      <el-table :data="analytics.sourceStats" v-loading="loading" stripe>
+        <el-table-column prop="key" label="来源场景" min-width="180" />
+        <el-table-column prop="impressions" label="曝光" />
+        <el-table-column prop="clicks" label="点击" />
+        <el-table-column prop="leads" label="线索" />
+        <el-table-column prop="activityRegistrations" label="活动报名" />
+      </el-table>
+
       <div class="section-title">每日趋势</div>
       <el-table :data="analytics.trend" v-loading="loading" stripe>
         <el-table-column prop="date" label="日期" min-width="140" />
@@ -74,6 +100,7 @@
         <el-table-column prop="clicks" label="点击" />
         <el-table-column prop="assessments" label="评估" />
         <el-table-column prop="leads" label="线索" />
+        <el-table-column prop="activityRegistrations" label="活动报名" />
       </el-table>
     </el-card>
   </div>
@@ -90,10 +117,16 @@ const emptyAnalytics = (): RecommendationAnalytics => ({
     clicks: 0,
     assessments: 0,
     leads: 0,
+    activityRegistrations: 0,
+    activityCancels: 0,
     clickRate: 0,
     leadRate: 0,
+    activityRegistrationRate: 0,
   },
   productStats: [],
+  activityStats: [],
+  sourceStats: [],
+  formStats: [],
   trend: [],
 })
 
@@ -102,7 +135,8 @@ const recommendationForms = [
   { label: '评估结果', value: 'assessment_result' },
   { label: '个人建议', value: 'profile_suggestion' },
   { label: '顾问推荐', value: 'consultant_recommendation' },
-  { label: '活动推荐', value: 'campaign_recommendation' },
+  { label: '活动推荐', value: 'activity_featured' },
+  { label: '运营推荐', value: 'campaign_recommendation' },
   { label: '组合方案', value: 'bundle_solution' },
 ]
 
@@ -125,8 +159,9 @@ const metrics = computed(() => [
   { label: '点击', value: analytics.value.overview.clicks, desc: '用户进入产品详情的次数' },
   { label: '评估', value: analytics.value.overview.assessments, desc: '用户完成需求评估的次数' },
   { label: '线索', value: analytics.value.overview.leads, desc: '用户提交咨询意向的次数' },
+  { label: '活动报名', value: analytics.value.overview.activityRegistrations, desc: '用户报名活动的次数' },
   { label: '点击率', value: `${analytics.value.overview.clickRate}%`, desc: '点击 / 曝光' },
-  { label: '线索率', value: `${analytics.value.overview.leadRate}%`, desc: '线索 / 点击' },
+  { label: '报名率', value: `${analytics.value.overview.activityRegistrationRate}%`, desc: '活动报名 / 点击' },
 ])
 
 async function loadModules() {

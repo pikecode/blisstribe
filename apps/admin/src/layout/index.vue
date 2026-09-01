@@ -112,6 +112,7 @@ import {
   EditPen,
   Goods,
   Lock,
+  Location,
   Menu as MenuIcon,
   OfficeBuilding,
   Picture,
@@ -168,6 +169,7 @@ const menuSections: MenuSection[] = [
     items: [
       { path: '/products', title: '产品管理', icon: Goods, desc: '维护产品模块、标签、推荐优先级与上下架' },
       { path: '/activities', title: '活动管理', icon: Calendar, desc: '维护活动内容、报名时间、名额和关联产品' },
+      { path: '/venues', title: '场地管理', icon: Location, desc: '维护活动场地、图片、可用时间和不可用时间' },
       { path: '/activity-registrations', title: '活动报名', icon: Tickets, desc: '查看报名用户、来源归属和现场确认状态' },
       { path: '/assessment-templates', title: '评估管理', icon: EditPen, desc: '维护模块评估题目、选项和标签映射' },
       { path: '/recommendation-rules', title: '推荐规则', icon: CollectionTag, desc: '配置评估标签命中后的产品加权和推荐理由' },

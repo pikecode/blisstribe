@@ -60,7 +60,14 @@ export interface Product {
 export type ProductType = 'service' | 'physical' | 'package'
 export type ProductServiceMode = 'online' | 'offline' | 'mixed'
 export type ProductStockStatus = 'available' | 'limited' | 'sold_out'
-export type RecommendationEventType = 'impression' | 'click' | 'lead_submit' | 'assessment_submit' | 'filter_click'
+export type RecommendationEventType =
+  | 'impression'
+  | 'click'
+  | 'lead_submit'
+  | 'assessment_submit'
+  | 'filter_click'
+  | 'activity_registration'
+  | 'activity_cancel'
 export type RecommendationForm =
   | 'module_featured'
   | 'assessment_result'
@@ -68,6 +75,7 @@ export type RecommendationForm =
   | 'consultant_recommendation'
   | 'campaign_recommendation'
   | 'bundle_solution'
+  | 'activity_featured'
 
 export interface RecommendationEventPayload {
   eventType: RecommendationEventType
@@ -75,6 +83,7 @@ export interface RecommendationEventPayload {
   moduleId?: number
   moduleCode?: string
   productId?: number
+  activityId?: number
   productType?: ProductType
   recommendationForm?: RecommendationForm
   sourceScene?: string

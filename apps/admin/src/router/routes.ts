@@ -74,6 +74,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '活动管理', icon: 'Calendar' },
       },
       {
+        path: 'venues',
+        name: 'Venues',
+        component: () => import('@/views/venue/index.vue'),
+        meta: { title: '场地管理', icon: 'Location' },
+      },
+      {
         path: 'activity-registrations',
         name: 'ActivityRegistrations',
         component: () => import('@/views/activity/registrations.vue'),

@@ -128,8 +128,11 @@ export interface RecommendationOverview {
   clicks: number
   leads: number
   assessments: number
+  activityRegistrations: number
+  activityCancels: number
   clickRate: number
   leadRate: number
+  activityRegistrationRate: number
 }
 
 export interface RecommendationProductStat extends RecommendationOverview {
@@ -143,11 +146,47 @@ export interface RecommendationTrendItem {
   clicks: number
   leads: number
   assessments: number
+  activityRegistrations: number
+}
+
+export interface RecommendationActivityStat {
+  activityId: number
+  activity: {
+    id: number
+    module: ProductModule
+    title: string
+    subtitle: string
+    activityType: string
+    startAt: string
+    endAt: string
+    status: number
+  } | null
+  impressions: number
+  clicks: number
+  registrations: number
+  cancels: number
+  clickRate: number
+  registrationRate: number
+}
+
+export interface RecommendationDimensionStat {
+  key: string
+  impressions: number
+  clicks: number
+  leads: number
+  assessments: number
+  activityRegistrations: number
+  clickRate: number
+  leadRate: number
+  activityRegistrationRate: number
 }
 
 export interface RecommendationAnalytics {
   overview: RecommendationOverview
   productStats: RecommendationProductStat[]
+  activityStats: RecommendationActivityStat[]
+  sourceStats: RecommendationDimensionStat[]
+  formStats: RecommendationDimensionStat[]
   trend: RecommendationTrendItem[]
 }
 
@@ -316,6 +355,7 @@ export const productApi = {
     moduleCode?: string
     productType?: ProductType | ''
     recommendationForm?: string
+    activityId?: number | ''
     startDate?: string
     endDate?: string
   }): Promise<RecommendationAnalytics> {

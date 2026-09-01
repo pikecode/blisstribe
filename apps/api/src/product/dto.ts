@@ -25,7 +25,15 @@ export const PRODUCT_SERVICE_MODES = ['online', 'offline', 'mixed', ''] as const
 export const PRODUCT_STOCK_STATUSES = ['available', 'limited', 'sold_out'] as const
 export const PRODUCT_LEAD_STATUS = ['new', 'contacted', 'qualified', 'converted', 'invalid'] as const
 export const ASSESSMENT_QUESTION_TYPES = ['single'] as const
-export const RECOMMENDATION_EVENT_TYPES = ['impression', 'click', 'lead_submit', 'assessment_submit', 'filter_click'] as const
+export const RECOMMENDATION_EVENT_TYPES = [
+  'impression',
+  'click',
+  'lead_submit',
+  'assessment_submit',
+  'filter_click',
+  'activity_registration',
+  'activity_cancel',
+] as const
 export const RECOMMENDATION_FORMS = [
   'module_featured',
   'assessment_result',
@@ -33,6 +41,7 @@ export const RECOMMENDATION_FORMS = [
   'consultant_recommendation',
   'campaign_recommendation',
   'bundle_solution',
+  'activity_featured',
 ] as const
 
 export class CreateProductModuleDto {
@@ -731,6 +740,11 @@ export class CreateRecommendationEventDto {
   @IsInt()
   @Min(1)
   productId?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  activityId?: number
 
   @IsOptional()
   @IsString()

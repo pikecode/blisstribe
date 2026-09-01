@@ -7,10 +7,12 @@ import {
   type Product,
   type ProductModule,
   type User,
+  type Venue,
 } from '@prisma/client'
 import { ErrorCode } from '@blisstribe/shared'
 import { BusinessException } from '../common/interceptors/response.interceptor'
 import { PrismaService } from '../common/prisma.service'
+import { VenueService } from '../venue/venue.service'
 import {
   ACTIVE_ACTIVITY_REGISTRATION_STATUS,
   ACTIVITY_REGISTRATION_STATUS,
@@ -24,9 +26,9 @@ import {
   type UpdateActivityRegistrationStatusDto,
 } from './dto'
 
-type ActivityWithModule = Activity & { module: ProductModule }
+type ActivityWithModule = Activity & { module: ProductModule; venue: Venue | null }
 type ActivityRegistrationWithRelations = ActivityRegistration & {
-  activity: Activity & { module: ProductModule }
+  activity: ActivityWithModule
   user: Pick<User, 'id' | 'nickname' | 'avatar' | 'phoneMasked'>
   partner: Pick<Partner, 'id' | 'displayName' | 'partnerNo'> | null
 }
@@ -35,7 +37,10 @@ const PUBLIC_PRODUCT_STATUS = 1
 
 @Injectable()
 export class ActivityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly venueService: VenueService,
+  ) {}
 
   async listPublic(params: {
     moduleCode?: string
@@ -49,7 +54,7 @@ export class ActivityService {
     const [rows, total] = await Promise.all([
       this.prisma.activity.findMany({
         where,
-        include: { module: true },
+        include: this.activityInclude(),
         orderBy: [{ priority: 'desc' }, { sortOrder: 'asc' }, { startAt: 'asc' }],
         skip: (params.page - 1) * params.pageSize,
         take: params.pageSize,
@@ -81,7 +86,7 @@ export class ActivityService {
         ...where,
         endAt: { gt: now },
       },
-      include: { module: true },
+      include: this.activityInclude(),
       orderBy: [{ priority: 'desc' }, { sortOrder: 'asc' }, { startAt: 'asc' }],
       take: Math.min(params.limit, 20),
     })
@@ -101,7 +106,7 @@ export class ActivityService {
         deletedAt: null,
         module: { status: 1, deletedAt: null },
       },
-      include: { module: true },
+      include: this.activityInclude(),
     })
     if (!activity) throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '活动不存在或已下线')
 
@@ -121,7 +126,7 @@ export class ActivityService {
   async register(activityId: bigint, userId: bigint, dto: CreateActivityRegistrationDto) {
     const activity = await this.prisma.activity.findFirst({
       where: { id: activityId, status: ACTIVITY_STATUS.PUBLISHED, deletedAt: null },
-      include: { module: true },
+      include: this.activityInclude(),
     })
     if (!activity) throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '活动不存在或已下线')
 
@@ -166,6 +171,12 @@ export class ActivityService {
           include: this.registrationInclude(),
         })
 
+    await this.recordActivityEvent(userId, activity, 'activity_registration', data.sourceScene, {
+      registrationId: Number(registration.id),
+      partnerId: partnerId ? Number(partnerId) : null,
+      sourceInviteCode,
+    })
+
     return this.toRegistrationVO(registration)
   }
 
@@ -185,6 +196,10 @@ export class ActivityService {
         cancelReason: dto.cancelReason?.trim() ?? '',
       },
       include: this.registrationInclude(),
+    })
+    await this.recordActivityEvent(userId, existing.activity, 'activity_cancel', existing.sourceScene || 'miniapp_activity_detail', {
+      registrationId: Number(updated.id),
+      cancelReason: updated.cancelReason,
     })
     return this.toRegistrationVO(updated)
   }
@@ -227,7 +242,7 @@ export class ActivityService {
     const [rows, total] = await Promise.all([
       this.prisma.activity.findMany({
         where,
-        include: { module: true },
+        include: this.activityInclude(),
         orderBy: [{ status: 'asc' }, { sortOrder: 'asc' }, { startAt: 'desc' }],
         skip: (params.page - 1) * params.pageSize,
         take: params.pageSize,
@@ -247,7 +262,7 @@ export class ActivityService {
     const data = await this.buildCreateData(dto)
     const activity = await this.prisma.activity.create({
       data,
-      include: { module: true },
+      include: this.activityInclude(),
     })
     return this.toActivityVO(activity, 0)
   }
@@ -255,7 +270,7 @@ export class ActivityService {
   async updateAdmin(id: bigint, dto: UpdateActivityDto) {
     const existing = await this.prisma.activity.findFirst({
       where: { id, deletedAt: null },
-      include: { module: true },
+      include: this.activityInclude(),
     })
     if (!existing) throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '活动不存在')
 
@@ -263,7 +278,7 @@ export class ActivityService {
     const activity = await this.prisma.activity.update({
       where: { id },
       data,
-      include: { module: true },
+      include: this.activityInclude(),
     })
     const count = await this.registrationCount(id)
     return this.toActivityVO(activity, count)
@@ -382,18 +397,28 @@ export class ActivityService {
     const tagSnapshot = await this.normalizeTags(BigInt(dto.moduleId), dto.tagIds ?? [], dto.tags ?? [])
     await this.ensureRelatedProducts(dto.relatedProductIds ?? [])
     this.validateSchedule(dto)
+    const startAt = new Date(dto.startAt)
+    const endAt = new Date(dto.endAt)
+    const venue = await this.venueService.ensureAvailableForActivity({
+      venueId: dto.venueId ? BigInt(dto.venueId) : null,
+      startAt,
+      endAt,
+      capacity: dto.capacity ?? null,
+    })
 
     return {
       module: { connect: { id: module.id } },
+      ...(venue && { venue: { connect: { id: venue.id } } }),
       title: dto.title.trim(),
       subtitle: dto.subtitle?.trim() ?? '',
       coverUrl: dto.coverUrl?.trim() ?? '',
       activityType: dto.activityType ?? 'online',
-      startAt: new Date(dto.startAt),
-      endAt: new Date(dto.endAt),
+      startAt,
+      endAt,
       registrationStartAt: dto.registrationStartAt ? new Date(dto.registrationStartAt) : null,
       registrationEndAt: new Date(dto.registrationEndAt),
-      locationText: dto.locationText?.trim() ?? '',
+      locationText: dto.locationText?.trim() || venue?.address || '',
+      venueSnapshot: venue ? (this.venueService.buildSnapshot(venue) as Prisma.InputJsonValue) : {},
       capacity: dto.capacity ?? null,
       targetUserText: dto.targetUserText?.trim() ?? '',
       highlights: this.cleanStrings(dto.highlights ?? []),
@@ -421,9 +446,20 @@ export class ActivityService {
       capacity: dto.capacity ?? existing.capacity ?? undefined,
     }
     this.validateSchedule(schedule)
+    const venueId = dto.venueId !== undefined ? (dto.venueId ? BigInt(dto.venueId) : null) : existing.venueId
+    const startAt = new Date(schedule.startAt)
+    const endAt = new Date(schedule.endAt)
+    const venue = await this.venueService.ensureAvailableForActivity({
+      venueId,
+      activityId: existing.id,
+      startAt,
+      endAt,
+      capacity: schedule.capacity ?? null,
+    })
 
     const data: Prisma.ActivityUpdateInput = {
       ...(dto.moduleId && { module: { connect: { id: moduleId } } }),
+      ...(dto.venueId !== undefined && (venue ? { venue: { connect: { id: venue.id } } } : { venue: { disconnect: true } })),
       ...(dto.title !== undefined && { title: dto.title.trim() }),
       ...(dto.subtitle !== undefined && { subtitle: dto.subtitle.trim() }),
       ...(dto.coverUrl !== undefined && { coverUrl: dto.coverUrl.trim() }),
@@ -434,7 +470,8 @@ export class ActivityService {
         registrationStartAt: dto.registrationStartAt ? new Date(dto.registrationStartAt) : null,
       }),
       ...(dto.registrationEndAt !== undefined && { registrationEndAt: new Date(dto.registrationEndAt) }),
-      ...(dto.locationText !== undefined && { locationText: dto.locationText.trim() }),
+      ...(dto.locationText !== undefined && { locationText: dto.locationText.trim() || venue?.address || '' }),
+      ...(dto.venueId !== undefined && { venueSnapshot: venue ? (this.venueService.buildSnapshot(venue) as Prisma.InputJsonValue) : {} }),
       ...(dto.capacity !== undefined && { capacity: dto.capacity }),
       ...(dto.targetUserText !== undefined && { targetUserText: dto.targetUserText.trim() }),
       ...(dto.highlights !== undefined && { highlights: this.cleanStrings(dto.highlights) }),
@@ -565,6 +602,29 @@ export class ActivityService {
     return record?.partnerId ?? null
   }
 
+  private async recordActivityEvent(
+    userId: bigint,
+    activity: ActivityWithModule,
+    eventType: 'activity_registration' | 'activity_cancel',
+    sourceScene: string,
+    metadata: Record<string, unknown>
+  ) {
+    await this.prisma.recommendationEvent.create({
+      data: {
+        userId,
+        moduleId: activity.moduleId,
+        moduleCode: activity.module.code,
+        activityId: activity.id,
+        recommendationForm: 'activity_featured',
+        eventType,
+        sourceScene,
+        tags: activity.tags,
+        tagIds: activity.tagIds,
+        metadata: metadata as Prisma.InputJsonValue,
+      },
+    })
+  }
+
   private async registrationCount(activityId: bigint) {
     return this.prisma.activityRegistration.count({
       where: { activityId, status: { in: [...ACTIVE_ACTIVITY_REGISTRATION_STATUS] } },
@@ -594,10 +654,14 @@ export class ActivityService {
 
   private registrationInclude() {
     return {
-      activity: { include: { module: true } },
+      activity: { include: this.activityInclude() },
       user: { select: { id: true, nickname: true, avatar: true, phoneMasked: true } },
       partner: { select: { id: true, displayName: true, partnerNo: true } },
     } satisfies Prisma.ActivityRegistrationInclude
+  }
+
+  private activityInclude() {
+    return { module: true, venue: true } satisfies Prisma.ActivityInclude
   }
 
   private toActivityVO(
@@ -609,6 +673,7 @@ export class ActivityService {
     return {
       id: Number(activity.id),
       moduleId: Number(activity.moduleId),
+      venueId: activity.venueId ? Number(activity.venueId) : null,
       module: {
         id: Number(activity.module.id),
         code: activity.module.code,
@@ -616,6 +681,19 @@ export class ActivityService {
         icon: activity.module.icon,
         coverUrl: activity.module.coverUrl,
       },
+      venue: activity.venue
+        ? {
+            id: Number(activity.venue.id),
+            name: activity.venue.name,
+            subtitle: activity.venue.subtitle,
+            coverUrl: activity.venue.coverUrl,
+            address: activity.venue.address,
+            city: activity.venue.city,
+            district: activity.venue.district,
+            capacity: activity.venue.capacity,
+            facilities: activity.venue.facilities,
+          }
+        : null,
       title: activity.title,
       subtitle: activity.subtitle,
       coverUrl: activity.coverUrl,
@@ -625,6 +703,7 @@ export class ActivityService {
       registrationStartAt: activity.registrationStartAt?.toISOString() ?? null,
       registrationEndAt: activity.registrationEndAt.toISOString(),
       locationText: activity.locationText,
+      venueSnapshot: activity.venueSnapshot,
       capacity: activity.capacity,
       registeredCount,
       remainingCount: activity.capacity === null ? null : Math.max(activity.capacity - registeredCount, 0),

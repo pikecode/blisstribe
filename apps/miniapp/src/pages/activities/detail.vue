@@ -33,8 +33,21 @@
         </view>
         <view class="activity-detail__info-row">
           <text>参与方式</text>
-          <text>{{ activity.locationText || '线上参与' }}</text>
+          <text>{{ activity.venue?.name || activity.locationText || '线上参与' }}</text>
         </view>
+        <view v-if="activity.venue?.address" class="activity-detail__info-row">
+          <text>场地地址</text>
+          <text>{{ activity.venue.address }}</text>
+        </view>
+      </view>
+    </view>
+
+    <view v-if="activity.venue" class="activity-detail__section">
+      <text class="activity-detail__section-title">活动场地</text>
+      <image v-if="activity.venue.coverUrl" :src="activity.venue.coverUrl" class="activity-detail__venue-cover" mode="aspectFill" />
+      <text class="activity-detail__text">{{ activity.venue.subtitle || activity.venue.address }}</text>
+      <view v-if="activity.venue.facilities.length" class="activity-detail__chips">
+        <text v-for="item in activity.venue.facilities" :key="item" class="activity-detail__chip">{{ item }}</text>
       </view>
     </view>
 
@@ -137,6 +150,7 @@ import {
   isActiveActivityRegistrationStatus,
   type Activity,
 } from '@/api/modules/activity'
+import { productApi } from '@/api/modules/product'
 import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
 import { storage } from '@/utils/storage'
@@ -188,9 +202,27 @@ async function loadDetail() {
     }
     activity.value = nextActivity
     if (!name.value) name.value = userStore.userInfo?.nickname || ''
+    reportDetailView(nextActivity)
   } catch {
     activity.value = null
   }
+}
+
+function reportDetailView(item: Activity) {
+  productApi.reportEvent({
+    eventType: 'click',
+    moduleId: item.moduleId,
+    moduleCode: item.module.code,
+    activityId: item.id,
+    recommendationForm: 'activity_featured',
+    sourceScene: 'miniapp_activity_detail',
+    tags: item.tags,
+    tagIds: item.tagIds,
+    metadata: {
+      activityType: item.activityType,
+      registrationStatus: item.registrationStatus,
+    },
+  }).catch(() => undefined)
 }
 
 function onNameInput(e: unknown) {
@@ -275,6 +307,14 @@ onShow(loadDetail)
       font-size: 32rpx;
       font-weight: 700;
     }
+  }
+
+  &__venue-cover {
+    width: 100%;
+    height: 260rpx;
+    margin-top: 18rpx;
+    border-radius: 14rpx;
+    background: #e9eef3;
   }
 
   &__main,

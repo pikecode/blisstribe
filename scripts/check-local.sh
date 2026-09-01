@@ -14,6 +14,8 @@
 # - 推荐事件上报
 # - 后台推荐分析
 # - 活动列表和后台报名列表
+# - 活动事件上报和统一分析口径
+# - 场地列表和活动场地关联
 
 set -euo pipefail
 
@@ -60,7 +62,7 @@ assert_code_200() {
   local response="$2"
   local code
   code="$(printf '%s' "$response" | json_get 'r.code')" || fail "$name 响应不是有效 JSON: $response"
-  [ "$code" = "200" ] || fail "$name 失败，code=$code，响应: $response"
+  [ "$code" = "200" ] || fail "$name 失败，code=${code}，响应: $response"
   pass "$name"
 }
 
@@ -102,10 +104,23 @@ assert_code_200 "后台推荐分析" "$analytics_response"
 lead_summary_response="$(request GET "$API_BASE_URL/admin/product-leads/summary" "" "$token")"
 assert_code_200 "线索跟进摘要" "$lead_summary_response"
 
+venues_response="$(request GET "$API_BASE_URL/admin/venues?page=1&pageSize=2" "" "$token")"
+assert_code_200 "后台场地列表" "$venues_response"
+venue_count="$(printf '%s' "$venues_response" | json_get 'r.data && r.data.list ? r.data.list.length : 0')"
+[ "$venue_count" -gt 0 ] || fail "后台场地列表为空，请先执行 prisma seed"
+pass "场地数量: $venue_count"
+
+public_venues_response="$(request GET "$API_BASE_URL/venues")"
+assert_code_200 "公开场地列表" "$public_venues_response"
+
 activities_response="$(request GET "$API_BASE_URL/activities?statusScope=registering&page=1&pageSize=2")"
 assert_code_200 "活动列表" "$activities_response"
 activity_id="$(printf '%s' "$activities_response" | json_get 'r.data && r.data.list && r.data.list[0] && r.data.list[0].id')" || fail "活动列表为空"
 pass "样例活动 ID: $activity_id"
+
+activity_event_body="{\"activityId\":$activity_id,\"eventType\":\"impression\",\"sourceScene\":\"local-smoke-activity\",\"recommendationForm\":\"activity_featured\",\"tags\":[],\"tagIds\":[],\"metadata\":{\"check\":\"activity_impression\"}}"
+activity_event_response="$(request POST "$API_BASE_URL/products/events" "$activity_event_body")"
+assert_code_200 "活动事件上报" "$activity_event_response"
 
 recommended_activities_response="$(request GET "$API_BASE_URL/activities/recommended?moduleCode=health&limit=2")"
 assert_code_200 "推荐活动列表" "$recommended_activities_response"
@@ -115,9 +130,18 @@ pass "推荐活动数量: $recommended_activity_count"
 
 admin_activities_response="$(request GET "$API_BASE_URL/admin/activities?page=1&pageSize=2" "" "$token")"
 assert_code_200 "后台活动列表" "$admin_activities_response"
+activity_venue_count="$(printf '%s' "$admin_activities_response" | json_get 'r.data && r.data.list ? r.data.list.filter(item => item.venueId && item.venue).length : 0')"
+[ "$activity_venue_count" -gt 0 ] || fail "后台活动列表缺少场地关联活动"
+pass "活动场地关联条目: $activity_venue_count"
 
 activity_registrations_response="$(request GET "$API_BASE_URL/admin/activity-registrations?page=1&pageSize=2" "" "$token")"
 assert_code_200 "后台活动报名列表" "$activity_registrations_response"
+
+analytics_after_activity_response="$(request GET "$API_BASE_URL/admin/products/analytics" "" "$token")"
+assert_code_200 "统一推荐活动分析" "$analytics_after_activity_response"
+activity_stats_count="$(printf '%s' "$analytics_after_activity_response" | json_get 'r.data && Array.isArray(r.data.activityStats) ? r.data.activityStats.length : 0')"
+[ "$activity_stats_count" -gt 0 ] || fail "统一推荐活动分析缺少 activityStats"
+pass "活动分析条目: $activity_stats_count"
 
 echo ""
 pass "本地冒烟验收通过"

@@ -15,6 +15,7 @@ import { MiniappModule } from './miniapp/miniapp.module'
 import { PartnerModule } from './partner/partner.module'
 import { ProductModule } from './product/product.module'
 import { ActivityModule } from './activity/activity.module'
+import { VenueModule } from './venue/venue.module'
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ActivityModule } from './activity/activity.module'
     MiniappModule,
     PartnerModule,
     ProductModule,
+    VenueModule,
     ActivityModule,
   ],
 })

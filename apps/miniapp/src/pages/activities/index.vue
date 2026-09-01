@@ -44,7 +44,7 @@
           </view>
           <view class="activity-card__foot">
             <text>已报名 {{ item.registeredCount }}{{ item.capacity ? `/${item.capacity}` : '' }}</text>
-            <text>{{ item.locationText || '线上参与' }}</text>
+            <text>{{ item.venue?.name || item.locationText || '线上参与' }}</text>
           </view>
         </view>
       </view>
@@ -96,6 +96,7 @@ async function loadActivities() {
       page: 1,
       pageSize: 20,
     })).list
+    reportActivityImpressions()
   } catch {
     activities.value = []
     loadError.value = true
@@ -110,7 +111,32 @@ function changeStatus(value: StatusScope) {
 }
 
 function goDetail(id: number) {
+  const item = activities.value.find((activity) => activity.id === id)
+  if (item) reportActivityEvent(item, 'click', 'miniapp_activity_list')
   uni.navigateTo({ url: `/pages/activities/detail?id=${id}` })
+}
+
+function reportActivityImpressions() {
+  for (const item of activities.value.slice(0, 10)) {
+    reportActivityEvent(item, 'impression', 'miniapp_activity_list')
+  }
+}
+
+function reportActivityEvent(item: Activity, eventType: 'impression' | 'click', sourceScene: string) {
+  productApi.reportEvent({
+    eventType,
+    moduleId: item.moduleId,
+    moduleCode: item.module.code,
+    activityId: item.id,
+    recommendationForm: 'activity_featured',
+    sourceScene,
+    tags: item.tags,
+    tagIds: item.tagIds,
+    metadata: {
+      activityType: item.activityType,
+      registrationStatus: item.registrationStatus,
+    },
+  }).catch(() => undefined)
 }
 
 function formatDate(value: string) {

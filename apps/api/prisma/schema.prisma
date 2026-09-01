@@ -405,6 +405,7 @@ model ProductModule {
 model Activity {
   id                  BigInt    @id @default(autoincrement())
   moduleId            BigInt
+  venueId             BigInt?
   title               String
   subtitle            String    @default("")
   coverUrl            String    @default("")
@@ -414,6 +415,7 @@ model Activity {
   registrationStartAt DateTime?
   registrationEndAt   DateTime
   locationText        String    @default("")
+  venueSnapshot       Json      @default("{}")
   capacity            Int?
   targetUserText      String    @default("")
   highlights          String[]
@@ -429,14 +431,90 @@ model Activity {
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
-  module        ProductModule          @relation(fields: [moduleId], references: [id], onDelete: Restrict)
-  registrations ActivityRegistration[]
+  module               ProductModule          @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  venue                Venue?                 @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  registrations        ActivityRegistration[]
+  recommendationEvents RecommendationEvent[]
 
   @@index([moduleId, status])
+  @@index([venueId, startAt, endAt])
   @@index([activityType, status])
   @@index([status, startAt])
   @@index([registrationEndAt])
   @@index([deletedAt])
+}
+
+// 活动场地
+model Venue {
+  id                 BigInt    @id @default(autoincrement())
+  name               String
+  subtitle           String    @default("")
+  coverUrl           String    @default("")
+  address            String    @default("")
+  city               String    @default("")
+  district           String    @default("")
+  latitude           Decimal?  @db.Decimal(10, 7)
+  longitude          Decimal?  @db.Decimal(10, 7)
+  capacity           Int?
+  facilities         String[]
+  description        String    @default("")
+  contactName        String    @default("")
+  contactPhoneMasked String    @default("")
+  status             Int       @default(1) // 0停用 1启用
+  sortOrder          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  images       VenueImage[]
+  availability VenueAvailability[]
+  blockedSlots VenueBlockedSlot[]
+  activities   Activity[]
+
+  @@index([status, sortOrder])
+  @@index([city, district])
+  @@index([deletedAt])
+}
+
+// 场地图片
+model VenueImage {
+  id        BigInt   @id @default(autoincrement())
+  venueId   BigInt
+  imageUrl  String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, sortOrder])
+}
+
+// 场地每周可用时间
+model VenueAvailability {
+  id        BigInt @id @default(autoincrement())
+  venueId   BigInt
+  weekday   Int // 1-7
+  startTime String
+  endTime   String
+  status    Int    @default(1)
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, weekday])
+}
+
+// 场地临时不可用时间
+model VenueBlockedSlot {
+  id        BigInt   @id @default(autoincrement())
+  venueId   BigInt
+  startAt   DateTime
+  endAt     DateTime
+  reason    String   @default("")
+  createdAt DateTime @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, startAt, endAt])
 }
 
 // 活动报名
@@ -622,6 +700,7 @@ model RecommendationEvent {
   moduleId           BigInt?
   moduleCode         String   @default("")
   productId          BigInt?
+  activityId         BigInt?
   productType        String   @default("")
   recommendationForm String   @default("")
   eventType          String
@@ -641,15 +720,17 @@ model RecommendationEvent {
   metadata           Json     @default("{}")
   createdAt          DateTime @default(now())
 
-  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  module  ProductModule? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
-  product Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  user     User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  module   ProductModule? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  product  Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  activity Activity?      @relation(fields: [activityId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([anonymousId, createdAt])
   @@index([moduleCode, createdAt])
   @@index([moduleId, createdAt])
   @@index([productId, createdAt])
+  @@index([activityId, createdAt])
   @@index([clicked, createdAt])
   @@index([converted, createdAt])
   @@index([createdAt])

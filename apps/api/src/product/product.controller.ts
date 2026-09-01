@@ -285,6 +285,7 @@ export class ProductAdminController {
     @Query('moduleCode') moduleCode?: string,
     @Query('productType') productType?: string,
     @Query('recommendationForm') recommendationForm?: string,
+    @Query('activityId') activityId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string
   ) {
@@ -293,6 +294,7 @@ export class ProductAdminController {
       moduleCode,
       productType,
       recommendationForm,
+      activityId: activityId ? BigInt(activityId) : undefined,
       startDate,
       endDate,
     })

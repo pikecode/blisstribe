@@ -50,6 +50,9 @@
             <el-tag type="info">{{ activityTypeText(row.activityType) }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="场地" width="160">
+          <template #default="{ row }">{{ row.venue?.name || row.locationText || '-' }}</template>
+        </el-table-column>
         <el-table-column label="活动时间" width="180">
           <template #default="{ row }">
             <div>{{ formatDate(row.startAt) }}</div>
@@ -123,6 +126,40 @@
                 <el-radio-button label="offline">线下活动</el-radio-button>
                 <el-radio-button label="mixed">线上+线下</el-radio-button>
               </el-radio-group>
+            </el-form-item>
+            <el-form-item label="活动场地">
+              <el-select v-model="form.venueId" clearable filterable placeholder="请选择线下场地" style="width: 100%" @change="handleVenueChange">
+                <el-option
+                  v-for="item in activeVenues"
+                  :key="item.id"
+                  :label="`${item.name}${item.capacity ? ` / ${item.capacity}人` : ''}`"
+                  :value="item.id"
+                />
+              </el-select>
+              <div v-if="selectedVenue" class="venue-preview">
+                <el-image v-if="selectedVenue.coverUrl" :src="selectedVenue.coverUrl" class="venue-preview__cover" fit="cover" />
+                <div v-else class="venue-preview__cover venue-preview__cover--empty">场地</div>
+                <div class="venue-preview__body">
+                  <div class="venue-preview__head">
+                    <div>
+                      <div class="venue-preview__title">{{ selectedVenue.name }}</div>
+                      <div class="venue-preview__subtitle">{{ selectedVenue.subtitle || '场地信息' }}</div>
+                    </div>
+                    <el-tag v-if="selectedVenue.capacity" type="success">容量 {{ selectedVenue.capacity }} 人</el-tag>
+                  </div>
+                  <div class="venue-preview__meta">{{ venueAddressText }}</div>
+                  <div v-if="selectedVenue.facilities.length" class="venue-preview__tags">
+                    <el-tag v-for="item in selectedVenue.facilities.slice(0, 5)" :key="item" size="small" effect="plain">{{ item }}</el-tag>
+                    <span v-if="selectedVenue.facilities.length > 5" class="muted">+{{ selectedVenue.facilities.length - 5 }}</span>
+                  </div>
+                  <div v-if="selectedVenue.availability.length" class="venue-preview__schedule">
+                    <span v-for="item in selectedVenue.availability.slice(0, 4)" :key="`${item.weekday}-${item.startTime}-${item.endTime}`">
+                      {{ weekdayText(item.weekday) }} {{ item.startTime }}-{{ item.endTime }}
+                    </span>
+                    <span v-if="selectedVenue.availability.length > 4" class="muted">+{{ selectedVenue.availability.length - 4 }}</span>
+                  </div>
+                </div>
+              </div>
             </el-form-item>
             <el-form-item label="地点/入口">
               <el-input v-model="form.locationText" maxlength="200" :placeholder="locationPlaceholder" />
@@ -202,6 +239,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { activityApi, activityStatusText, activityTypeText, type Activity, type ActivityPayload, type ActivityType } from '@/api/activity'
 import { productApi, type Product, type ProductModule, type TagDictionary } from '@/api/product'
+import { venueApi, weekdayText, type Venue } from '@/api/venue'
 import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
 
 type ActivityForm = Omit<ActivityPayload, 'startAt' | 'endAt' | 'registrationStartAt' | 'registrationEndAt'> & {
@@ -213,6 +251,7 @@ const activities = ref<Activity[]>([])
 const modules = ref<ProductModule[]>([])
 const tags = ref<TagDictionary[]>([])
 const products = ref<Product[]>([])
+const venues = ref<Venue[]>([])
 const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
@@ -229,6 +268,7 @@ const status = ref<number | ''>('')
 
 const defaultForm = (): ActivityForm => ({
   moduleId: 0,
+  venueId: null,
   title: '',
   subtitle: '',
   coverUrl: '',
@@ -249,6 +289,13 @@ const defaultForm = (): ActivityForm => ({
 
 const form = reactive<ActivityForm>(defaultForm())
 const activeModules = computed(() => modules.value.filter((item) => item.status === 1))
+const activeVenues = computed(() => venues.value.filter((item) => item.status === 1))
+const selectedVenue = computed(() => activeVenues.value.find((item) => item.id === form.venueId) || null)
+const venueAddressText = computed(() => {
+  const venue = selectedVenue.value
+  if (!venue) return ''
+  return [venue.city, venue.district, venue.address].filter(Boolean).join(' · ') || '未填写地址'
+})
 const selectableProducts = computed(() => products.value.filter((item) => !form.moduleId || item.module?.id === form.moduleId))
 const locationPlaceholder = computed(() => {
   if (form.activityType === 'offline') return '填写门店地址、集合地点或详细到场说明'
@@ -274,14 +321,16 @@ const rules: FormRules<ActivityForm> = {
 }
 
 async function loadOptions() {
-  const [moduleRows, tagRows, productResult] = await Promise.all([
+  const [moduleRows, tagRows, productResult, venueResult] = await Promise.all([
     productApi.listModules(),
     productApi.listTags({ status: 1 }),
     productApi.listProducts({ page: 1, pageSize: 200, status: 1 }),
+    venueApi.list({ page: 1, pageSize: 200, status: 1 }),
   ])
   modules.value = moduleRows
   tags.value = tagRows
   products.value = productResult.list
+  venues.value = venueResult.list
 }
 
 async function loadActivities() {
@@ -321,6 +370,7 @@ function openDialog(row?: Activity) {
   Object.assign(form, row
     ? {
         moduleId: row.moduleId,
+        venueId: row.venueId,
         title: row.title,
         subtitle: row.subtitle,
         coverUrl: row.coverUrl,
@@ -347,6 +397,15 @@ function handleModuleChange() {
   form.tagIds = form.tagIds?.filter((id) => validTagIds.has(id)) ?? []
   const validProductIds = new Set(selectableProducts.value.map((item) => item.id))
   form.relatedProductIds = form.relatedProductIds?.filter((id) => validProductIds.has(id)) ?? []
+}
+
+function handleVenueChange() {
+  if (!form.locationText && selectedVenue.value?.address) {
+    form.locationText = selectedVenue.value.address
+  }
+  if (!form.coverUrl && selectedVenue.value?.coverUrl) {
+    form.coverUrl = selectedVenue.value.coverUrl
+  }
 }
 
 function validateActivityTimeline() {
@@ -391,6 +450,7 @@ async function submit() {
   try {
     const payload: ActivityPayload = {
       moduleId: form.moduleId,
+      venueId: form.venueId || null,
       title: form.title.trim(),
       subtitle: form.subtitle?.trim(),
       coverUrl: form.coverUrl?.trim(),
@@ -480,5 +540,88 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.venue-preview {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.venue-preview__cover {
+  width: 112px;
+  height: 78px;
+  border-radius: 6px;
+  background: #eef2f7;
+  flex: 0 0 auto;
+}
+
+.venue-preview__cover--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a94a6;
+  font-size: 12px;
+}
+
+.venue-preview__body {
+  min-width: 0;
+}
+
+.venue-preview__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.venue-preview__title {
+  color: #1f2937;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.venue-preview__subtitle,
+.venue-preview__meta {
+  margin-top: 4px;
+  color: #8a94a6;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.venue-preview__tags,
+.venue-preview__schedule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.venue-preview__schedule span {
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.muted {
+  color: #8a94a6;
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .venue-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .venue-preview__cover {
+    width: 100%;
+    height: 140px;
+  }
 }
 </style>

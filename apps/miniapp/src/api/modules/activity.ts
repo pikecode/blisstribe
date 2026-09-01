@@ -1,6 +1,7 @@
 import { request } from '@/api/request'
 import { storage } from '@/utils/storage'
 import type { Product, ProductModule } from './product'
+import type { Venue } from './venue'
 
 export type ActivityType = 'online' | 'offline' | 'mixed'
 export type ActivityRegistrationStatus = 'registered' | 'confirmed' | 'attended' | 'cancelled' | 'invalid'
@@ -8,7 +9,9 @@ export type ActivityRegistrationStatus = 'registered' | 'confirmed' | 'attended'
 export interface Activity {
   id: number
   moduleId: number
+  venueId: number | null
   module: Pick<ProductModule, 'id' | 'code' | 'name' | 'icon' | 'coverUrl'>
+  venue: Pick<Venue, 'id' | 'name' | 'subtitle' | 'coverUrl' | 'address' | 'city' | 'district' | 'capacity' | 'facilities'> | null
   title: string
   subtitle: string
   coverUrl: string
@@ -18,6 +21,7 @@ export interface Activity {
   registrationStartAt: string | null
   registrationEndAt: string
   locationText: string
+  venueSnapshot: Record<string, unknown>
   capacity: number | null
   registeredCount: number
   remainingCount: number | null

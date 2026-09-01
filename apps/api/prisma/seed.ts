@@ -1097,6 +1097,52 @@ async function main(): Promise<void> {
       ],
     })
   }
+  async function upsertVenue() {
+    const existing = await prisma.venue.findFirst({
+      where: { name: '杭州线下体验点', deletedAt: null },
+      select: { id: true },
+    })
+    const data = {
+      name: '杭州线下体验点',
+      subtitle: '适合小型沙龙、体验课和一对多咨询',
+      coverUrl: uploadedCoverUrl('product-family.jpg'),
+      address: '杭州市西湖区示例路 88 号',
+      city: '杭州',
+      district: '西湖区',
+      capacity: 40,
+      facilities: ['投影', '茶水', '咨询室', '停车位'],
+      description: '用于本地验收的默认线下场地，可承接健康、美学和家庭类小型活动。',
+      contactName: '运营值班',
+      contactPhoneMasked: '0571****8888',
+      status: 1,
+      sortOrder: 0,
+    }
+    const venue = existing
+      ? await prisma.venue.update({ where: { id: existing.id }, data })
+      : await prisma.venue.create({ data })
+    await prisma.venueImage.deleteMany({ where: { venueId: venue.id } })
+    await prisma.venueImage.createMany({
+      data: [
+        { venueId: venue.id, imageUrl: uploadedCoverUrl('product-family.jpg'), sortOrder: 0 },
+        { venueId: venue.id, imageUrl: uploadedCoverUrl('product-consult.jpg'), sortOrder: 1 },
+      ],
+    })
+    await prisma.venueAvailability.deleteMany({ where: { venueId: venue.id } })
+    await prisma.venueAvailability.createMany({
+      data: [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
+        venueId: venue.id,
+        weekday,
+        startTime: '09:00',
+        endTime: '21:00',
+        status: 1,
+      })),
+    })
+    await prisma.venueBlockedSlot.deleteMany({ where: { venueId: venue.id } })
+    return venue
+  }
+
+  const demoVenue = await upsertVenue()
+
   async function upsertActivity(item: {
     moduleId: bigint
     title: string
@@ -1114,6 +1160,7 @@ async function main(): Promise<void> {
     detail: string
     tags: string[]
     relatedProductTitles: string[]
+    venueId?: bigint
     priority: number
     sortOrder: number
   }) {
@@ -1146,6 +1193,20 @@ async function main(): Promise<void> {
       registrationStartAt,
       registrationEndAt,
       locationText: item.locationText,
+      venueId: item.venueId ?? null,
+      venueSnapshot: item.venueId
+        ? {
+            id: Number(demoVenue.id),
+            name: demoVenue.name,
+            subtitle: demoVenue.subtitle,
+            coverUrl: demoVenue.coverUrl,
+            address: demoVenue.address,
+            city: demoVenue.city,
+            district: demoVenue.district,
+            capacity: demoVenue.capacity,
+            facilities: demoVenue.facilities,
+          }
+        : {},
       capacity: item.capacity ?? null,
       targetUserText: item.targetUserText,
       highlights: item.highlights,
@@ -1192,6 +1253,7 @@ async function main(): Promise<void> {
       durationHours: 2,
       registrationEndOffsetDays: 6,
       locationText: '线上说明 + 到店体验名额',
+      venueId: demoVenue.id,
       capacity: 30,
       targetUserText: '关注体重管理、饮食结构和运动习惯的人群。',
       highlights: ['方案拆解', '体验名额', '顾问答疑'],
@@ -1211,6 +1273,7 @@ async function main(): Promise<void> {
       durationHours: 4,
       registrationEndOffsetDays: 9,
       locationText: '杭州线下体验点',
+      venueId: demoVenue.id,
       capacity: 20,
       targetUserText: '想改善皮肤状态但不确定服务选择的人群。',
       highlights: ['肤质初筛', '护理建议', '到店体验'],

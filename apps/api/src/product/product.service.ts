@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import {
   Prisma,
+  type Activity,
   type AssessmentOption,
   type AssessmentQuestion,
   type AssessmentRecommendationRule,
@@ -217,7 +218,13 @@ export class ProductService {
           select: { id: true, moduleId: true, productType: true, module: { select: { id: true, code: true } } },
         })
       : null
-    const module = !product && (dto.moduleId || dto.moduleCode)
+    const activity = !product && dto.activityId
+      ? await this.prisma.activity.findFirst({
+          where: { id: BigInt(dto.activityId), deletedAt: null },
+          select: { id: true, moduleId: true, activityType: true, module: { select: { id: true, code: true } } },
+        })
+      : null
+    const module = !product && !activity && (dto.moduleId || dto.moduleCode)
       ? await this.prisma.productModule.findFirst({
           where: {
             deletedAt: null,
@@ -232,9 +239,10 @@ export class ProductService {
       data: {
         userId,
         anonymousId: dto.anonymousId?.trim() ?? '',
-        moduleId: product?.moduleId ?? module?.id ?? (dto.moduleId ? BigInt(dto.moduleId) : null),
-        moduleCode: product?.module.code ?? module?.code ?? dto.moduleCode?.trim() ?? '',
+        moduleId: product?.moduleId ?? activity?.moduleId ?? module?.id ?? (dto.moduleId ? BigInt(dto.moduleId) : null),
+        moduleCode: product?.module.code ?? activity?.module.code ?? module?.code ?? dto.moduleCode?.trim() ?? '',
         productId: product?.id ?? (dto.productId ? BigInt(dto.productId) : null),
+        activityId: activity?.id ?? (dto.activityId ? BigInt(dto.activityId) : null),
         productType: product?.productType ?? dto.productType ?? '',
         recommendationForm: dto.recommendationForm ?? '',
         eventType: dto.eventType,
@@ -254,6 +262,7 @@ export class ProductService {
     moduleCode?: string
     productType?: string
     recommendationForm?: string
+    activityId?: bigint
     startDate?: string
     endDate?: string
   }) {
@@ -265,7 +274,14 @@ export class ProductService {
       take: 100,
     })
     const productIds = productRefs.map((item) => item.productId).filter((id): id is bigint => !!id)
-    const [eventGroups, productGroups, productRows, trendEvents] = await Promise.all([
+    const activityRefs = await this.prisma.recommendationEvent.findMany({
+      where: { ...where, activityId: { not: null } },
+      select: { activityId: true },
+      distinct: ['activityId'],
+      take: 100,
+    })
+    const activityIds = activityRefs.map((item) => item.activityId).filter((id): id is bigint => !!id)
+    const [eventGroups, productGroups, activityGroups, productRows, activityRows, sourceGroups, formGroups, trendEvents] = await Promise.all([
       this.prisma.recommendationEvent.groupBy({
         by: ['eventType'],
         where,
@@ -276,9 +292,28 @@ export class ProductService {
         where: { ...where, productId: { not: null } },
         _count: { _all: true },
       }),
+      this.prisma.recommendationEvent.groupBy({
+        by: ['activityId', 'eventType'],
+        where: { ...where, activityId: { not: null } },
+        _count: { _all: true },
+      }),
       this.prisma.product.findMany({
         where: { id: { in: productIds } },
         include: { module: true },
+      }),
+      this.prisma.activity.findMany({
+        where: { id: { in: activityIds } },
+        include: { module: true },
+      }),
+      this.prisma.recommendationEvent.groupBy({
+        by: ['sourceScene', 'eventType'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.recommendationEvent.groupBy({
+        by: ['recommendationForm', 'eventType'],
+        where,
+        _count: { _all: true },
       }),
       this.prisma.recommendationEvent.findMany({
         where,
@@ -288,12 +323,19 @@ export class ProductService {
     ])
     const overview = this.buildEventOverview(eventGroups)
     const productMap = new Map(productRows.map((item) => [item.id.toString(), item]))
+    const activityMap = new Map(activityRows.map((item) => [item.id.toString(), item]))
     const productStats = this.buildProductEventStats(productGroups, productMap)
+    const activityStats = this.buildActivityEventStats(activityGroups, activityMap)
+    const sourceStats = this.buildDimensionEventStats(sourceGroups, 'sourceScene')
+    const formStats = this.buildDimensionEventStats(formGroups, 'recommendationForm')
     const trend = this.buildEventTrend(trendEvents)
 
     return {
       overview,
       productStats,
+      activityStats,
+      sourceStats,
+      formStats,
       trend,
     }
   }
@@ -913,6 +955,7 @@ export class ProductService {
     moduleCode?: string
     productType?: string
     recommendationForm?: string
+    activityId?: bigint
     startDate?: string
     endDate?: string
   }): Prisma.RecommendationEventWhereInput {
@@ -928,6 +971,7 @@ export class ProductService {
       ...(params.moduleCode && { moduleCode: params.moduleCode }),
       ...(params.productType && { productType: params.productType }),
       ...(params.recommendationForm && { recommendationForm: params.recommendationForm }),
+      ...(params.activityId && { activityId: params.activityId }),
       ...(Object.keys(createdAt).length && { createdAt }),
     }
   }
@@ -938,13 +982,18 @@ export class ProductService {
     const clicks = countOf('click')
     const leads = countOf('lead_submit')
     const assessments = countOf('assessment_submit')
+    const activityRegistrations = countOf('activity_registration')
+    const activityCancels = countOf('activity_cancel')
     return {
       impressions,
       clicks,
       leads,
       assessments,
+      activityRegistrations,
+      activityCancels,
       clickRate: this.percent(clicks, impressions),
       leadRate: this.percent(leads, clicks || impressions),
+      activityRegistrationRate: this.percent(activityRegistrations, clicks || impressions),
     }
   }
 
@@ -959,6 +1008,7 @@ export class ProductService {
       clicks: number
       leads: number
       assessments: number
+      activityRegistrations: number
     }>()
 
     for (const group of groups) {
@@ -972,11 +1022,13 @@ export class ProductService {
         clicks: 0,
         leads: 0,
         assessments: 0,
+        activityRegistrations: 0,
       }
       if (group.eventType === 'impression') current.impressions += group._count._all
       if (group.eventType === 'click') current.clicks += group._count._all
       if (group.eventType === 'lead_submit') current.leads += group._count._all
       if (group.eventType === 'assessment_submit') current.assessments += group._count._all
+      if (group.eventType === 'activity_registration') current.activityRegistrations += group._count._all
       statMap.set(key, current)
     }
 
@@ -989,18 +1041,119 @@ export class ProductService {
       .sort((a, b) => b.leads - a.leads || b.clicks - a.clicks || b.impressions - a.impressions)
   }
 
+  private buildActivityEventStats(
+    groups: Array<{ activityId: bigint | null; eventType: string; _count: { _all: number } }>,
+    activityMap: Map<string, Activity & { module: ProductModule }>
+  ) {
+    const statMap = new Map<string, {
+      activityId: number
+      activity: Record<string, unknown> | null
+      impressions: number
+      clicks: number
+      registrations: number
+      cancels: number
+    }>()
+
+    for (const group of groups) {
+      if (!group.activityId) continue
+      const key = group.activityId.toString()
+      const activity = activityMap.get(key)
+      const current = statMap.get(key) ?? {
+        activityId: Number(group.activityId),
+        activity: activity ? this.toActivityAnalyticsVO(activity) : null,
+        impressions: 0,
+        clicks: 0,
+        registrations: 0,
+        cancels: 0,
+      }
+      if (group.eventType === 'impression') current.impressions += group._count._all
+      if (group.eventType === 'click') current.clicks += group._count._all
+      if (group.eventType === 'activity_registration') current.registrations += group._count._all
+      if (group.eventType === 'activity_cancel') current.cancels += group._count._all
+      statMap.set(key, current)
+    }
+
+    return Array.from(statMap.values())
+      .map((item) => ({
+        ...item,
+        clickRate: this.percent(item.clicks, item.impressions),
+        registrationRate: this.percent(item.registrations, item.clicks || item.impressions),
+      }))
+      .sort((a, b) => b.registrations - a.registrations || b.clicks - a.clicks || b.impressions - a.impressions)
+  }
+
+  private buildDimensionEventStats(
+    groups: Array<{
+      eventType: string
+      sourceScene?: string
+      recommendationForm?: string
+      _count: { _all: number }
+    }>,
+    keyName: 'sourceScene' | 'recommendationForm'
+  ) {
+    const statMap = new Map<string, {
+      key: string
+      impressions: number
+      clicks: number
+      leads: number
+      assessments: number
+      activityRegistrations: number
+    }>()
+
+    for (const group of groups) {
+      const key = group[keyName] || '未标记'
+      const current = statMap.get(key) ?? {
+        key,
+        impressions: 0,
+        clicks: 0,
+        leads: 0,
+        assessments: 0,
+        activityRegistrations: 0,
+      }
+      if (group.eventType === 'impression') current.impressions += group._count._all
+      if (group.eventType === 'click') current.clicks += group._count._all
+      if (group.eventType === 'lead_submit') current.leads += group._count._all
+      if (group.eventType === 'assessment_submit') current.assessments += group._count._all
+      if (group.eventType === 'activity_registration') current.activityRegistrations += group._count._all
+      statMap.set(key, current)
+    }
+
+    return Array.from(statMap.values())
+      .map((item) => ({
+        ...item,
+        clickRate: this.percent(item.clicks, item.impressions),
+        leadRate: this.percent(item.leads, item.clicks || item.impressions),
+        activityRegistrationRate: this.percent(item.activityRegistrations, item.clicks || item.impressions),
+      }))
+      .sort((a, b) => (b.leads + b.activityRegistrations) - (a.leads + a.activityRegistrations) || b.clicks - a.clicks)
+  }
+
   private buildEventTrend(events: Array<{ createdAt: Date; eventType: string }>) {
-    const trendMap = new Map<string, { date: string; impressions: number; clicks: number; leads: number; assessments: number }>()
+    const trendMap = new Map<string, { date: string; impressions: number; clicks: number; leads: number; assessments: number; activityRegistrations: number }>()
     for (const event of events) {
       const date = event.createdAt.toISOString().slice(0, 10)
-      const current = trendMap.get(date) ?? { date, impressions: 0, clicks: 0, leads: 0, assessments: 0 }
+      const current = trendMap.get(date) ?? { date, impressions: 0, clicks: 0, leads: 0, assessments: 0, activityRegistrations: 0 }
       if (event.eventType === 'impression') current.impressions += 1
       if (event.eventType === 'click') current.clicks += 1
       if (event.eventType === 'lead_submit') current.leads += 1
       if (event.eventType === 'assessment_submit') current.assessments += 1
+      if (event.eventType === 'activity_registration') current.activityRegistrations += 1
       trendMap.set(date, current)
     }
     return Array.from(trendMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  private toActivityAnalyticsVO(activity: Activity & { module: ProductModule }) {
+    return {
+      id: Number(activity.id),
+      module: this.toModuleVO(activity.module),
+      title: activity.title,
+      subtitle: activity.subtitle,
+      activityType: activity.activityType,
+      startAt: activity.startAt.toISOString(),
+      endAt: activity.endAt.toISOString(),
+      status: activity.status,
+    }
   }
 
   private percent(numerator: number, denominator: number) {

@@ -26,6 +26,11 @@ export class CreateActivityDto {
   @Min(1)
   moduleId!: number
 
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  venueId?: number
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
@@ -119,6 +124,11 @@ export class UpdateActivityDto {
   @IsInt()
   @Min(1)
   moduleId?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  venueId?: number
 
   @IsOptional()
   @IsString()
