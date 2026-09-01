@@ -166,7 +166,8 @@ async function confirmContact() {
   if (!lead.value || confirming.value || !canConfirm.value) return
   confirming.value = true
   try {
-    lead.value = await productApi.confirmLeadContact(lead.value.id)
+    await productApi.confirmLeadContact(lead.value.id)
+    await loadLead()
     uni.showToast({ title: '已确认沟通', icon: 'success' })
   } catch {
     // 请求层已统一提示
