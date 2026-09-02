@@ -4,9 +4,15 @@
     <view class="auth-popup__sheet">
       <view class="auth-popup__handle" />
       <view class="auth-popup__brand">
-        <view class="auth-popup__logo">B</view>
-        <text class="auth-popup__title">加入心悦部落</text>
-        <text class="auth-popup__desc">授权后即可体验完整功能</text>
+        <view class="auth-popup__brand-row">
+          <view class="auth-popup__logo">B</view>
+          <view class="auth-popup__brand-copy">
+            <text class="auth-popup__brand-name">BlissTribe</text>
+            <text class="auth-popup__brand-subtitle">心悦部落</text>
+          </view>
+        </view>
+        <text class="auth-popup__title">登录后继续查看</text>
+        <text class="auth-popup__desc">保存评估结果，同步咨询与报名进度</text>
       </view>
       <button
         class="auth-popup__btn"
@@ -14,8 +20,9 @@
         open-type="getUserProfile"
         @tap="handleLogin"
       >
-        <text>{{ loading ? '授权中...' : '微信一键授权' }}</text>
+        <text>{{ loading ? '登录中...' : '微信登录 / 继续' }}</text>
       </button>
+      <text class="auth-popup__privacy-tip">仅用于账号识别和资料完善</text>
       <view class="auth-popup__agreement">
         <UserAgreement v-model="agreed" />
       </view>
@@ -88,7 +95,7 @@ const handleLogin = async (): Promise<void> => {
   &__mask {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(31, 41, 55, 0.46);
   }
 
   &__sheet {
@@ -98,66 +105,111 @@ const handleLogin = async (): Promise<void> => {
     right: 0;
     background: #fff;
     border-radius: 32rpx 32rpx 0 0;
-    padding: 24rpx 48rpx 64rpx;
+    padding: 22rpx 48rpx calc(48rpx + env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
   }
 
   &__handle {
     width: 64rpx;
     height: 8rpx;
-    background: #e0e0e0;
+    background: var(--color-border-strong);
     border-radius: 4rpx;
-    margin-bottom: 40rpx;
+    margin: 0 auto 36rpx;
   }
 
   &__brand {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 48rpx;
+    margin-bottom: 40rpx;
+    text-align: center;
+  }
+
+  &__brand-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 32rpx;
+  }
+
+  &__brand-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-left: 18rpx;
+  }
+
+  &__brand-name {
+    color: var(--color-text);
+    font-size: 30rpx;
+    font-weight: 800;
+    line-height: 38rpx;
+  }
+
+  &__brand-subtitle {
+    margin-top: 2rpx;
+    color: var(--color-text-secondary);
+    font-size: 22rpx;
+    line-height: 28rpx;
   }
 
   &__logo {
-    width: 96rpx;
-    height: 96rpx;
-    border-radius: 24rpx;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    width: 76rpx;
+    height: 76rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
     color: #fff;
-    font-size: 48rpx;
-    font-weight: bold;
+    font-size: 38rpx;
+    font-weight: 800;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 20rpx;
+    box-shadow: var(--shadow-action);
   }
 
   &__title {
     font-size: 36rpx;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin-bottom: 8rpx;
+    font-weight: 800;
+    color: var(--color-text);
+    line-height: 46rpx;
+    margin-bottom: 12rpx;
   }
 
   &__desc {
     font-size: 26rpx;
-    color: #999;
+    color: var(--color-text-secondary);
+    line-height: 36rpx;
   }
 
   &__btn {
     width: 100%;
-    height: 88rpx;
-    background: #07c160;
+    height: 96rpx;
+    background: var(--color-primary);
     color: #fff;
-    border-radius: 44rpx;
-    font-size: 30rpx;
-    font-weight: 500;
+    border-radius: var(--radius-round);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 24rpx;
+    margin-bottom: 18rpx;
+    box-shadow: var(--shadow-action);
+
     &::after { border: none; }
+
+    &[disabled] {
+      opacity: var(--opacity-disabled);
+    }
+  }
+
+  &__privacy-tip {
+    display: block;
+    margin-bottom: 24rpx;
+    color: var(--color-text-tertiary);
+    font-size: 22rpx;
+    line-height: 32rpx;
+    text-align: center;
   }
 
   &__agreement {

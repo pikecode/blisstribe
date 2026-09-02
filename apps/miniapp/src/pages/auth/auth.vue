@@ -1,12 +1,27 @@
 <template>
   <view class="auth">
-    <view class="auth__brand">
-      <view class="auth__logo">B</view>
-      <text class="auth__title">欢迎使用 BlissTribe</text>
-      <text class="auth__desc">授权后即可体验完整功能</text>
+    <view class="auth__hero">
+      <view class="auth__brand-row">
+        <view class="auth__logo">B</view>
+        <view class="auth__brand-copy">
+          <text class="auth__brand-name">BlissTribe</text>
+          <text class="auth__brand-subtitle">心悦部落</text>
+        </view>
+      </view>
+
+      <view class="auth__headline">
+        <text class="auth__title">先了解你的需求，再推荐合适服务</text>
+        <text class="auth__desc">登录后可保存评估结果、同步咨询进展和活动报名记录。</text>
+      </view>
+
+      <view class="auth__benefits">
+        <view v-for="item in benefits" :key="item" class="auth__benefit">
+          <view class="auth__benefit-icon">✓</view>
+          <text>{{ item }}</text>
+        </view>
+      </view>
     </view>
 
-    <!-- 占位空白，把底部区推下去 -->
     <view class="auth__spacer" />
 
     <view class="auth__bottom">
@@ -17,11 +32,12 @@
           open-type="getUserProfile"
           @tap="handleWechatLogin"
         >
-          <text v-if="!loading" class="auth__btn-text">微信一键授权</text>
-          <text v-else class="auth__btn-text">授权中...</text>
+          <text v-if="!loading" class="auth__btn-text">微信登录 / 继续</text>
+          <text v-else class="auth__btn-text">登录中...</text>
         </button>
       </view>
 
+      <text class="auth__privacy-tip">仅用于账号识别和资料完善，你可在后续页面补充信息</text>
       <view class="auth__agreement">
         <UserAgreement v-model="agreed" />
       </view>
@@ -42,6 +58,7 @@ const authStore = useAuthStore()
 
 const loading = ref(false)
 const agreed = ref(false)
+const benefits = ['保存健康需求评估', '查看专属服务推荐', '同步咨询与报名进度']
 
 const handleWechatLogin = async (): Promise<void> => {
   if (!agreed.value) {
@@ -97,17 +114,64 @@ if (authStore.isLogin) {
 
 <style lang="scss" scoped>
 .auth {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   padding: 0 48rpx;
-  background-color: var(--color-bg-white);
+  background:
+    linear-gradient(180deg, var(--color-primary-soft) 0%, #ffffff 44%, #ffffff 100%);
+  box-sizing: border-box;
+  overflow: hidden;
 
-  &__brand {
+  &::before {
+    content: '';
+    position: absolute;
+    top: -120rpx;
+    right: -160rpx;
+    width: 360rpx;
+    height: 360rpx;
+    border-radius: 50%;
+    background: rgba(7, 193, 96, 0.1);
+  }
+
+  &__hero {
+    position: relative;
     display: flex;
     flex-direction: column;
+    padding-top: calc(112rpx + env(safe-area-inset-top));
+  }
+
+  &__brand-row {
+    display: flex;
     align-items: center;
-    padding-top: 160rpx;
+    margin-bottom: 72rpx;
+  }
+
+  &__brand-copy {
+    display: flex;
+    flex-direction: column;
+    margin-left: 20rpx;
+  }
+
+  &__brand-name {
+    color: var(--color-text);
+    font-size: 34rpx;
+    font-weight: 800;
+    line-height: 42rpx;
+  }
+
+  &__brand-subtitle {
+    margin-top: 2rpx;
+    color: var(--color-text-secondary);
+    font-size: 23rpx;
+    line-height: 30rpx;
+  }
+
+  &__headline {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 44rpx;
   }
 
   &__spacer {
@@ -115,58 +179,106 @@ if (authStore.isLogin) {
   }
 
   &__bottom {
-    padding-bottom: 60rpx;
+    position: relative;
+    padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
   }
 
   &__logo {
-    width: 128rpx;
-    height: 128rpx;
+    width: 88rpx;
+    height: 88rpx;
     border-radius: var(--radius-lg);
     background-color: var(--color-primary);
     color: #fff;
-    font-size: 64rpx;
-    font-weight: bold;
+    font-size: 44rpx;
+    font-weight: 800;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 32rpx;
+    box-shadow: var(--shadow-action);
   }
 
   &__title {
-    font-size: 40rpx;
-    font-weight: bold;
     color: var(--color-text);
-    margin-bottom: 16rpx;
+    font-size: 48rpx;
+    font-weight: 800;
+    line-height: 62rpx;
   }
 
   &__desc {
-    font-size: var(--font-size-sm);
+    margin-top: 20rpx;
     color: var(--color-text-secondary);
+    font-size: 28rpx;
+    line-height: 42rpx;
+  }
+
+  &__benefits {
+    display: flex;
+    flex-direction: column;
+    gap: 18rpx;
+  }
+
+  &__benefit {
+    display: flex;
+    align-items: center;
+    min-height: 56rpx;
+    color: var(--color-text);
+    font-size: 27rpx;
+    line-height: 36rpx;
+  }
+
+  &__benefit-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 34rpx;
+    height: 34rpx;
+    margin-right: 16rpx;
+    border-radius: 50%;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    font-size: 22rpx;
+    font-weight: 800;
   }
 
   &__action {
     width: 100%;
-    margin-bottom: 48rpx;
+    margin-bottom: 18rpx;
   }
 
   &__btn-wechat {
     width: 100%;
-    height: 88rpx;
+    height: 96rpx;
     background-color: var(--color-primary);
     color: #fff;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-round);
     font-size: var(--font-size-lg);
+    font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: var(--shadow-action);
+
+    &::after {
+      border: none;
+    }
 
     &[disabled] {
-      opacity: 0.6;
+      opacity: var(--opacity-disabled);
     }
   }
 
   &__btn-text {
     color: #fff;
+  }
+
+  &__privacy-tip {
+    display: block;
+    margin-bottom: 28rpx;
+    color: var(--color-text-tertiary);
+    font-size: 22rpx;
+    line-height: 32rpx;
+    text-align: center;
   }
 
   &__agreement {
