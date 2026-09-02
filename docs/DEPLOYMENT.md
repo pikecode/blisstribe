@@ -2,7 +2,7 @@
 
 ## 1. 文档目的
 
-本文档沉淀 BlissTribe 的本地开发、Docker 部署、镜像发布和后续 CI/CD 演进标准。后续讨论部署、服务器初始化、镜像构建、发布、回滚和验收时，默认以本文档为基准。
+本文档沉淀 BlissTribe 的本地开发、Docker 部署、镜像发布和后续 CI/CD 演进标准。后续讨论部署、服务器初始化、镜像构建、发布、回滚和验收时，默认以本文档为基准。当前 `ytxybl.com` 生产环境的实际部署运行手册见 [PRODUCTION_DEPLOYMENT_RUNBOOK.md](PRODUCTION_DEPLOYMENT_RUNBOOK.md)。
 
 适用范围：
 - `apps/api`：NestJS API 服务。

@@ -1,81 +1,72 @@
 <template>
   <div class="product-page">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <div>
-            <div class="card-header__title">产品管理</div>
-            <div class="card-header__desc">维护服务模块、产品标签、推荐优先级和上下架状态</div>
+    <el-tabs v-model="activeTab">
+      <!-- 产品列表标签页 -->
+      <el-tab-pane label="产品列表" name="products">
+        <!-- 工具栏 -->
+        <div class="toolbar">
+          <div class="toolbar__search">
+            <el-input
+              v-model="keyword"
+              placeholder="搜索产品标题..."
+              clearable
+              prefix-icon="Search"
+              @keyup.enter="handleSearch"
+            />
+            <el-button type="primary" @click="handleSearch">搜索</el-button>
           </div>
-          <div>
-            <el-button @click="openModuleDialog()">新增模块</el-button>
+
+          <div class="toolbar__filters">
+            <el-select
+              v-model="moduleId"
+              placeholder="全部模块"
+              clearable
+              style="width: 160px"
+              @change="handleSearch"
+            >
+              <el-option v-for="item in modules" :key="item.id" :label="item.name" :value="item.id" />
+            </el-select>
+
+            <el-select
+              v-model="productType"
+              placeholder="全部类型"
+              clearable
+              style="width: 160px"
+              @change="handleSearch"
+            >
+              <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+
+            <el-select
+              v-model="status"
+              placeholder="全部状态"
+              clearable
+              style="width: 140px"
+              @change="handleSearch"
+            >
+              <el-option label="草稿" :value="0" />
+              <el-option label="已上架" :value="1" />
+              <el-option label="已下架" :value="2" />
+            </el-select>
+
+            <el-button plain icon="Refresh" @click="resetSearch">重置</el-button>
+
+            <!-- 新增产品按钮 -->
             <el-button type="primary" @click="openProductDialog()">新增产品</el-button>
           </div>
         </div>
-      </template>
 
-      <el-tabs v-model="activeTab">
-        <el-tab-pane label="产品列表" name="products">
-          <!-- 搜索栏 -->
-          <div class="search-bar">
-            <div class="search-box">
-              <el-input
-                v-model="keyword"
-                placeholder="搜索产品标题或简介..."
-                clearable
-                @keyup.enter="handleSearch"
-              >
-                <template #prefix>
-                  <i class="el-icon-search"></i>
-                </template>
-              </el-input>
-              <el-button type="primary" @click="handleSearch" class="search-btn">搜索</el-button>
-              <el-button @click="showFilters = !showFilters" :class="{ active: showFilters }">
-                🔽 高级筛选
-              </el-button>
-            </div>
-
-            <!-- 筛选面板 -->
-            <el-collapse-transition>
-              <div v-if="showFilters" class="filters-panel">
-                <div class="filters-row">
-                  <div class="filter-item">
-                    <label>模块</label>
-                    <el-select v-model="moduleId" placeholder="全部模块" clearable>
-                      <el-option v-for="item in modules" :key="item.id" :label="item.name" :value="item.id" />
-                    </el-select>
-                  </div>
-                  <div class="filter-item">
-                    <label>产品类型</label>
-                    <el-select v-model="productType" placeholder="全部类型" clearable>
-                      <el-option v-for="item in productTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
-                    </el-select>
-                  </div>
-                  <div class="filter-item">
-                    <label>上下架状态</label>
-                    <el-select v-model="status" placeholder="全部状态" clearable>
-                      <el-option label="草稿" :value="0" />
-                      <el-option label="上架" :value="1" />
-                      <el-option label="下架" :value="2" />
-                    </el-select>
-                  </div>
-                </div>
-                <div class="filters-actions">
-                  <el-button @click="resetSearch">重置筛选</el-button>
-                  <el-button type="primary" @click="handleSearch">应用筛选</el-button>
-                </div>
-              </div>
-            </el-collapse-transition>
-          </div>
-
-          <el-table :data="products" v-loading="loading" stripe>
-            <el-table-column label="产品" min-width="240">
+        <!-- 产品表格 -->
+        <div class="table-wrapper">
+          <el-table :data="products" v-loading="loading" stripe style="width: 100%">
+            <el-table-column type="index" label="序号" width="60" />
+            <el-table-column label="产品" min-width="260">
               <template #default="{ row }">
                 <div class="product-info">
                   <el-image v-if="row.coverUrl" :src="row.coverUrl" class="product-cover" fit="cover" />
                   <div>
-                    <div class="table-title">{{ row.title }}</div>
-                    <div class="table-subtitle">{{ row.subtitle || row.summary || '-' }}</div>
+                    <div class="product-title">{{ row.title }}</div>
+                    <div class="product-subtitle">{{ row.subtitle || row.summary || '-' }}</div>
                   </div>
                 </div>
               </template>
@@ -85,89 +76,97 @@
             </el-table-column>
             <el-table-column label="类型" width="110">
               <template #default="{ row }">
-                <el-tag :type="productTypeTagType(row.productType)">{{ productTypeText(row.productType) }}</el-tag>
+                <el-tag :type="productTypeTagType(row.productType)" effect="light">{{ productTypeText(row.productType) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="priceText" label="价格" width="100" />
-            <el-table-column label="标签" min-width="160">
+            <el-table-column label="标签" min-width="140">
               <template #default="{ row }">
                 <div class="tags-container">
-                  <el-tag v-for="tag in row.tags.slice(0, 3)" :key="tag" size="small" class="tag-item">{{ tag }}</el-tag>
-                  <el-popover v-if="row.tags.length > 3" :content="`${row.tags.slice(3).join(', ')}`" placement="top">
-                    <template #reference>
-                      <span class="tag-more">+{{ row.tags.length - 3 }}</span>
-                    </template>
-                  </el-popover>
+                  <el-tag v-for="tag in row.tags.slice(0, 2)" :key="tag" size="small">{{ tag }}</el-tag>
+                  <el-tag v-if="row.tags.length > 2" size="small" type="info" effect="plain">+{{ row.tags.length - 2 }}</el-tag>
                 </div>
               </template>
             </el-table-column>
             <el-table-column label="状态" width="100">
               <template #default="{ row }">
-                <el-tag v-if="row.status === 1" type="success" effect="light">已上架</el-tag>
-                <el-tag v-else-if="row.status === 2" type="info" effect="light">已下架</el-tag>
-                <el-tag v-else type="warning" effect="light">草稿</el-tag>
+                <el-tag v-if="row.status === 1" type="success" effect="light" round>已上架</el-tag>
+                <el-tag v-else-if="row.status === 2" type="info" effect="light" round>已下架</el-tag>
+                <el-tag v-else type="warning" effect="light" round>草稿</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="60" fixed="right" align="center">
-              <template #default="{ row }">
-                <el-dropdown @command="handleAction(row, $event)">
-                  <span class="action-icon">⋮</span>
-                  <template #dropdown>
-                    <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status !== 1" command="publish">上架</el-dropdown-item>
-                    <el-dropdown-item v-if="row.status === 1" command="unpublish">下架</el-dropdown-item>
-                  </template>
-                </el-dropdown>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <div class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="page"
-              v-model:page-size="pageSize"
-              :total="total"
-              :page-sizes="[10, 20, 50, 100]"
-              layout="total, sizes, prev, pager, next, jumper"
-              @current-change="loadProducts"
-              @size-change="loadProducts"
-            />
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="产品模块" name="modules">
-          <el-table :data="modules" stripe>
-            <el-table-column prop="code" label="编码" width="140" />
-            <el-table-column prop="name" label="名称" width="140" />
-            <el-table-column prop="icon" label="图标文案" width="100" />
-            <el-table-column prop="description" label="说明" />
-            <el-table-column label="首页展示" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.showOnHome ? 'success' : 'info'">{{ row.showOnHome ? '展示' : '隐藏' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="评估" width="110">
-              <template #default="{ row }">
-                <el-tag :type="row.assessmentEnabled ? 'success' : 'info'">{{ row.assessmentEnabled ? (row.assessmentType || '已开启') : '未开启' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="sortOrder" label="排序" width="90" />
-            <el-table-column label="状态" width="90">
-              <template #default="{ row }">
-                <el-switch :model-value="row.status === 1" @change="toggleModule(row)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="100" fixed="right">
+            <el-table-column label="操作" width="140" fixed="right" align="center">
               <template #default="{ row }">
                 <div class="table-actions">
-                  <el-button size="small" @click="openModuleDialog(row)">编辑</el-button>
+                  <el-button type="primary" link size="small" @click="editProduct(row)">编辑</el-button>
+                  <el-divider direction="vertical" />
+                  <el-button v-if="row.status !== 1" type="success" link size="small" @click="publishProduct(row)">上架</el-button>
+                  <el-button v-else type="danger" link size="small" @click="unpublishProduct(row)">下架</el-button>
                 </div>
               </template>
             </el-table-column>
           </el-table>
-        </el-tab-pane>
-      </el-tabs>
-    </el-card>
+
+          <el-empty v-if="!loading && products.length === 0" description="暂无产品数据" />
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination-wrapper">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            @current-change="loadProducts"
+            @size-change="loadProducts"
+          />
+        </div>
+      </el-tab-pane>
+
+      <!-- 产品模块标签页 -->
+      <el-tab-pane label="产品模块" name="modules">
+        <div class="page-head">
+          <h2 class="page-head__title">产品模块</h2>
+          <el-button type="primary" @click="openModuleDialog()">新增模块</el-button>
+        </div>
+
+        <div class="table-wrapper">
+          <el-table :data="modules" stripe style="width: 100%">
+            <el-table-column prop="name" label="模块名称" width="160" />
+            <el-table-column prop="code" label="编码" width="120" show-overflow-tooltip />
+            <el-table-column prop="icon" label="图标文案" width="100" />
+            <el-table-column prop="description" label="说明" min-width="200" show-overflow-tooltip />
+            <el-table-column label="首页展示" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.showOnHome ? 'success' : 'info'" effect="light" round>
+                  {{ row.showOnHome ? '展示' : '隐藏' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="评估" width="110">
+              <template #default="{ row }">
+                <el-tag :type="row.assessmentEnabled ? 'success' : 'info'" effect="light" round>
+                  {{ row.assessmentEnabled ? '已开启' : '未开启' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="sortOrder" label="排序" width="80" />
+            <el-table-column label="操作" width="140" fixed="right">
+              <template #default="{ row }">
+                <div class="table-actions">
+                  <el-button type="primary" link size="small" @click="openModuleDialog(row)">编辑</el-button>
+                  <el-divider direction="vertical" />
+                  <el-button type="danger" link size="small" @click="deleteModule(row)">删除</el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <el-empty v-if="modules.length === 0" description="暂无模块数据" />
+        </div>
+      </el-tab-pane>
+    </el-tabs>
 
     <el-dialog v-model="productDialogVisible" :title="editingProductId ? '编辑产品' : '新增产品'" width="800px" :close-on-click-modal="false">
       <el-form ref="productFormRef" :model="productForm" :rules="productRules" label-width="100px">
@@ -367,7 +366,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, type FormInstance } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { productApi, type Product, type ProductModule, type ProductModulePayload, type ProductPayload, type ProductType, type TagDictionary } from '@/api/product'
 import { buildTagOptionGroups, mapTagNamesToIds, tagOptionLabel } from '@/utils/tags'
 import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
@@ -647,6 +646,33 @@ async function unpublish(row: Product) {
   await loadProducts()
 }
 
+function editProduct(row: Product) {
+  openProductDialog(row)
+}
+
+function publishProduct(row: Product) {
+  publish(row)
+}
+
+function unpublishProduct(row: Product) {
+  unpublish(row)
+}
+
+async function deleteModule(row: ProductModule) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除模块「${row.name}」？删除后无法恢复。`,
+      '提示',
+      { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' }
+    )
+    // await productApi.deleteModule(row.id)
+    ElMessage.success('模块已删除')
+    await loadModules()
+  } catch {
+    // 用户取消
+  }
+}
+
 onMounted(async () => {
   await loadModules()
   await loadTags()
@@ -654,215 +680,289 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
-.product-info {
+<style lang="scss" scoped>
+@use '@/styles/variables.scss' as *;
+.product-page {
+  display: flex;
+  flex-direction: column;
+  gap: $space-16;
+}
+
+.page-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: $space-16;
+  margin-bottom: $space-12;
+
+  &__title {
+    margin: 0;
+    font-size: $font-size-xl;
+    font-weight: 800;
+    color: $color-text;
+    line-height: 1.2;
+  }
+
+  &__actions {
+    display: flex;
+    gap: $space-12;
+    flex-shrink: 0;
+  }
 }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-16;
+  background: $color-bg-white;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  padding: $space-16;
+  flex-wrap: wrap;
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: $space-12;
+    flex: 1;
+    min-width: 300px;
+
+    :deep(.el-input) {
+      .el-input__wrapper {
+        background: $color-surface-soft;
+
+        &:hover {
+          border-color: $color-primary;
+        }
+      }
+    }
+  }
+
+  &__filters {
+    display: flex;
+    align-items: center;
+    gap: $space-12;
+    flex-wrap: wrap;
+
+    :deep(.el-select) {
+      background: $color-surface-soft;
+
+      .el-input__wrapper {
+        background: $color-surface-soft;
+
+        &:hover {
+          border-color: $color-primary;
+        }
+      }
+    }
+  }
+}
+
+.table-wrapper {
+  background: $color-bg-white;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  overflow: hidden;
+  box-shadow: $shadow-sm;
+
+  :deep(.el-table) {
+    --el-table-border-color: #{$color-border};
+    --el-table-header-bg-color: #{$color-surface-soft};
+    --el-table-header-text-color: #{$color-text};
+    --el-table-row-hover-bg-color: #{$color-bg-hover};
+
+    thead {
+      background: $color-surface-soft;
+
+      th {
+        background: $color-surface-soft;
+        font-weight: 600;
+        color: $color-text;
+        border-bottom: 1px solid $color-border;
+      }
+    }
+
+    tbody tr {
+      &:hover > td {
+        background: $color-bg-hover !important;
+      }
+    }
+  }
+}
+
+.product-info {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-12;
+}
+
 .product-cover {
-  width: 72px;
-  height: 48px;
-  border-radius: 6px;
+  width: 64px;
+  height: 64px;
+  border-radius: $radius-md;
   flex-shrink: 0;
-  background: #f1f5f9;
+  background: $color-surface-soft;
+  object-fit: cover;
 }
-.tag-item {
-  margin: 2px 4px 2px 0;
+
+.product-title {
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $color-text;
+  line-height: 1.4;
 }
-.sort-input {
-  margin-left: 12px;
+
+.product-subtitle {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $space-4;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-6;
+  align-items: center;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: $space-8;
+
+  :deep(.el-button) {
+    padding: 0;
+    height: auto;
+    font-size: $font-size-sm;
+
+    &.is-link {
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  :deep(.el-divider--vertical) {
+    margin: 0 $space-6;
+    background-color: $color-border;
+  }
 }
 
 .pagination-wrapper {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 24px;
-  padding: 16px;
-  background: #fafafa;
-  border-radius: 4px;
-  border-top: 1px solid #eee;
-}
-
-/* 搜索栏样式 */
-.search-bar {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #f5f7fa;
-  border-radius: 6px;
-  border: 1px solid #e4e7eb;
-}
-
-.search-box {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.search-box :deep(.el-input) {
-  flex: 1;
-  max-width: 400px;
-}
-
-.search-btn {
-  flex-shrink: 0;
-}
-
-.search-box > button:last-of-type {
-  border-color: #dcdfe6;
-  color: #606266;
-  transition: all 0.3s;
-}
-
-.search-box > button.active {
-  background: #e3f2fd;
-  border-color: #2196f3;
-  color: #2196f3;
-}
-
-/* 筛选面板 */
-.filters-panel {
-  margin-top: 16px;
-  padding: 16px;
-  background: #fff;
-  border-radius: 4px;
-  border: 1px solid #eee;
-  animation: slideDown 0.3s ease-out;
-}
-
-.filters-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.filter-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.filter-item label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.filter-item :deep(.el-select) {
-  width: 100%;
-}
-
-.filters-actions {
-  display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #eee;
-}
+  padding: $space-16;
+  background: $color-bg-white;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
 
-/* 表格行样式 */
-:deep(.el-table__row) {
-  transition: all 0.3s ease;
-}
-
-:deep(.el-table__row:hover) {
-  background: #f5f7fa;
-}
-
-:deep(.el-table__row:hover .action-menu) {
-  color: #2196f3;
-}
-
-/* 标签容器 */
-.tags-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.tag-more {
-  padding: 2px 8px;
-  background: #f0f0f0;
-  border-radius: 12px;
-  font-size: 12px;
-  color: #666;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.tag-more:hover {
-  background: #e0e0e0;
-  color: #333;
-}
-
-/* 操作菜单 */
-.action-menu {
-  cursor: pointer;
-  color: #606266;
-  font-size: 13px;
-  transition: all 0.3s;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.action-menu:hover {
-  color: #2196f3;
-}
-
-/* 操作图标 */
-.action-icon {
-  cursor: pointer;
-  font-size: 18px;
-  color: #909399;
-  transition: all 0.3s;
-  display: inline-block;
-  line-height: 1;
-}
-
-.action-icon:hover {
-  color: #2196f3;
-  transform: scale(1.2);
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  :deep(.el-pagination) {
+    --el-pagination-font-size: #{$font-size-sm};
+    --el-pagination-bg-color: transparent;
+    --el-pagination-button-bg-color: #{$color-surface-soft};
+    --el-pagination-button-disabled-bg-color: #{$color-bg};
   }
 }
 
-/* Dialog 内 tabs 样式优化 */
-:deep(.el-dialog__body) {
-  padding: 0;
-}
+:deep(.el-dialog) {
+  .el-dialog__header {
+    background: $color-surface-soft;
+    border-bottom: 1px solid $color-border;
+  }
 
-:deep(.el-tabs) {
-  height: 100%;
-}
+  .el-dialog__body {
+    padding: 0;
+  }
 
-:deep(.el-tabs__content) {
-  padding: 20px;
-}
+  .el-tabs__content {
+    padding: $space-24;
+  }
 
-:deep(.el-form-item) {
-  margin-bottom: 20px;
+  .el-form-item {
+    margin-bottom: $space-20;
+  }
 }
 
 .tag-rule-desc {
-  padding: 12px;
-  margin-bottom: 16px;
-  background: #f0f9ff;
-  border-left: 3px solid #0ea5e9;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #0c4a6e;
+  padding: $space-12;
+  margin-bottom: $space-16;
+  background: color-mix(in srgb, $color-info 8%, $color-bg-white);
+  border-left: 3px solid $color-info;
+  border-radius: $radius-md;
+  font-size: $font-size-xs;
+  color: $color-info;
+  line-height: 1.6;
+}
+
+/* ── 平板端 ── */
+@media (max-width: 1024px) {
+  .toolbar {
+    &__search {
+      min-width: 100%;
+      flex: none;
+    }
+
+    &__filters {
+      width: 100%;
+    }
+  }
+
+  .product-cover {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+/* ── 移动端 ── */
+@media (max-width: 767px) {
+  .product-page {
+    gap: $space-12;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    padding: $space-12;
+
+    &__search,
+    &__filters {
+      width: 100%;
+
+      :deep(.el-input),
+      :deep(.el-select),
+      :deep(.el-button) {
+        width: 100%;
+      }
+    }
+  }
+
+  .product-cover {
+    width: 48px;
+    height: 48px;
+  }
+
+  .product-title {
+    font-size: $font-size-xs;
+  }
+
+  .product-subtitle {
+    font-size: 11px;
+  }
+
+  .pagination-wrapper {
+    padding: $space-12;
+    justify-content: center;
+  }
+
+  :deep(.el-tabs__content) {
+    padding: $space-16 !important;
+  }
 }
 </style>

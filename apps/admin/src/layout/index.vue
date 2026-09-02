@@ -12,8 +12,9 @@
       direction="ltr"
       :size="280"
       :with-header="false"
+      aria-label="导航菜单"
     >
-      <aside class="layout__sidebar layout__sidebar--drawer">
+      <aside class="layout__sidebar layout__sidebar--drawer" role="navigation" aria-label="主导航菜单">
         <div class="layout__brand">
           <span class="layout__brand-icon">B</span>
           <span class="layout__brand-text">
@@ -69,7 +70,15 @@
     <div class="layout__body">
       <header class="layout__header">
         <div class="layout__breadcrumb">
-          <h1 class="layout__page-title">{{ route.meta.title || '管理后台' }}</h1>
+          <!-- 面包屑导航 -->
+          <div class="breadcrumb" v-if="breadcrumbs.length">
+            <router-link v-for="(crumb, i) in breadcrumbs" :key="crumb.path" :to="crumb.path" class="breadcrumb__item">
+              {{ crumb.title }}
+            </router-link>
+          </div>
+
+          <!-- 页面标题自动从菜单项获取 -->
+          <h1 class="layout__page-title">{{ currentMenu?.title || '管理后台' }}</h1>
           <p class="layout__page-desc">{{ currentMenu?.desc || '管理平台业务配置与运营数据' }}</p>
         </div>
         <div class="layout__header-right">
@@ -139,6 +148,9 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
+// 深色模式状态
+const isDarkMode = ref(false)
+
 // 移动端检测
 const windowWidth = ref(window.innerWidth)
 const isMobile = computed(() => windowWidth.value < 768)
@@ -189,6 +201,21 @@ const menuSections: MenuSection[] = [
 const menuItems = computed(() => menuSections.flatMap(section => section.items))
 const currentMenu = computed(() => menuItems.value.find(item => isActiveMenu(item.path)))
 
+const breadcrumbs = computed(() => {
+  const items: Array<{ title: string; path: string }> = []
+  const current = menuItems.value.find(item => isActiveMenu(item.path))
+
+  if (current && current.path !== '/dashboard') {
+    const section = menuSections.find(s => s.items.includes(current as any))
+    if (section) {
+      items.push({ title: '管理后台', path: '/dashboard' })
+      items.push({ title: section.title, path: current.path })
+    }
+  }
+
+  return items
+})
+
 const isActiveMenu = (path: string) => {
   return route.path === path || route.path.startsWith(`${path}/`)
 }
@@ -197,6 +224,39 @@ const handleLogout = () => {
   authStore.clear()
   router.replace('/login')
 }
+
+// 深色模式切换
+const toggleDarkMode = (): void => {
+  isDarkMode.value = !isDarkMode.value
+  if (isDarkMode.value) {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    localStorage.setItem('theme', 'dark')
+  } else {
+    document.documentElement.removeAttribute('data-theme')
+    localStorage.setItem('theme', 'light')
+  }
+}
+
+// 初始化深色模式
+const initDarkMode = (): void => {
+  const savedTheme = localStorage.getItem('theme')
+  if (savedTheme === 'dark') {
+    isDarkMode.value = true
+    document.documentElement.setAttribute('data-theme', 'dark')
+  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches && !savedTheme) {
+    isDarkMode.value = true
+    document.documentElement.setAttribute('data-theme', 'dark')
+  }
+}
+
+onMounted(() => {
+  initDarkMode()
+  window.addEventListener('resize', updateWidth)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateWidth)
+})
 </script>
 
 <style scoped lang="scss">
@@ -205,9 +265,7 @@ const handleLogout = () => {
 .layout {
   display: flex;
   height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(245, 247, 248, 0) 260px),
-    $color-bg;
+  @include bg-scheme($color-bg, $dark-color-bg);
 }
 
 /* ── 侧边栏 ── */
@@ -217,70 +275,99 @@ const handleLogout = () => {
   background:
     linear-gradient(180deg, rgba(20, 184, 166, 0.08) 0%, rgba(17, 24, 39, 0) 220px),
     $color-sidebar;
+  @include dark-mode {
+    background:
+      linear-gradient(180deg, rgba(20, 184, 166, 0.08) 0%, rgba(15, 23, 42, 0) 220px),
+      $dark-color-sidebar;
+  }
   border-right: 1px solid rgba(255, 255, 255, 0.06);
+  @include dark-mode {
+    border-right-color: rgba(255, 255, 255, 0.1);
+  }
   display: flex;
   flex-direction: column;
   color: #fff;
+  transition: width $transition-base;
 }
 
 .layout__brand {
-  height: 76px;
+  height: $space-32 + $space-20;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 22px;
+  gap: $space-12;
+  padding: 0 $space-20;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .layout__brand-icon {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
-  border-radius: 8px;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  border-radius: $radius-md;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-weight: bold;
+  font-weight: 700;
   font-size: 16px;
-  box-shadow: 0 10px 26px rgba(20, 184, 166, 0.22);
+  box-shadow: $shadow-lg;
+  flex-shrink: 0;
 }
 
 .layout__brand-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: $space-2;
+  min-width: 0;
 }
 
 .layout__brand-name {
-  font-size: 16px;
+  font-size: $font-size-md;
   font-weight: 700;
   color: #fff;
   line-height: 1;
 }
 
 .layout__brand-sub {
-  font-size: 12px;
+  font-size: $font-size-xs;
   color: $color-sidebar-muted;
+  line-height: 1;
 }
 
 .layout__nav {
   flex: 1;
-  padding: 14px 12px 18px;
+  padding: $space-14 $space-12 $space-18;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: $space-12;
   overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  }
 }
 
 .layout__nav-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: $space-4;
 }
 
 .layout__nav-section-title {
-  padding: 8px 12px 6px;
+  padding: $space-8 $space-12 $space-6;
   color: rgba(255, 255, 255, 0.42);
   font-size: 11px;
   font-weight: 700;
@@ -291,14 +378,15 @@ const handleLogout = () => {
 .layout__nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 14px;
+  gap: $space-10;
+  padding: $space-12 $space-14;
   min-height: 42px;
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.70);
-  font-size: 14px;
+  border-radius: $radius-md;
+  border-left: 3px solid transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: $font-size-sm;
   text-decoration: none;
-  transition: background 0.16s, color 0.16s, transform 0.16s;
+  transition: background $transition-base, color $transition-base, border-color $transition-base;
 }
 
 .layout__nav-item:hover {
@@ -307,11 +395,10 @@ const handleLogout = () => {
 }
 
 .layout__nav-item.active {
-  background: rgba(255, 255, 255, 0.96);
-  color: $color-primary-dark;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-left-color: $color-primary-light;
   font-weight: 600;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
-  transform: translateX(2px);
 }
 
 .layout__nav-icon {
@@ -328,50 +415,103 @@ const handleLogout = () => {
 }
 
 .layout__header {
-  min-height: 82px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(14px);
+  min-height: 72px;
+  background: $color-bg-white;
+  @include dark-mode {
+    background: $dark-color-bg-white;
+  }
   border-bottom: 1px solid $color-border;
+  @include dark-mode {
+    border-bottom-color: $dark-color-border;
+  }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 30px;
+  padding: $space-16 $space-24;
   flex-shrink: 0;
+  box-shadow: $shadow-sm;
+  @include dark-mode {
+    box-shadow: $dark-shadow-sm;
+  }
+}
+
+.layout__breadcrumb {
+  flex: 1;
+  min-width: 0;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: $space-8;
+  margin-bottom: $space-8;
+  font-size: $font-size-xs;
+
+  &__item {
+    @include color-scheme($color-text-tertiary, $dark-color-text-tertiary);
+    text-decoration: none;
+    transition: color $transition-fast;
+    display: inline-flex;
+    align-items: center;
+
+    &:hover {
+      @include color-scheme($color-primary, $dark-color-primary);
+    }
+
+    &:after {
+      content: '/';
+      margin-left: $space-8;
+      margin-right: $space-8;
+    }
+
+    &:last-child {
+      @include color-scheme($color-text, $dark-color-text);
+      font-weight: 600;
+      cursor: default;
+      pointer-events: none;
+
+      &:after {
+        content: '';
+        margin: 0;
+      }
+    }
+  }
 }
 
 .layout__page-title {
-  font-size: 20px;
+  font-size: $font-size-xl;
   font-weight: 800;
-  color: $color-text;
+  @include color-scheme($color-text, $dark-color-text);
   margin: 0;
   line-height: 1.2;
 }
 
 .layout__page-desc {
-  margin: 7px 0 0;
-  color: $color-text-tertiary;
-  font-size: 13px;
-  line-height: 1.3;
+  margin: $space-6 0 0;
+  @include color-scheme($color-text-tertiary, $dark-color-text-tertiary);
+  font-size: $font-size-xs;
+  line-height: 1.5;
 }
 
 .layout__header-right {
   display: flex;
   align-items: center;
+  gap: $space-12;
 }
 
 .layout__user {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: $space-8;
   cursor: pointer;
-  padding: 6px 10px 6px 6px;
-  border-radius: 8px;
+  padding: $space-8 $space-12;
+  border-radius: $radius-md;
   border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background $transition-fast, border-color $transition-fast;
 }
 
 .layout__user:hover {
-  background: $color-surface-soft;
+  background: $color-bg-hover;
   border-color: $color-border;
 }
 
@@ -379,70 +519,111 @@ const handleLogout = () => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #111827 0%, #0f766e 100%);
+  background: linear-gradient(135deg, $color-sidebar 0%, $color-primary 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: $font-size-xs;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .layout__user-name {
-  font-size: 14px;
-  color: $color-text;
+  font-size: $font-size-sm;
+  @include color-scheme($color-text, $dark-color-text);
   font-weight: 600;
 }
 
 .layout__main {
   flex: 1;
   overflow-y: auto;
-  padding: 26px 30px 34px;
-  max-width: 1480px;
-  width: 100%;
-  margin: 0 auto;
+  padding: $space-24 $space-24 $space-32;
+  @include bg-scheme($color-bg, $dark-color-bg);
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    @include dark-mode {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    border-radius: 4px;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.2);
+      @include dark-mode {
+        background: rgba(255, 255, 255, 0.3);
+      }
+    }
+  }
 }
 
 /* ── 汉堡按钮（移动端） ── */
 .layout__hamburger {
   position: fixed;
-  top: 12px;
-  left: 12px;
+  top: $space-12;
+  left: $space-12;
   z-index: 2001;
   width: 40px;
   height: 40px;
   border: none;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(28, 25, 23, 0.12);
+  background: $color-bg-white;
+  border-radius: $radius-md;
+  box-shadow: $shadow-md;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: $color-text;
   font-size: 18px;
+  transition: background $transition-fast;
+
+  &:hover {
+    background: $color-bg-hover;
+  }
 }
 
 /* drawer内侧边栏填满高度 */
 .layout__sidebar--drawer {
   height: 100%;
-  width: 280px;
   overflow-y: auto;
 }
 
-/* ── 移动端布局 ── */
-@media (max-width: 767px) {
+/* ── 平板端布局 (768px - 1024px) ── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .layout__main {
+    padding: $space-20 $space-20 $space-28;
+  }
+
   .layout__header {
-    min-height: 64px;
-    padding: 10px 16px 10px 60px; // 给汉堡按钮留位
+    padding: $space-14 $space-20;
+  }
+}
+
+/* ── 移动端布局 (< 768px) ── */
+@media (max-width: 767px) {
+  .layout__hamburger {
+    display: flex;
+  }
+
+  .layout__header {
+    min-height: 60px;
+    padding: $space-12 $space-16 $space-12 54px;
   }
 
   .layout__main {
-    padding: 16px;
+    padding: $space-16;
   }
 
   .layout__page-title {
-    font-size: 15px;
+    font-size: $font-size-lg;
   }
 
   .layout__page-desc {
@@ -450,7 +631,7 @@ const handleLogout = () => {
   }
 
   .layout__user-name {
-    display: none; // 移动端只显示头像
+    display: none;
   }
 }
 </style>

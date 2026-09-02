@@ -3,27 +3,47 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { router } from '@/router/routes'
 import type { ApiResponse } from '@blisstribe/shared'
+import { performanceMonitor } from './performance'
+
+const requestMeasureNames = new WeakMap<object, string>()
 
 const service: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 15000,
 })
 
-// 请求拦截：携带 Token
+// 请求拦截：携带 Token + 性能监控
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const authStore = useAuthStore()
     if (authStore.token) {
       config.headers.Authorization = authStore.token
     }
+
+    // 开始性能测量
+    const requestId = `${config.method?.toUpperCase()}_${config.url}_${Date.now()}`
+    const measureName = `api_${requestId}`
+    requestMeasureNames.set(config, measureName)
+    performanceMonitor.startMeasure(measureName, {
+      method: config.method,
+      url: config.url,
+    })
+
     return config
   },
   (error) => Promise.reject(error)
 )
 
-// 响应拦截：统一处理 code，返回业务数据 T
+// 响应拦截：统一处理 code，返回业务数据 T + 性能记录
 service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse<unknown>>) => {
+    // 记录 API 响应时间
+    const measureName = requestMeasureNames.get(response.config)
+    if (measureName) {
+      performanceMonitor.endMeasure(measureName)
+      requestMeasureNames.delete(response.config)
+    }
+
     const body = response.data
     if (body.code === 200) {
       // 返回业务数据，覆盖 AxiosResponse 包装
@@ -41,6 +61,15 @@ service.interceptors.response.use(
     return Promise.reject(new Error(body.message))
   },
   (error) => {
+    const config = error.config
+    if (config) {
+      const measureName = requestMeasureNames.get(config)
+      if (measureName) {
+        performanceMonitor.endMeasure(measureName)
+        requestMeasureNames.delete(config)
+      }
+    }
+
     const body = error.response?.data
     if (body?.code === 401001 || body?.code === 401002 || body?.code === 401003) {
       const authStore = useAuthStore()

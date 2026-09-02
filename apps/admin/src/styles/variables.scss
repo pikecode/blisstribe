@@ -1,33 +1,140 @@
 // 主题变量：运营后台使用中性灰和深青绿，强调可信、清晰和可持续运营。
+
+/* ── 色彩体系 ── */
 $color-primary: #0f766e;
 $color-primary-light: #14b8a6;
 $color-primary-dark: #115e59;
 $color-danger: #d92d20;
+$color-danger-light: #f97066;
 $color-warning: #b45309;
+$color-warning-light: #f59e0b;
 $color-success: #039855;
+$color-success-light: #6ee7b7;
 $color-info: #2563eb;
+$color-info-light: #60a5fa;
 
+/* ── 文字色 ── */
 $color-text: #111827;
 $color-text-secondary: #4b5563;
 $color-text-tertiary: #8a94a6;
+$color-text-disabled: #d1d5db;
 
+/* ── 背景色 ── */
 $color-bg: #f5f7f8;
 $color-bg-white: #ffffff;
+$color-bg-hover: #f3f4f6;
+$color-bg-active: #e5e7eb;
 
+/* ── 边框色 ── */
 $color-border: #e5e7eb;
 $color-border-strong: #cbd5e1;
 $color-surface-soft: #f8fafc;
+
+/* ── 侧边栏 ── */
 $color-sidebar: #111827;
 $color-sidebar-muted: #9ca3af;
 
+/* ── 深色模式 ── */
+$dark-color-primary: #14b8a6;
+$dark-color-text: #f3f4f6;
+$dark-color-text-secondary: #d1d5db;
+$dark-color-text-tertiary: #9ca3af;
+$dark-color-bg: #0f172a;
+$dark-color-bg-white: #1e293b;
+$dark-color-bg-hover: #334155;
+$dark-color-bg-active: #475569;
+$dark-color-border: #334155;
+$dark-color-border-strong: #64748b;
+$dark-color-surface-soft: #1e293b;
+$dark-color-sidebar: #0f172a;
+$dark-color-sidebar-muted: #64748b;
+
+/* ── 圆角 ── */
 $radius-sm: 4px;
 $radius-md: 8px;
 $radius-lg: 12px;
+$radius-xl: 16px;
 
+/* ── 字体大小 ── */
 $font-size-xs: 12px;
 $font-size-sm: 14px;
 $font-size-md: 16px;
 $font-size-lg: 18px;
 $font-size-xl: 20px;
 
+/* ── 间距系统 ── */
+$space-2: 2px;
+$space-4: 4px;
+$space-6: 6px;
+$space-8: 8px;
+$space-10: 10px;
+$space-12: 12px;
+$space-14: 14px;
+$space-16: 16px;
+$space-18: 18px;
+$space-20: 20px;
+$space-24: 24px;
+$space-28: 28px;
+$space-32: 32px;
+
+/* ── 阴影系统 ── */
+$shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.04);
+$shadow-md: 0 4px 6px rgba(17, 24, 39, 0.08);
+$shadow-lg: 0 8px 16px rgba(17, 24, 39, 0.12);
+$shadow-xl: 0 10px 28px rgba(17, 24, 39, 0.16);
+$shadow-2xl: 0 20px 40px rgba(17, 24, 39, 0.2);
+
+/* ── 深色模式阴影 ── */
+$dark-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+$dark-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+$dark-shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
+$dark-shadow-xl: 0 10px 28px rgba(0, 0, 0, 0.6);
+$dark-shadow-2xl: 0 20px 40px rgba(0, 0, 0, 0.7);
+
+/* ── 过渡 ── */
+$transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+$transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+$transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+/* ── 断点 ── */
 $breakpoint-mobile: 767px;
+$breakpoint-tablet: 1024px;
+$breakpoint-desktop: 1440px;
+
+/* ── 深色模式工具 mixin ── */
+@mixin dark-mode {
+  @media (prefers-color-scheme: dark) {
+    @content;
+  }
+
+  [data-theme='dark'] & {
+    @content;
+  }
+}
+
+@mixin light-mode {
+  @media (prefers-color-scheme: light) {
+    @content;
+  }
+
+  [data-theme='light'] & {
+    @content;
+  }
+}
+
+/* ── 深色模式色彩映射 ── */
+@mixin color-scheme($light-color, $dark-color) {
+  color: $light-color;
+
+  @include dark-mode {
+    color: $dark-color;
+  }
+}
+
+@mixin bg-scheme($light-color, $dark-color) {
+  background-color: $light-color;
+
+  @include dark-mode {
+    background-color: $dark-color;
+  }
+}

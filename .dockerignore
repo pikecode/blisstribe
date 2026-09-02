@@ -6,6 +6,7 @@ dist
 .DS_Store
 *.log
 .env
+.env.*
 apps/api/.env
 apps/api/uploads
 coverage

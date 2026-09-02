@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core'
 import { ValidationPipe, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { NestExpressApplication } from '@nestjs/platform-express'
-import { join } from 'path'
+import { isAbsolute, join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
 import { AppModule } from './app.module'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
@@ -18,7 +18,7 @@ async function bootstrap(): Promise<void> {
 
   // 静态文件服务：上传目录
   const uploadDir = configService.get<string>('UPLOAD_DIR', './uploads')
-  const absoluteUploadDir = join(process.cwd(), uploadDir)
+  const absoluteUploadDir = isAbsolute(uploadDir) ? uploadDir : join(process.cwd(), uploadDir)
   if (!existsSync(absoluteUploadDir)) {
     mkdirSync(absoluteUploadDir, { recursive: true })
   }
