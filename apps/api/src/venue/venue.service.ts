@@ -172,6 +172,96 @@ export class VenueService {
     return this.toFacilityVO(row)
   }
 
+  async getSchedule(id: bigint, params: { startDate?: string; days?: number }) {
+    const venue = await this.prisma.venue.findFirst({
+      where: { id, deletedAt: null },
+      include: this.include(),
+    })
+    if (!venue) throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '场地不存在')
+    const startDate = this.startOfDay(params.startDate ? new Date(params.startDate) : new Date())
+    const days = Math.min(Math.max(params.days || 14, 1), 60)
+    const endDate = new Date(startDate)
+    endDate.setDate(startDate.getDate() + days)
+    const activities = await this.prisma.activity.findMany({
+      where: {
+        venueId: id,
+        deletedAt: null,
+        status: { in: [0, 1] },
+        startAt: { lt: endDate },
+        endAt: { gt: startDate },
+      },
+      select: { id: true, title: true, activityType: true, status: true, startAt: true, endAt: true },
+      orderBy: [{ startAt: 'asc' }],
+    })
+    const scheduleDays = Array.from({ length: days }).map((_, index) => {
+      const dayStart = new Date(startDate)
+      dayStart.setDate(startDate.getDate() + index)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayStart.getDate() + 1)
+      const weekday = this.weekday(dayStart)
+      const dayAvailability = venue.availability.filter((item) => item.weekday === weekday)
+      const activeAvailability = dayAvailability.filter((item) => item.status === 1)
+      const dayBlockedSlots = venue.blockedSlots.filter((item) => this.overlaps(dayStart, dayEnd, item.startAt, item.endAt))
+      const dayActivities = activities.filter((item) => this.overlaps(dayStart, dayEnd, item.startAt, item.endAt))
+      return {
+        date: this.dateKey(dayStart),
+        weekday,
+        availability: dayAvailability.map((item) => ({
+          id: Number(item.id),
+          startTime: item.startTime,
+          endTime: item.endTime,
+          status: item.status,
+        })),
+        blockedSlots: dayBlockedSlots.map((item) => ({
+          id: Number(item.id),
+          startAt: item.startAt.toISOString(),
+          endAt: item.endAt.toISOString(),
+          reason: item.reason,
+        })),
+        activities: dayActivities.map((item) => ({
+          id: Number(item.id),
+          title: item.title,
+          activityType: item.activityType,
+          status: item.status,
+          startAt: item.startAt.toISOString(),
+          endAt: item.endAt.toISOString(),
+        })),
+        state: this.scheduleState(activeAvailability.length, dayBlockedSlots.length, dayActivities.length),
+      }
+    })
+    return { venue: this.toVO(venue), days: scheduleDays }
+  }
+
+  async checkAvailability(params: {
+    venueId: bigint
+    activityId?: bigint
+    startAt?: string
+    endAt?: string
+    capacity?: number
+  }) {
+    if (!params.startAt || !params.endAt) return { available: false, message: '请选择活动时间' }
+    const startAt = new Date(params.startAt)
+    const endAt = new Date(params.endAt)
+    if (!Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime()) || endAt <= startAt) {
+      return { available: false, message: '活动结束时间必须晚于开始时间' }
+    }
+    try {
+      await this.ensureAvailableForActivity({
+        venueId: params.venueId,
+        activityId: params.activityId,
+        startAt,
+        endAt,
+        capacity: params.capacity,
+      })
+      return { available: true, message: '场地时间可用' }
+    } catch (error) {
+      if (error instanceof BusinessException) {
+        return { available: false, message: error.message }
+      }
+      throw error
+    }
+  }
+
   async ensureAvailableForActivity(params: {
     venueId?: bigint | null
     activityId?: bigint
@@ -366,6 +456,25 @@ export class VenueService {
 
   private overlaps(startA: Date, endA: Date, startB: Date, endB: Date) {
     return startA.getTime() < endB.getTime() && endA.getTime() > startB.getTime()
+  }
+
+  private startOfDay(date: Date) {
+    const value = new Date(date)
+    value.setHours(0, 0, 0, 0)
+    return value
+  }
+
+  private dateKey(date: Date) {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  private scheduleState(availabilityCount: number, blockedCount: number, activityCount: number) {
+    if (!availabilityCount) return 'closed'
+    if (blockedCount || activityCount) return 'busy'
+    return 'free'
   }
 
   private include() {

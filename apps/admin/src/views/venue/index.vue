@@ -63,9 +63,10 @@
             <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
+              <el-button size="small" @click="openSchedule(row)">排期</el-button>
               <el-button size="small" @click="openDialog(row)">编辑</el-button>
               <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" plain @click="toggleStatus(row)">
                 {{ row.status === 1 ? '停用' : '启用' }}
@@ -224,6 +225,51 @@
         <el-button type="primary" :loading="facilitySubmitting" @click="submitFacility">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="scheduleDialogVisible" title="场地排期" width="920px">
+      <div class="schedule-toolbar">
+        <div>
+          <div class="schedule-title">{{ scheduleVenue?.name || '-' }}</div>
+          <div class="muted">{{ scheduleVenue ? [scheduleVenue.city, scheduleVenue.district, scheduleVenue.address].filter(Boolean).join(' · ') : '' }}</div>
+        </div>
+        <div class="schedule-toolbar__controls">
+          <el-date-picker v-model="scheduleStartDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" />
+          <el-button :loading="scheduleLoading" @click="loadSchedule">刷新</el-button>
+        </div>
+      </div>
+      <div v-loading="scheduleLoading" class="schedule-grid">
+        <div v-for="day in scheduleDays" :key="day.date" class="schedule-day" :class="`schedule-day--${day.state}`">
+          <div class="schedule-day__head">
+            <div>
+              <div class="schedule-day__date">{{ day.date }}</div>
+              <div class="muted">{{ weekdayText(day.weekday) }}</div>
+            </div>
+            <el-tag :type="scheduleStateType(day.state)" size="small">{{ scheduleStateText(day.state) }}</el-tag>
+          </div>
+          <div class="schedule-day__section">
+            <div class="schedule-day__label">开放时间</div>
+            <div v-if="day.availability.length" class="schedule-day__items">
+              <span v-for="item in day.availability" :key="item.id" :class="{ muted: item.status !== 1 }">
+                {{ item.startTime }}-{{ item.endTime }}{{ item.status === 1 ? '' : '（停用）' }}
+              </span>
+            </div>
+            <div v-else class="muted">无</div>
+          </div>
+          <div v-if="day.activities.length" class="schedule-day__section">
+            <div class="schedule-day__label">活动占用</div>
+            <div class="schedule-day__items">
+              <span v-for="item in day.activities" :key="item.id">{{ formatTime(item.startAt) }} {{ item.title }}</span>
+            </div>
+          </div>
+          <div v-if="day.blockedSlots.length" class="schedule-day__section">
+            <div class="schedule-day__label">不可用</div>
+            <div class="schedule-day__items">
+              <span v-for="item in day.blockedSlots" :key="item.id">{{ formatTime(item.startAt) }}-{{ formatTime(item.endAt) }} {{ item.reason || '未填写原因' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -231,7 +277,15 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { venueApi, weekdayText, type Venue, type VenueFacility, type VenueFacilityPayload, type VenuePayload } from '@/api/venue'
+import {
+  venueApi,
+  weekdayText,
+  type Venue,
+  type VenueFacility,
+  type VenueFacilityPayload,
+  type VenuePayload,
+  type VenueScheduleDay,
+} from '@/api/venue'
 import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
 
 const weekdays = [
@@ -253,8 +307,12 @@ const facilitySubmitting = ref(false)
 const dialogVisible = ref(false)
 const facilityDialogVisible = ref(false)
 const facilityFormVisible = ref(false)
+const scheduleDialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 const facilityEditingId = ref<number | null>(null)
+const scheduleVenue = ref<Venue | null>(null)
+const scheduleDays = ref<VenueScheduleDay[]>([])
+const scheduleLoading = ref(false)
 const activeTab = ref('basic')
 const formRef = ref<FormInstance>()
 const facilityFormRef = ref<FormInstance>()
@@ -265,6 +323,7 @@ const keyword = ref('')
 const city = ref('')
 const status = ref<number | ''>('')
 const facilityKeyword = ref('')
+const scheduleStartDate = ref(dateKey(new Date()))
 
 const defaultForm = (): VenuePayload => ({
   name: '',
@@ -392,6 +451,24 @@ function openFacilityDialog(row?: VenueFacility) {
   facilityFormRef.value?.clearValidate()
 }
 
+async function openSchedule(row: Venue) {
+  scheduleVenue.value = row
+  scheduleDialogVisible.value = true
+  await loadSchedule()
+}
+
+async function loadSchedule() {
+  if (!scheduleVenue.value) return
+  scheduleLoading.value = true
+  try {
+    const result = await venueApi.schedule(scheduleVenue.value.id, { startDate: scheduleStartDate.value, days: 14 })
+    scheduleVenue.value = result.venue
+    scheduleDays.value = result.days
+  } finally {
+    scheduleLoading.value = false
+  }
+}
+
 function addAvailability() {
   form.availability.push({ weekday: 1, startTime: '09:00', endTime: '18:00', status: 1 })
 }
@@ -472,6 +549,29 @@ async function toggleFacilityStatus(row: VenueFacility) {
   await loadVenues()
 }
 
+function dateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function scheduleStateText(value: VenueScheduleDay['state']) {
+  if (value === 'free') return '空闲'
+  if (value === 'busy') return '有占用'
+  return '未开放'
+}
+
+function scheduleStateType(value: VenueScheduleDay['state']) {
+  if (value === 'free') return 'success'
+  if (value === 'busy') return 'warning'
+  return 'info'
+}
+
 onMounted(async () => {
   await Promise.all([loadVenues(), loadFacilities()])
 })
@@ -491,6 +591,79 @@ onMounted(async () => {
 .facility-toolbar {
   justify-content: space-between;
   margin-bottom: 12px;
+}
+
+.schedule-toolbar,
+.schedule-toolbar__controls,
+.schedule-day__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-toolbar {
+  margin-bottom: 14px;
+}
+
+.schedule-title {
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  min-height: 180px;
+}
+
+.schedule-day {
+  min-height: 164px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.schedule-day--free {
+  border-color: #b7ebc6;
+  background: #fbfffc;
+}
+
+.schedule-day--busy {
+  border-color: #f5d59a;
+  background: #fffaf0;
+}
+
+.schedule-day--closed {
+  background: #f7f8fa;
+}
+
+.schedule-day__date {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.schedule-day__section {
+  margin-top: 10px;
+}
+
+.schedule-day__label {
+  margin-bottom: 4px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.schedule-day__items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .venue-cover {

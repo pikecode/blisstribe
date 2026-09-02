@@ -15,7 +15,7 @@
 # - 后台推荐分析
 # - 活动列表和后台报名列表
 # - 活动事件上报和统一分析口径
-# - 场地设施字典、场地列表和活动场地关联
+# - 场地设施字典、场地列表、场地排期、可用性检查和活动场地关联
 
 set -euo pipefail
 
@@ -109,6 +109,7 @@ assert_code_200 "后台场地列表" "$venues_response"
 venue_count="$(printf '%s' "$venues_response" | json_get 'r.data && r.data.list ? r.data.list.length : 0')"
 [ "$venue_count" -gt 0 ] || fail "后台场地列表为空，请先执行 prisma seed"
 pass "场地数量: $venue_count"
+venue_id="$(printf '%s' "$venues_response" | json_get 'r.data && r.data.list && r.data.list[0] && r.data.list[0].id')" || fail "后台场地列表未返回场地 ID"
 venue_facility_id_count="$(printf '%s' "$venues_response" | json_get 'r.data && r.data.list && r.data.list[0] && Array.isArray(r.data.list[0].facilityIds) ? r.data.list[0].facilityIds.length : 0')"
 [ "$venue_facility_id_count" -gt 0 ] || fail "后台场地列表缺少 facilityIds"
 pass "场地关联设施数量: $venue_facility_id_count"
@@ -118,6 +119,12 @@ assert_code_200 "后台场地设施字典" "$venue_facilities_response"
 venue_facility_count="$(printf '%s' "$venue_facilities_response" | json_get 'Array.isArray(r.data) ? r.data.length : 0')"
 [ "$venue_facility_count" -gt 0 ] || fail "后台场地设施字典为空，请先执行 prisma seed"
 pass "场地设施字典数量: $venue_facility_count"
+
+venue_schedule_response="$(request GET "$API_BASE_URL/admin/venues/$venue_id/schedule?days=7" "" "$token")"
+assert_code_200 "后台场地排期" "$venue_schedule_response"
+venue_schedule_count="$(printf '%s' "$venue_schedule_response" | json_get 'r.data && Array.isArray(r.data.days) ? r.data.days.length : 0')"
+[ "$venue_schedule_count" -eq 7 ] || fail "后台场地排期天数异常: $venue_schedule_count"
+pass "场地排期天数: $venue_schedule_count"
 
 public_venues_response="$(request GET "$API_BASE_URL/venues")"
 assert_code_200 "公开场地列表" "$public_venues_response"
@@ -142,6 +149,13 @@ assert_code_200 "后台活动列表" "$admin_activities_response"
 activity_venue_count="$(printf '%s' "$admin_activities_response" | json_get 'r.data && r.data.list ? r.data.list.filter(item => item.venueId && item.venue).length : 0')"
 [ "$activity_venue_count" -gt 0 ] || fail "后台活动列表缺少场地关联活动"
 pass "活动场地关联条目: $activity_venue_count"
+venue_activity_payload="$(printf '%s' "$admin_activities_response" | json_get 'r.data.list.find(item => item.venueId && item.venue)')" || fail "后台活动列表未找到场地关联活动"
+venue_check_url="$(printf '%s' "$venue_activity_payload" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const item=JSON.parse(s); const params=new URLSearchParams({startAt:item.startAt,endAt:item.endAt,activityId:String(item.id)}); if (item.capacity) params.set('capacity', String(item.capacity)); console.log(\`$API_BASE_URL/admin/venues/\${item.venueId}/availability-check?\${params.toString()}\`)})")"
+venue_check_response="$(request GET "$venue_check_url" "" "$token")"
+assert_code_200 "后台场地可用性检查" "$venue_check_response"
+venue_check_available="$(printf '%s' "$venue_check_response" | json_get 'r.data && r.data.available')"
+[ "$venue_check_available" = "true" ] || fail "后台场地可用性检查失败: $venue_check_response"
+pass "场地可用性检查通过"
 
 activity_registrations_response="$(request GET "$API_BASE_URL/admin/activity-registrations?page=1&pageSize=2" "" "$token")"
 assert_code_200 "后台活动报名列表" "$activity_registrations_response"

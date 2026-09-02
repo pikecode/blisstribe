@@ -160,6 +160,14 @@
                   </div>
                 </div>
               </div>
+              <el-alert
+                v-if="venueAvailabilityChecking || venueAvailabilityMessage"
+                class="venue-availability-alert"
+                :title="venueAvailabilityChecking ? '正在检查场地可用性' : venueAvailabilityMessage"
+                :type="venueAvailabilityChecking ? 'info' : (venueAvailabilityAvailable ? 'success' : 'warning')"
+                :closable="false"
+                show-icon
+              />
             </el-form-item>
             <el-form-item label="地点/入口">
               <el-input v-model="form.locationText" maxlength="200" :placeholder="locationPlaceholder" />
@@ -234,7 +242,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { activityApi, activityStatusText, activityTypeText, type Activity, type ActivityPayload, type ActivityType } from '@/api/activity'
@@ -254,6 +262,9 @@ const products = ref<Product[]>([])
 const venues = ref<Venue[]>([])
 const loading = ref(false)
 const submitting = ref(false)
+const venueAvailabilityChecking = ref(false)
+const venueAvailabilityMessage = ref('')
+const venueAvailabilityAvailable = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 const activeFormTab = ref('basic')
@@ -312,6 +323,8 @@ const groupedTags = computed(() => {
   })
   return Array.from(map.entries()).map(([label, groupOptions]) => ({ label, options: groupOptions }))
 })
+
+let venueCheckTimer: ReturnType<typeof setTimeout> | null = null
 
 const rules: FormRules<ActivityForm> = {
   moduleId: [{ required: true, message: '请选择所属模块', trigger: 'change' }],
@@ -405,6 +418,33 @@ function handleVenueChange() {
   }
   if (!form.coverUrl && selectedVenue.value?.coverUrl) {
     form.coverUrl = selectedVenue.value.coverUrl
+  }
+  scheduleVenueAvailabilityCheck()
+}
+
+function scheduleVenueAvailabilityCheck() {
+  if (venueCheckTimer) clearTimeout(venueCheckTimer)
+  venueCheckTimer = setTimeout(checkVenueAvailability, 300)
+}
+
+async function checkVenueAvailability() {
+  venueAvailabilityMessage.value = ''
+  venueAvailabilityAvailable.value = false
+  if (!form.venueId || form.activityTimeRange.length < 2) return
+  const [startAt, endAt] = form.activityTimeRange
+  if (!startAt || !endAt) return
+  venueAvailabilityChecking.value = true
+  try {
+    const result = await venueApi.availabilityCheck(form.venueId, {
+      startAt,
+      endAt,
+      activityId: editingId.value || undefined,
+      capacity: form.capacity,
+    })
+    venueAvailabilityAvailable.value = result.available
+    venueAvailabilityMessage.value = result.message
+  } finally {
+    venueAvailabilityChecking.value = false
   }
 }
 
@@ -520,6 +560,11 @@ onMounted(async () => {
   await loadOptions()
   await loadActivities()
 })
+
+watch(
+  () => [form.venueId, form.activityTimeRange[0], form.activityTimeRange[1], form.capacity],
+  scheduleVenueAvailabilityCheck
+)
 </script>
 
 <style scoped>
@@ -607,6 +652,10 @@ onMounted(async () => {
   color: #4b5563;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.venue-availability-alert {
+  margin-top: 10px;
 }
 
 .muted {

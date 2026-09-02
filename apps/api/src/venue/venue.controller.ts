@@ -46,6 +46,31 @@ export class VenueAdminController {
     return this.venueService.create(dto)
   }
 
+  @Get(':id/schedule')
+  schedule(@Param('id') id: string, @Query('startDate') startDate?: string, @Query('days') days?: string) {
+    return this.venueService.getSchedule(BigInt(id), {
+      startDate,
+      days: days ? Number(days) : undefined,
+    })
+  }
+
+  @Get(':id/availability-check')
+  availabilityCheck(
+    @Param('id') id: string,
+    @Query('startAt') startAt?: string,
+    @Query('endAt') endAt?: string,
+    @Query('activityId') activityId?: string,
+    @Query('capacity') capacity?: string
+  ) {
+    return this.venueService.checkAvailability({
+      venueId: BigInt(id),
+      activityId: activityId ? BigInt(activityId) : undefined,
+      startAt,
+      endAt,
+      capacity: capacity ? Number(capacity) : undefined,
+    })
+  }
+
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateVenueDto) {
     return this.venueService.update(BigInt(id), dto)
