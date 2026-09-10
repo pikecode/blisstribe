@@ -645,3 +645,21 @@ ssh blisstribe-prod
 3. 使用真实微信配置完成小程序联调。
 4. 补齐数据库备份、日志和回滚策略。
 5. 稳定后再考虑 CI/CD 自动构建和自动部署。
+
+## 17. 宿主机部署
+
+生产环境禁止 Docker 时，使用宿主机方案：API 由 systemd 管理，Admin 由 Nginx 托管静态文件，PostgreSQL 和 Redis 使用系统服务。初始化、数据迁移、发布和回滚步骤见 [PRODUCTION_DEPLOYMENT_RUNBOOK.md](PRODUCTION_DEPLOYMENT_RUNBOOK.md) 第 13 节。
+
+本地发布入口：
+
+```bash
+./scripts/deploy-host.sh
+```
+
+预发布构建但不切换生产：
+
+```bash
+CUTOVER=0 TAG=staging-<timestamp> ./scripts/deploy-host.sh
+```
+
+该方案必须在生产切换前完成 PostgreSQL、Redis 和上传文件备份，并保留现有 Docker 部署作为回滚点。

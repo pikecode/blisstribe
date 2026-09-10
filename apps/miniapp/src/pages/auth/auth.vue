@@ -2,9 +2,9 @@
   <view class="auth">
     <view class="auth__hero">
       <view class="auth__brand-row">
-        <view class="auth__logo">B</view>
+        <image class="auth__logo" src="/static/logo-brand.jpeg" mode="aspectFit" />
         <view class="auth__brand-copy">
-          <text class="auth__brand-name">BlissTribe</text>
+          <text class="auth__brand-name">隐途心悦部落</text>
           <text class="auth__brand-subtitle">心悦部落</text>
         </view>
       </view>
@@ -186,15 +186,8 @@ if (authStore.isLogin) {
   &__logo {
     width: 88rpx;
     height: 88rpx;
-    border-radius: var(--radius-lg);
-    background-color: var(--color-primary);
-    color: #fff;
-    font-size: 44rpx;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow-action);
+    flex-shrink: 0;
+    border-radius: 16rpx;
   }
 
   &__title {

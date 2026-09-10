@@ -1,0 +1,19 @@
+[Unit]
+Description=BlissTribe API
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=blisstribe
+Group=blisstribe
+WorkingDirectory=/opt/blisstribe/current/apps/api
+EnvironmentFile=/etc/blisstribe/api.env
+ExecStart=/usr/bin/node /opt/blisstribe/current/apps/api/dist/main.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

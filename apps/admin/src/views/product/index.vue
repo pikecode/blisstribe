@@ -170,7 +170,7 @@
 
     <el-dialog v-model="productDialogVisible" :title="editingProductId ? '编辑产品' : '新增产品'" width="800px" :close-on-click-modal="false">
       <el-form ref="productFormRef" :model="productForm" :rules="productRules" label-width="100px">
-        <el-tabs>
+        <el-tabs v-model="activeProductFormTab">
           <!-- 基础信息 -->
           <el-tab-pane label="基础信息" name="basic">
             <el-form-item label="所属模块" prop="moduleId">
@@ -390,6 +390,7 @@ const productDialogVisible = ref(false)
 const moduleDialogVisible = ref(false)
 const editingProductId = ref<number | null>(null)
 const editingModuleId = ref<number | null>(null)
+const activeProductFormTab = ref('basic')
 const productFormRef = ref<FormInstance>()
 
 const defaultProductForm = (): ProductPayload => ({
@@ -535,6 +536,7 @@ function assignProductForm(data: ProductPayload) {
 
 function openProductDialog(row?: Product) {
   editingProductId.value = row?.id ?? null
+  activeProductFormTab.value = 'basic'
   assignProductForm(row
     ? {
         moduleId: row.module.id,

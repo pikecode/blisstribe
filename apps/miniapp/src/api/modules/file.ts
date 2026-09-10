@@ -10,16 +10,17 @@ export interface UploadAvatarResult {
 }
 
 export const fileApi = {
-  uploadAvatar(filePath: string): Promise<UploadAvatarResult> {
+  uploadAvatar(filePath: string, tempToken?: string): Promise<UploadAvatarResult> {
     return new Promise<UploadAvatarResult>((resolve, reject) => {
       const authStore = useAuthStore()
       uni.uploadFile({
-        url: `${APP_CONFIG.apiBaseUrl}/upload/avatar`,
+        url: `${APP_CONFIG.apiBaseUrl}/upload/${tempToken ? 'register-avatar' : 'avatar'}`,
         filePath,
         name: 'file',
-        header: {
-          Authorization: `Bearer ${authStore.token}`,
+        header: tempToken ? {} : {
+          Authorization: `Bearer ${authStore.token.replace(/^Bearer\s+/i, '')}`,
         },
+        formData: tempToken ? { tempToken } : undefined,
         success: (res) => {
           try {
             const data = JSON.parse(res.data) as {

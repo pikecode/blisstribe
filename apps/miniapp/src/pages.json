@@ -11,7 +11,7 @@
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "BlissTribe"
+        "navigationBarTitleText": "心悦部落"
       }
     },
     {
@@ -132,7 +132,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "BlissTribe",
+    "navigationBarTitleText": "心悦部落",
     "navigationBarBackgroundColor": "#FFFFFF",
     "backgroundColor": "#F5F5F5"
   },

@@ -1,7 +1,7 @@
 {
-    "name" : "BlissTribe",
+    "name" : "隐途心悦部落",
     "appid" : "",
-    "description" : "BlissTribe 小程序",
+    "description" : "隐途心悦部落小程序",
     "versionName" : "1.0.0",
     "versionCode" : "100",
     "transformPx" : false,
@@ -52,7 +52,7 @@
     "mp-weixin" : {
         "appid" : "wx79953fe2080835f6",
         "setting" : {
-            "urlCheck" : false,
+            "urlCheck" : true,
             "sourceMap" : false
         },
         "usingComponents" : true

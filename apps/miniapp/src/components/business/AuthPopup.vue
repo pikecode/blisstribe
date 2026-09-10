@@ -5,9 +5,9 @@
       <view class="auth-popup__handle" />
       <view class="auth-popup__brand">
         <view class="auth-popup__brand-row">
-          <view class="auth-popup__logo">B</view>
+          <image class="auth-popup__logo" src="/static/logo-brand.jpeg" mode="aspectFit" />
           <view class="auth-popup__brand-copy">
-            <text class="auth-popup__brand-name">BlissTribe</text>
+            <text class="auth-popup__brand-name">隐途心悦部落</text>
             <text class="auth-popup__brand-subtitle">心悦部落</text>
           </view>
         </view>
@@ -157,15 +157,8 @@ const handleLogin = async (): Promise<void> => {
   &__logo {
     width: 76rpx;
     height: 76rpx;
-    border-radius: var(--radius-md);
-    background: var(--color-primary);
-    color: #fff;
-    font-size: 38rpx;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow-action);
+    flex-shrink: 0;
+    border-radius: 14rpx;
   }
 
   &__title {

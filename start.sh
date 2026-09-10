@@ -212,6 +212,14 @@ ensure_infra() {
     return
   fi
 
+  if command -v pg_isready >/dev/null 2>&1 \
+    && pg_isready -h localhost -p 5432 >/dev/null 2>&1 \
+    && command -v redis-cli >/dev/null 2>&1 \
+    && [ "$(redis-cli -h localhost -p 6379 ping 2>/dev/null)" = "PONG" ]; then
+    warn "检测到本机 Postgres + Redis，跳过 Docker 依赖"
+    return
+  fi
+
   require_cmd docker
 
   if ! docker info >/dev/null 2>&1; then
@@ -250,7 +258,7 @@ start_process() {
   fi
 
   log "启动 ${name}"
-  nohup bash -c 'cd "$1"; shift; exec "$@"' _ "$workdir" "$@" </dev/null > "$log_file" 2>&1 &
+  nohup bash -c 'trap "" HUP; cd "$1"; shift; exec "$@"' _ "$workdir" "$@" </dev/null > "$log_file" 2>&1 &
   echo $! > "$PID_DIR/${name}.pid"
 }
 

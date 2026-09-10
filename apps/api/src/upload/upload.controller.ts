@@ -1,5 +1,6 @@
 import {
   Controller,
+  Body,
   Post,
   Delete,
   Query,
@@ -13,23 +14,33 @@ import { UploadService } from './upload.service'
 import { JwtAuthGuard } from '../common/guards/jwt.guard'
 import { AdminJwtGuard } from '../common/guards/admin-jwt.guard'
 
+const AvatarFileInterceptor = FileInterceptor('file', {
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!['image/jpeg', 'image/png'].includes(file.mimetype)) {
+      return cb(new BadRequestException('仅支持 jpg/png 格式'), false)
+    }
+    cb(null, true)
+  },
+})
+
 @Controller('upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
+  @Post('register-avatar')
+  @UseInterceptors(AvatarFileInterceptor)
+  async uploadRegisterAvatar(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('tempToken') tempToken: string,
+  ) {
+    if (!file) throw new BadRequestException('请上传文件')
+    return this.uploadService.saveRegisterAvatar(file, tempToken)
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('avatar')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      limits: { fileSize: 2 * 1024 * 1024 },
-      fileFilter: (_req, file, cb) => {
-        if (!['image/jpeg', 'image/png'].includes(file.mimetype)) {
-          return cb(new BadRequestException('仅支持 jpg/png 格式'), false)
-        }
-        cb(null, true)
-      },
-    })
-  )
+  @UseInterceptors(AvatarFileInterceptor)
   async uploadAvatar(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('请上传文件')
     return this.uploadService.saveAvatar(file)

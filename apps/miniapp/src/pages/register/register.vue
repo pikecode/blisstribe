@@ -23,7 +23,7 @@
           <view v-else class="register__avatar-placeholder">👤</view>
         </view>
         <text class="register__avatar-tip">点击上传头像（选填）</text>
-        <button class="register__avatar-wx-btn" open-type="chooseAvatar" @chooseavatar="onChooseWxAvatar">
+        <button class="register__avatar-wx-btn" open-type="chooseAvatar" @tap.stop @chooseavatar="onChooseWxAvatar">
           选择微信头像
         </button>
       </view>
@@ -361,11 +361,9 @@ function onInviteCodeInput(e: InputEvent) {
   resolveInviteCode()
 }
 
-function onChooseWxAvatar(e: unknown): void {
+async function onChooseWxAvatar(e: unknown): Promise<void> {
   const avatarUrl = (e as { detail?: { avatarUrl?: string } }).detail?.avatarUrl
-  if (avatarUrl) {
-    form.avatar = avatarUrl
-  }
+  if (avatarUrl) await uploadRegisterAvatar(avatarUrl)
 }
 
 function applyWxProfile(): void {
@@ -431,11 +429,18 @@ const chooseAvatar = async (): Promise<void> => {
   try {
     const { tempFilePaths } = await uni.chooseImage({ count: 1, sizeType: ['compressed'], sourceType: ['album', 'camera'] })
     if (!tempFilePaths.length) return
-    form.avatar = tempFilePaths[0]  // 先显示本地预览
-    uni.showLoading({ title: '上传中...' })
-    const result = await userApi.uploadAvatar(tempFilePaths[0])
-    form.avatar = result.url  // 替换为服务器永久 URL
-  } catch { /* 用户取消或上传失败，保持本地预览 */ } finally { uni.hideLoading() }
+    await uploadRegisterAvatar(tempFilePaths[0])
+  } catch { /* 用户取消 */ }
+}
+
+async function uploadRegisterAvatar(filePath: string): Promise<void> {
+  uni.showLoading({ title: '上传中...', mask: true })
+  try {
+    const uploaded = await userApi.uploadRegisterAvatar(filePath, authStore.tempToken)
+    form.avatar = uploaded.url
+  } finally {
+    uni.hideLoading()
+  }
 }
 
 const onGetPhoneNumber = async (e: { detail: { code?: string; errMsg?: string } }): Promise<void> => {

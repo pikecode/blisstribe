@@ -606,3 +606,81 @@ docker compose --env-file .env -f docker-compose.prod.yml up -d admin
 - YAGNI：暂不引入 Kubernetes、服务网格、复杂 CI/CD，先保证手动部署可重复。
 - SOLID：Dockerfile 负责构建，Compose 负责编排，Nginx 负责公网入口，环境变量负责配置，职责边界清晰。
 - DRY：域名、端口、镜像标签集中在 Compose 和服务器 `.env` 管理，小程序 API 地址集中到环境文件和 `APP_CONFIG` fallback。
+
+## 13. 宿主机部署方案
+
+如果生产环境禁止 Docker，保留宿主机 Nginx 和现有域名，API 使用 systemd 运行，Admin 构建为静态文件，PostgreSQL 和 Redis 使用系统服务。
+
+### 13.1 服务器初始化
+
+当前服务器安装 Node.js 22、pnpm 10.22.0、PostgreSQL 18、Redis 8，并创建非 root 用户：
+
+```bash
+useradd --system --home /opt/blisstribe --shell /usr/sbin/nologin blisstribe
+mkdir -p /opt/blisstribe/releases /var/lib/blisstribe/uploads /etc/blisstribe
+chown -R blisstribe:blisstribe /opt/blisstribe /var/lib/blisstribe
+```
+
+创建 `/etc/blisstribe/api.env`，至少包含：
+
+```env
+NODE_ENV=production
+DATABASE_URL=postgresql://<db-user>:<db-password>@127.0.0.1:5432/<db-name>?schema=public
+REDIS_URL=redis://127.0.0.1:6379
+PORT=14000
+UPLOAD_DIR=/var/lib/blisstribe/uploads
+PUBLIC_BASE_URL=https://api.ytxybl.com
+CORS_ORIGIN=https://admin.ytxybl.com
+```
+
+```bash
+chmod 600 /etc/blisstribe/api.env
+```
+
+### 13.2 首次数据迁移
+
+先备份现有 Docker 数据，再迁移到宿主机 PostgreSQL：
+
+```bash
+docker compose --env-file .env -f docker-compose.prod.yml exec -T postgres \
+  pg_dump -U <db-user> -d <db-name> --format=custom > /opt/blisstribe/database.dump
+pg_restore -U <db-user> -d <db-name> --clean --if-exists /opt/blisstribe/database.dump
+```
+
+复制现有 Docker 上传卷到 `/var/lib/blisstribe/uploads`。Redis 如果只承担缓存可以重建；如果保存业务状态，必须先备份并恢复 RDB/AOF。
+
+### 13.3 安装服务
+
+```bash
+cp deploy/systemd/blisstribe-api.service /etc/systemd/system/
+cp deploy/nginx/host-api.conf /etc/nginx/sites-enabled/api.ytxybl.com
+cp deploy/nginx/host-admin.conf /etc/nginx/sites-enabled/admin.ytxybl.com
+systemctl daemon-reload
+systemctl enable --now postgresql redis-server
+systemctl enable blisstribe-api
+nginx -t && systemctl reload nginx
+```
+
+### 13.4 发布
+
+从本地执行：
+
+```bash
+./scripts/deploy-host.sh
+```
+
+脚本会同步代码、在服务器构建、执行 Prisma 迁移、切换 `/opt/blisstribe/current` 并重启 API。Admin 静态文件由 Nginx 直接读取，不需要单独的 Admin 进程。
+
+只构建和同步、不切换生产：
+
+```bash
+CUTOVER=0 TAG=staging-<timestamp> ./scripts/deploy-host.sh
+```
+
+### 13.5 回滚
+
+```bash
+ssh blisstribe-prod 'ln -sfn /opt/blisstribe/releases/<previous-tag> /opt/blisstribe/current && systemctl restart blisstribe-api'
+```
+
+数据库迁移不会自动回滚；涉及 schema 变更时必须先确认备份和兼容性。

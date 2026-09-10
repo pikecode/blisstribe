@@ -44,4 +44,8 @@ export const userApi = {
   uploadAvatar(filePath: string): Promise<{ url: string }> {
     return fileApi.uploadAvatar(filePath)
   },
+
+  uploadRegisterAvatar(filePath: string, tempToken: string): Promise<{ url: string }> {
+    return fileApi.uploadAvatar(filePath, tempToken)
+  },
 }

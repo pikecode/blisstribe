@@ -11,7 +11,7 @@
       <view v-else class="index__banner index__banner--fallback" />
 
       <view class="index__hero-content">
-        <view class="index__hero-kicker">{{ isLogin ? '你的服务推荐' : 'BlissTribe 心悦部落' }}</view>
+        <view class="index__hero-kicker">{{ isLogin ? '你的服务推荐' : '隐途心悦部落' }}</view>
         <text class="index__hero-title">{{ isLogin ? userStore.displayName : '先了解需求，再推荐合适服务' }}</text>
         <text class="index__hero-desc">{{ heroDesc }}</text>
         <view class="index__hero-actions">

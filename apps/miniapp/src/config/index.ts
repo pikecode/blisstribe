@@ -1,6 +1,6 @@
 // 全局配置
 export const APP_CONFIG = {
-  appName: 'BlissTribe',
+  appName: '隐途心悦部落',
   version: '1.0.0',
   // API 基础地址，通过环境变量注入
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://api.ytxybl.com/api/v1',

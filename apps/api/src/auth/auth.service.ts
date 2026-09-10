@@ -116,6 +116,16 @@ export class AuthService {
     const phoneMasked = temp.phoneMasked ?? ''
     if (!dto.agreement) throw new BusinessException(ErrorCode.AGREEMENT_NOT_ACCEPTED)
 
+    const [userAgreement, privacyAgreement] = await Promise.all([
+      this.prisma.agreement.findFirst({ where: { type: 'user', isCurrent: true } }),
+      this.prisma.agreement.findFirst({ where: { type: 'privacy', isCurrent: true } }),
+    ])
+    if (!userAgreement || !privacyAgreement
+      || userAgreement.content.includes('待补充')
+      || privacyAgreement.content.includes('待补充')) {
+      throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '当前协议内容尚未配置')
+    }
+
     // 昵称校验
     const name = dto.nickname.trim()
     if (name.length < 2 || name.length > 20) {
@@ -159,12 +169,12 @@ export class AuthService {
             create: [
               {
                 agreementType: 'user',
-                agreementVersion: '1.0',
+                agreementVersion: userAgreement.version,
                 agreedAt: new Date(),
               },
               {
                 agreementType: 'privacy',
-                agreementVersion: '1.0',
+                agreementVersion: privacyAgreement.version,
                 agreedAt: new Date(),
               },
             ],

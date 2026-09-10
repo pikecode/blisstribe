@@ -4,13 +4,19 @@ import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs'
 import { join, basename } from 'path'
 import { randomUUID } from 'crypto'
 import sharp from 'sharp'
+import { ErrorCode } from '@blisstribe/shared'
+import { PrismaService } from '../common/prisma.service'
+import { BusinessException } from '../common/interceptors/response.interceptor'
 
 @Injectable()
 export class UploadService {
   private readonly uploadDir: string
   readonly baseUrl: string
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     this.uploadDir = this.config.get<string>('UPLOAD_DIR', './uploads')
     const base = this.config.get<string>('PUBLIC_BASE_URL')
     if (!base) throw new Error('PUBLIC_BASE_URL env var is required')
@@ -18,6 +24,19 @@ export class UploadService {
     if (!existsSync(this.uploadDir)) {
       mkdirSync(this.uploadDir, { recursive: true })
     }
+  }
+
+  async saveRegisterAvatar(file: Express.Multer.File, tempToken: string) {
+    const temp = tempToken && await this.prisma.userRegisterTemp.findUnique({ where: { tempToken } })
+    if (!temp || temp.expiresAt < new Date()) {
+      throw new BusinessException(ErrorCode.TEMP_TOKEN_INVALID)
+    }
+    const uploaded = await this.saveAvatar(file)
+    await this.prisma.userRegisterTemp.update({
+      where: { tempToken },
+      data: { wxAvatar: uploaded.url },
+    })
+    return uploaded
   }
 
   async saveAvatar(file: Express.Multer.File): Promise<{ url: string; width: number; height: number; size: number }> {
