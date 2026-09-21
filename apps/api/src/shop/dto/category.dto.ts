@@ -3,6 +3,10 @@ import { IsString, IsInt, IsOptional, IsNotEmpty, Min, IsBoolean } from 'class-v
 export class CreateCategoryDto {
   @IsString()
   @IsNotEmpty()
+  code!: string
+
+  @IsString()
+  @IsNotEmpty()
   name!: string
 
   @IsString()
@@ -37,29 +41,19 @@ export class UpdateCategoryDto {
   @Min(0)
   sortOrder?: number
 
-  @IsBoolean()
+  @IsInt()
   @IsOptional()
-  isActive?: boolean
+  status?: number
 }
 
 export class CategoryResponseDto {
   id!: number
+  code!: string
   name!: string
   description?: string
   imageUrl?: string
   sortOrder!: number
-  isActive!: boolean
-  createdAt!: Date
-  updatedAt!: Date
-}
-
-export class CategoryResponseDto {
-  id!: number
-  name!: string
-  description?: string
-  imageUrl?: string
-  sortOrder!: number
-  isActive!: boolean
+  status!: number
   createdAt!: Date
   updatedAt!: Date
 }
