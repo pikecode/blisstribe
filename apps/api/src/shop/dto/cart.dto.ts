@@ -3,7 +3,7 @@ import { IsInt, IsOptional, IsNotEmpty, Min } from 'class-validator'
 export class AddCartItemDto {
   @IsInt()
   @IsNotEmpty()
-  productId!: number
+  productId!: bigint
 
   @IsInt()
   @IsNotEmpty()
@@ -19,9 +19,9 @@ export class UpdateCartItemDto {
 }
 
 export class CartItemResponseDto {
-  id!: number
-  cartId!: number
-  productId!: number
+  id!: bigint
+  cartId!: bigint
+  productId!: bigint
   quantity!: number
   priceInFen!: number
   totalInFen!: number
@@ -30,8 +30,8 @@ export class CartItemResponseDto {
 }
 
 export class CartResponseDto {
-  id!: number
-  userId!: string
+  id!: bigint
+  userId!: bigint
   items!: CartItemResponseDto[]
   totalItemsCount!: number
   totalPriceInFen!: number

@@ -3,6 +3,7 @@ const path = require('path');
 module.exports = {
   displayName: 'api',
   preset: 'ts-jest/presets/default-esm',
+  extensionsToTreatAsEsm: ['.ts'],
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   rootDir: path.join(__dirname, '../..'),
@@ -12,17 +13,13 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/apps/api/src/$1',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
-  extensionsToTreatAsEsm: ['.ts'],
-  transformIgnorePatterns: [
-    'node_modules/(?!(@nestjs|@prisma|prisma)/)'
-  ],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
       tsconfig: {
         module: 'ES2020',
-        target: 'ES2020',
-        lib: ['ES2020'],
+        target: 'ES2021',
+        lib: ['ES2021'],
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
         moduleResolution: 'node',
@@ -38,10 +35,12 @@ module.exports = {
       },
     }],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(@nestjs/(?!testing)|@nestjs/testing|@prisma|rxjs|class-validator|class-transformer|reflect-metadata|uuid|@types)/)'
+  ],
   collectCoverageFrom: [
     'apps/api/src/**/*.ts',
     '!apps/api/src/**/*.spec.ts',
   ],
   coverageDirectory: '<rootDir>/coverage/api',
 };
-

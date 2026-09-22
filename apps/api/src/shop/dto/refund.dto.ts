@@ -3,10 +3,6 @@ import { IsInt, IsString, IsOptional, IsNotEmpty, Min, IsBoolean } from 'class-v
 export class CreateRefundDto {
   @IsInt()
   @IsNotEmpty()
-  orderId!: number
-
-  @IsInt()
-  @IsNotEmpty()
   @Min(0)
   amountInFen!: number
 
@@ -16,13 +12,13 @@ export class CreateRefundDto {
 }
 
 export class RefundResponseDto {
-  id!: number
-  orderId!: number
-  userId!: string
+  id!: bigint
+  orderId!: bigint
+  userId!: bigint
   amountInFen!: number
   reason?: string
   status!: string
-  refundTransactionId?: string
+  wechatRefundNo?: string
   refundedAt?: Date
   createdAt!: Date
   updatedAt!: Date
@@ -35,5 +31,5 @@ export class ApproveRefundDto {
 
   @IsString()
   @IsOptional()
-  rejectReason?: string
+  adminNote?: string
 }
