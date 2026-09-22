@@ -1,6 +1,10 @@
-import { IsString, IsInt, IsOptional, IsNotEmpty, Min, IsBoolean, IsArray } from 'class-validator'
+import { IsString, IsInt, IsOptional, IsNotEmpty, Min, IsArray } from 'class-validator'
 
 export class CreateProductDto {
+  @IsInt()
+  @IsNotEmpty()
+  categoryId!: number
+
   @IsString()
   @IsNotEmpty()
   name!: string
@@ -9,42 +13,25 @@ export class CreateProductDto {
   @IsOptional()
   description?: string
 
-  @IsInt()
-  @IsNotEmpty()
-  @Min(0)
-  priceInFen!: number
-
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  originalPriceInFen?: number
-
-  @IsInt()
-  @IsNotEmpty()
-  categoryId!: number
-
-  @IsString()
-  @IsOptional()
-  imageUrl?: string
-
   @IsArray()
   @IsString({ each: true })
-  @IsOptional()
-  imageUrls?: string[]
+  @IsNotEmpty()
+  images!: string[]
 
   @IsInt()
-  @IsOptional()
+  @IsNotEmpty()
+  @Min(1)
+  priceFen!: number
+
+  @IsInt()
+  @IsNotEmpty()
   @Min(0)
-  stock?: number
+  totalStock!: number
 
   @IsInt()
   @IsOptional()
   @Min(0)
   sortOrder?: number
-
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean
 }
 
 export class UpdateProductDto {
@@ -56,68 +43,54 @@ export class UpdateProductDto {
   @IsOptional()
   description?: string
 
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  priceInFen?: number
-
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  originalPriceInFen?: number
-
-  @IsInt()
-  @IsOptional()
-  categoryId?: number
-
-  @IsString()
-  @IsOptional()
-  imageUrl?: string
-
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  imageUrls?: string[]
+  images?: string[]
+
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  priceFen?: number
 
   @IsInt()
   @IsOptional()
   @Min(0)
-  stock?: number
+  totalStock?: number
+
+  @IsInt()
+  @IsOptional()
+  status?: number
 
   @IsInt()
   @IsOptional()
   @Min(0)
   sortOrder?: number
-
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean
 }
 
 export class ProductResponseDto {
   id!: number
+  categoryId!: number
   name!: string
   description?: string
-  priceInFen!: number
-  originalPriceInFen?: number
-  categoryId!: number
-  imageUrl?: string
-  imageUrls?: string[]
-  stock!: number
-  soldCount!: number
+  images!: string[]
+  priceFen!: number
+  totalStock!: number
+  reservedStock!: number
+  soldStock!: number
+  status!: number
   sortOrder!: number
-  isActive!: boolean
   createdAt!: Date
   updatedAt!: Date
 }
 
 export class ProductListDto {
   id!: number
+  categoryId!: number
   name!: string
-  priceInFen!: number
-  originalPriceInFen?: number
-  imageUrl?: string
-  stock!: number
-  soldCount!: number
-  isActive!: boolean
+  priceFen!: number
+  images!: string[]
+  totalStock!: number
+  reservedStock!: number
+  soldStock!: number
 }

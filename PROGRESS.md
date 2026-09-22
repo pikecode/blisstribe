@@ -36,16 +36,18 @@
 
 ### Task 3: Category Management (Service + Controller)
 **Files:**
-- Create: `apps/api/src/shop/category/category.repository.ts`
-- Create: `apps/api/src/shop/category/category.service.ts`
-- Create: `apps/api/src/shop/category/category.controller.ts`
-- Create: `tests/shop/category.spec.ts`
+- Create: `apps/api/src/shop/category/category.repository.ts` ✓
+- Create: `apps/api/src/shop/category/category.service.ts` ✓
+- Create: `apps/api/src/shop/category/category.controller.ts` ✓
+- Create: `tests/shop/category.spec.ts` ✓
 
-**Status:** [→] IN PROGRESS
+**Status:** [✓] COMPLETE
 **Assigned to:** Agent a872563c1adadfe1e
 **Dependencies:** Task 2 ✓
 **Blocking:** Task 4
 **Started:** 2026-09-21 18:45
+**Completed:** 2026-09-21 11:21
+**Commit:** 6191cee
 
 ---
 
