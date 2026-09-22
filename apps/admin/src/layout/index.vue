@@ -126,6 +126,7 @@ import {
   OfficeBuilding,
   Picture,
   Share,
+  ShoppingCart,
   SwitchButton,
   Tickets,
   User,
@@ -174,6 +175,13 @@ const menuSections: MenuSection[] = [
       { path: '/invitations', title: '邀请管理', icon: Share, desc: '查看邀请效果、注册记录与关系链路' },
       { path: '/partners', title: '服务伙伴审核', icon: OfficeBuilding, desc: '审核经营主体、客户归属与邀请记录' },
       { path: '/product-leads', title: '咨询线索', icon: Tickets, desc: '查看用户需求并记录线索跟进状态' },
+    ],
+  },
+  {
+    title: '商城管理',
+    items: [
+      { path: '/shop/categories', title: '商品分类', icon: CollectionTag, desc: '维护商城商品分类' },
+      { path: '/shop/products', title: '商品管理', icon: Goods, desc: '维护商城商品信息、库存、价格' },
     ],
   },
   {
