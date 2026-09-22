@@ -22,9 +22,9 @@ export class CreateOrderDto {
   items!: CartItemForCheckout[]
 
   @IsInt()
-  @IsNotEmpty()
+  @IsOptional()
   @Min(0)
-  totalInFen!: number
+  totalInFen?: number
 
   @IsString()
   @IsOptional()
