@@ -17,11 +17,11 @@ import { WechatPayService } from '../payment/wechat-pay.service'
 import { CreateRefundDto, ApproveRefundDto } from '../dto/refund.dto'
 
 @Controller('shop')
-@UseGuards(JwtAuthGuard)
 export class RefundController {
   constructor(private refundService: RefundService) {}
 
   @Post('orders/:id/refund')
+  @UseGuards(JwtAuthGuard)
   async requestRefund(
     @Request() req: any,
     @Param('id') orderId: string,
@@ -32,6 +32,7 @@ export class RefundController {
   }
 
   @Get('refunds')
+  @UseGuards(JwtAuthGuard)
   async getUserRefunds(
     @Request() req: any,
     @Query('status') status?: string,
@@ -47,6 +48,7 @@ export class RefundController {
   }
 
   @Get('refunds/:id')
+  @UseGuards(JwtAuthGuard)
   async getRefundDetail(@Request() req: any, @Param('id') refundId: string) {
     const userId = BigInt(req.user.id)
     return this.refundService.getRefundDetail(BigInt(refundId), userId)
@@ -54,11 +56,11 @@ export class RefundController {
 }
 
 @Controller('admin/shop/refunds')
-@UseGuards(AdminJwtGuard)
 export class AdminRefundController {
   constructor(private refundService: RefundService) {}
 
   @Get()
+  @UseGuards(AdminJwtGuard)
   async listRefunds(
     @Query('status') status?: string,
     @Query('page') page?: string,
@@ -72,11 +74,13 @@ export class AdminRefundController {
   }
 
   @Get(':id')
+  @UseGuards(AdminJwtGuard)
   async getRefundDetail(@Param('id') refundId: string) {
     return this.refundService.getRefundDetail(BigInt(refundId))
   }
 
   @Post(':id/approve')
+  @UseGuards(AdminJwtGuard)
   async approveRefund(
     @Param('id') refundId: string,
     @Body() dto: ApproveRefundDto

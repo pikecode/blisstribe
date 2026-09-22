@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
 import { PrismaModule } from '../common/prisma.module'
+import { AdminModule } from '../admin/admin.module'
+import { AuthModule } from '../auth/auth.module'
 import { CategoryRepository } from './category/category.repository'
 import { CategoryService } from './category/category.service'
 import { CategoryController, AdminCategoryController } from './category/category.controller'
@@ -24,7 +26,7 @@ import { RefundService } from './refund/refund.service'
 import { RefundController, AdminRefundController, RefundWebhookController } from './refund/refund.controller'
 
 @Module({
-  imports: [PrismaModule, ScheduleModule.forRoot()],
+  imports: [PrismaModule, ScheduleModule.forRoot(), AdminModule, AuthModule],
   controllers: [
     CategoryController,
     AdminCategoryController,

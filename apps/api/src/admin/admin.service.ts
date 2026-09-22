@@ -40,7 +40,7 @@ export class AdminService {
       data: { lastLoginAt: new Date() },
     })
 
-    const token = this.jwt.sign({ adminId: admin.id.toString(), username: admin.username })
+    const token = this.jwt.sign({ adminId: admin.id.toString(), username: admin.username, isAdmin: true })
     return {
       token: `Bearer ${token}`,
       admin: {

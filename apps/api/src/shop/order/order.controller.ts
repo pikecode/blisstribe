@@ -14,17 +14,18 @@ import { OrderService } from './order.service'
 import { CreateOrderDto } from '../dto/order.dto'
 
 @Controller('shop')
-@UseGuards(JwtAuthGuard)
 export class OrderController {
   constructor(private orderService: OrderService) {}
 
   @Post('orders')
+  @UseGuards(JwtAuthGuard)
   async createOrder(@Request() req: any, @Body() dto: CreateOrderDto) {
     const userId = BigInt(req.user.id)
     return this.orderService.createOrder(userId, dto)
   }
 
   @Get('orders')
+  @UseGuards(JwtAuthGuard)
   async getUserOrders(
     @Request() req: any,
     @Query('status') status?: string,
@@ -40,12 +41,14 @@ export class OrderController {
   }
 
   @Get('orders/:id')
+  @UseGuards(JwtAuthGuard)
   async getOrderDetail(@Request() req: any, @Param('id') orderId: string) {
     const userId = BigInt(req.user.id)
     return this.orderService.getOrderDetail(BigInt(orderId), userId)
   }
 
   @Post('orders/:id/cancel')
+  @UseGuards(JwtAuthGuard)
   async cancelOrder(@Request() req: any, @Param('id') orderId: string) {
     const userId = BigInt(req.user.id)
     return this.orderService.cancelOrder(BigInt(orderId), userId)
@@ -53,11 +56,11 @@ export class OrderController {
 }
 
 @Controller('admin/shop')
-@UseGuards(AdminJwtGuard)
 export class AdminOrderController {
   constructor(private orderService: OrderService) {}
 
   @Get('orders')
+  @UseGuards(AdminJwtGuard)
   async listOrders(
     @Query('status') status?: string,
     @Query('paymentStatus') paymentStatus?: string,
@@ -84,11 +87,13 @@ export class AdminOrderController {
   }
 
   @Get('orders/:id')
+  @UseGuards(AdminJwtGuard)
   async getOrderDetail(@Param('id') orderId: string) {
     return this.orderService.getOrderDetailByOrderNo(orderId)
   }
 
   @Post('orders/:id/ship')
+  @UseGuards(AdminJwtGuard)
   async shipOrder(
     @Param('id') orderId: string,
     @Body() dto: { trackingNo: string; logisticsCompany?: string }

@@ -173,53 +173,57 @@ export class TagDictionaryPublicController {
 }
 
 @Controller('admin/product-modules')
-@UseGuards(AdminJwtGuard)
 export class ProductModuleAdminController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
+  @UseGuards(AdminJwtGuard)
   list() {
     return this.productService.listModulesAdmin()
   }
 
   @Post()
+  @UseGuards(AdminJwtGuard)
   create(@Body() dto: CreateProductModuleDto) {
     return this.productService.createModule(dto)
   }
 
   @Put(':id')
+  @UseGuards(AdminJwtGuard)
   update(@Param('id') id: string, @Body() dto: UpdateProductModuleDto) {
     return this.productService.updateModule(BigInt(id), dto)
   }
 }
 
 @Controller('admin/assessment-templates')
-@UseGuards(AdminJwtGuard)
 export class AssessmentTemplateAdminController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
+  @UseGuards(AdminJwtGuard)
   list() {
     return this.productService.listAssessmentTemplatesAdmin()
   }
 
   @Post()
+  @UseGuards(AdminJwtGuard)
   create(@Body() dto: CreateAssessmentTemplateDto) {
     return this.productService.createAssessmentTemplateAdmin(dto)
   }
 
   @Put(':id')
+  @UseGuards(AdminJwtGuard)
   update(@Param('id') id: string, @Body() dto: UpdateAssessmentTemplateDto) {
     return this.productService.updateAssessmentTemplateAdmin(BigInt(id), dto)
   }
 }
 
 @Controller('admin/recommendation-rules')
-@UseGuards(AdminJwtGuard)
 export class RecommendationRuleAdminController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
+  @UseGuards(AdminJwtGuard)
   list(
     @Query('moduleId') moduleId?: string,
     @Query('productId') productId?: string,
@@ -233,22 +237,24 @@ export class RecommendationRuleAdminController {
   }
 
   @Post()
+  @UseGuards(AdminJwtGuard)
   create(@Body() dto: CreateRecommendationRuleDto) {
     return this.productService.createRecommendationRuleAdmin(dto)
   }
 
   @Put(':id')
+  @UseGuards(AdminJwtGuard)
   update(@Param('id') id: string, @Body() dto: UpdateRecommendationRuleDto) {
     return this.productService.updateRecommendationRuleAdmin(BigInt(id), dto)
   }
 }
 
 @Controller('admin/tags')
-@UseGuards(AdminJwtGuard)
 export class TagDictionaryAdminController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
+  @UseGuards(AdminJwtGuard)
   list(
     @Query('moduleId') moduleId?: string,
     @Query('status') status?: string,
@@ -264,22 +270,24 @@ export class TagDictionaryAdminController {
   }
 
   @Post()
+  @UseGuards(AdminJwtGuard)
   create(@Body() dto: CreateTagDictionaryDto) {
     return this.productService.createTagAdmin(dto)
   }
 
   @Put(':id')
+  @UseGuards(AdminJwtGuard)
   update(@Param('id') id: string, @Body() dto: UpdateTagDictionaryDto) {
     return this.productService.updateTagAdmin(BigInt(id), dto)
   }
 }
 
 @Controller('admin/products')
-@UseGuards(AdminJwtGuard)
 export class ProductAdminController {
   constructor(private readonly productService: ProductService) {}
 
   @Get('analytics')
+  @UseGuards(AdminJwtGuard)
   analytics(
     @Query('moduleId') moduleId?: string,
     @Query('moduleCode') moduleCode?: string,
@@ -301,6 +309,7 @@ export class ProductAdminController {
   }
 
   @Get()
+  @UseGuards(AdminJwtGuard)
   list(
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '20',
@@ -319,32 +328,36 @@ export class ProductAdminController {
   }
 
   @Post()
+  @UseGuards(AdminJwtGuard)
   create(@Body() dto: CreateProductDto) {
     return this.productService.createProduct(dto)
   }
 
   @Put(':id')
+  @UseGuards(AdminJwtGuard)
   update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     return this.productService.updateProduct(BigInt(id), dto)
   }
 
   @Post(':id/publish')
+  @UseGuards(AdminJwtGuard)
   publish(@Param('id') id: string) {
     return this.productService.publishProduct(BigInt(id))
   }
 
   @Post(':id/unpublish')
+  @UseGuards(AdminJwtGuard)
   unpublish(@Param('id') id: string) {
     return this.productService.unpublishProduct(BigInt(id))
   }
 }
 
 @Controller('admin/product-leads')
-@UseGuards(AdminJwtGuard)
 export class ProductLeadAdminController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
+  @UseGuards(AdminJwtGuard)
   list(
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '20',
@@ -365,16 +378,19 @@ export class ProductLeadAdminController {
   }
 
   @Get('summary')
+  @UseGuards(AdminJwtGuard)
   summary() {
     return this.productService.leadSummaryAdmin()
   }
 
   @Get(':id')
+  @UseGuards(AdminJwtGuard)
   detail(@Param('id') id: string) {
     return this.productService.detailLeadAdmin(BigInt(id))
   }
 
   @Put(':id/follow-up')
+  @UseGuards(AdminJwtGuard)
   followUp(
     @CurrentAdmin() admin: { adminId: string },
     @Param('id') id: string,
@@ -385,11 +401,11 @@ export class ProductLeadAdminController {
 }
 
 @Controller('partner')
-@UseGuards(JwtAuthGuard)
 export class ProductPartnerController {
   constructor(private readonly productService: ProductService) {}
 
   @Get('products')
+  @UseGuards(JwtAuthGuard)
   products(
     @CurrentUser() user: { userId: string },
     @Query('page') page = '1',
@@ -399,6 +415,7 @@ export class ProductPartnerController {
   }
 
   @Get('product-leads')
+  @UseGuards(JwtAuthGuard)
   leads(
     @CurrentUser() user: { userId: string },
     @Query('page') page = '1',
