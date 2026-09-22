@@ -1,9 +1,8 @@
 import { IsInt, IsString, IsOptional, IsNotEmpty, Min, IsArray } from 'class-validator'
 
 export class CartItemForCheckout {
-  @IsInt()
   @IsNotEmpty()
-  productId!: number
+  productId!: number | bigint | string
 
   @IsInt()
   @IsNotEmpty()
@@ -13,7 +12,7 @@ export class CartItemForCheckout {
   @IsInt()
   @IsNotEmpty()
   @Min(0)
-  priceInFen!: number
+  unitPriceFen!: number
 }
 
 export class CreateOrderDto {
@@ -24,7 +23,7 @@ export class CreateOrderDto {
   @IsInt()
   @IsOptional()
   @Min(0)
-  totalInFen?: number
+  discountAmountFen?: number
 
   @IsString()
   @IsOptional()
@@ -36,34 +35,40 @@ export class CreateOrderDto {
 
   @IsString()
   @IsOptional()
-  recipientPhone?: string
+  receiverPhone?: string
 
   @IsString()
   @IsOptional()
-  recipientName?: string
+  receiverName?: string
 }
 
 export class OrderItemResponseDto {
-  id!: number
-  orderId!: number
-  productId!: number
+  id!: bigint
+  orderId!: bigint
+  productId!: bigint
+  productName!: string
   quantity!: number
-  priceInFen!: number
-  totalInFen!: number
+  unitPriceFen!: number
+  subtotalFen!: number
   createdAt!: Date
 }
 
 export class OrderResponseDto {
-  id!: number
-  userId!: string
+  id!: bigint
+  userId!: bigint
   orderNo!: string
-  totalInFen!: number
+  totalAmountFen!: number
+  discountAmountFen!: number
+  paymentAmountFen!: number
+  refundedAmountFen!: number
   status!: string
+  paymentStatus!: string
+  fulfillmentStatus!: string
   items!: OrderItemResponseDto[]
   remark?: string
   shippingAddress?: string
-  recipientPhone?: string
-  recipientName?: string
+  receiverPhone?: string
+  receiverName?: string
   createdAt!: Date
   updatedAt!: Date
   paidAt?: Date

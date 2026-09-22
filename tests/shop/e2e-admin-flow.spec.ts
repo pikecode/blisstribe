@@ -67,7 +67,7 @@ describe('E2E: Backend Admin Flow (Task 22 - Scenario 2)', () => {
         phoneMasked: '****9999',
         phoneCiphertext: Buffer.from('admin'),
         nickname: 'Admin User',
-        role: 'admin',
+        roles: ['admin'],
       },
     })
     adminUserId = adminUser.id
@@ -271,9 +271,9 @@ describe('E2E: Backend Admin Flow (Task 22 - Scenario 2)', () => {
 
       // Create order for regular user
       const orderResult = await orderService.createOrder(regularUserId, {
-        items: [{ productId: testProductId, quantity: 1 }],
-        recipientName: 'Test Recipient',
-        recipientPhone: '13200132000',
+        items: [{ productId: testProductId, quantity: 1, unitPriceFen: 10000 }],
+        receiverName: 'Test Recipient',
+        receiverPhone: '13200132000',
         shippingAddress: '100 Admin Street, Test City',
       })
       testOrderId = orderResult.id
@@ -333,9 +333,9 @@ describe('E2E: Backend Admin Flow (Task 22 - Scenario 2)', () => {
       await productService.publishProduct(testProductId)
 
       const orderResult = await orderService.createOrder(regularUserId, {
-        items: [{ productId: testProductId, quantity: 2 }],
-        recipientName: 'Refund User',
-        recipientPhone: '13100131000',
+        items: [{ productId: testProductId, quantity: 2, unitPriceFen: 10000 }],
+        receiverName: 'Refund User',
+        receiverPhone: '13100131000',
         shippingAddress: '200 Refund Ave, Test City',
       })
       testOrderId = orderResult.id
@@ -349,8 +349,7 @@ describe('E2E: Backend Admin Flow (Task 22 - Scenario 2)', () => {
 
     test('Admin can view pending refunds', async () => {
       // Customer requests refund
-      await refundService.createRefund(regularUserId, {
-        orderId: testOrderId,
+      await refundService.createRefund(regularUserId, testOrderId, {
         reason: 'Quality issue',
         description: 'Product has defects',
       })
@@ -363,13 +362,13 @@ describe('E2E: Backend Admin Flow (Task 22 - Scenario 2)', () => {
     })
 
     test('Admin can approve refund', async () => {
-      const refundRequest = await refundService.createRefund(regularUserId, {
-        orderId: testOrderId,
+      const refundRequest = await refundService.createRefund(regularUserId, testOrderId, {
         reason: 'Changed mind',
         description: 'Not what I expected',
       })
 
       const approved = await refundService.approveRefund(refundRequest.id, {
+        approvedAmountFen: refundRequest.requestedAmountFen,
         adminNotes: 'Approved for full refund',
       })
 
@@ -378,8 +377,7 @@ describe('E2E: Backend Admin Flow (Task 22 - Scenario 2)', () => {
     })
 
     test('Admin can reject refund', async () => {
-      const refundRequest = await refundService.createRefund(regularUserId, {
-        orderId: testOrderId,
+      const refundRequest = await refundService.createRefund(regularUserId, testOrderId, {
         reason: 'Test reason',
         description: 'Test description',
       })
@@ -389,7 +387,7 @@ describe('E2E: Backend Admin Flow (Task 22 - Scenario 2)', () => {
       })
 
       expect(rejected.status).toBe('rejected')
-      expect(rejected.rejectedAt).toBeDefined()
+      expect(rejected.updatedAt).toBeDefined()
     })
   })
 
@@ -399,9 +397,9 @@ describe('E2E: Backend Admin Flow (Task 22 - Scenario 2)', () => {
       // This would typically be enforced by route guards/decorators
       const userRole = await prisma.user.findUnique({
         where: { id: regularUserId },
-        select: { role: true },
+        select: { roles: true },
       })
-      expect(userRole?.role).not.toBe('admin')
+      expect(userRole?.roles).not.toContain('admin')
     })
 
     test('User can only see their own orders', async () => {

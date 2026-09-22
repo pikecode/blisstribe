@@ -20,8 +20,8 @@ export class OrderService {
   async createOrder(userId: bigint, dto: CreateOrderDto) {
     // Validate receiver info
     if (
-      !dto.recipientName ||
-      !dto.recipientPhone ||
+      !dto.receiverName ||
+      !dto.receiverPhone ||
       !dto.shippingAddress
     ) {
       throw new BadRequestException('Incomplete receiver information')
@@ -113,8 +113,8 @@ export class OrderService {
           paymentStatus: 'unpaid',
           fulfillmentStatus: 'pending',
           totalAmountFen: totalAmountFen,
-          recipientName: dto.recipientName,
-          recipientPhone: dto.recipientPhone,
+          receiverName: dto.receiverName,
+          receiverPhone: dto.receiverPhone,
           shippingAddress: dto.shippingAddress,
           remark: dto.remark,
           expiresAt,

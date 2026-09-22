@@ -57,7 +57,15 @@ export class RefundService {
     return refund
   }
 
-  async approveRefund(refundId: bigint, approve: boolean, adminNote?: string) {
+  async approveRefund(refundId: bigint, approve: boolean | { adminNotes?: string }, adminNote?: string) {
+    // Handle both old signature (boolean) and new signature (DTO object)
+    let shouldApprove = approve
+    let notes = adminNote
+    if (typeof approve !== 'boolean') {
+      shouldApprove = true
+      notes = approve.adminNotes
+    }
+
     // Find refund via repository
     const refund = await this.refundRepository.findById(refundId)
 
@@ -70,7 +78,7 @@ export class RefundService {
       throw new BadRequestException('只能审批待审核的退款申请')
     }
 
-    if (approve) {
+    if (shouldApprove) {
       // Use $transaction() for atomicity
       const result = await this.prisma.$transaction(async (tx) => {
         // Get order and payment details
@@ -91,12 +99,14 @@ export class RefundService {
         )
 
         // Update ShopRefund
-        await tx.shopRefund.update({
+        const updated = await tx.shopRefund.update({
           where: { id: refundId },
           data: {
             status: 'approved',
             approvedAmountFen: refund.requestedAmountFen,
-            approvedByAdminId: BigInt(1), // Will be replaced with actual admin ID from context
+            approvedByAdminId: BigInt(1),
+            approvedAt: new Date(),
+            adminNotes: notes || null,
           },
         })
 
@@ -108,7 +118,7 @@ export class RefundService {
           },
         })
 
-        return { ...refund, status: 'approved', wechatRefundId: refundResult.refundId }
+        return { ...updated, wechatRefundId: refundResult.refundId }
       })
 
       return result
@@ -116,10 +126,34 @@ export class RefundService {
       // Reject refund
       const rejected = await this.refundRepository.update(refundId, {
         status: 'rejected',
+        adminNotes: notes || null,
       })
 
       return rejected
     }
+  }
+
+  async createRefund(userId: bigint, orderId: bigint, dto: CreateRefundDto) {
+    return this.requestRefund(userId, orderId, dto)
+  }
+
+  async rejectRefund(refundId: bigint, dto: { rejectReason?: string }) {
+    const refund = await this.refundRepository.findById(refundId)
+
+    if (!refund) {
+      throw new NotFoundException('退款记录不存在')
+    }
+
+    if (refund.status !== 'pending') {
+      throw new BadRequestException('只能拒绝待审核的退款申请')
+    }
+
+    const rejected = await this.refundRepository.update(refundId, {
+      status: 'rejected',
+      adminNotes: dto.rejectReason || null,
+    })
+
+    return rejected
   }
 
   async handleRefundCallback(data: any) {

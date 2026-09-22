@@ -84,7 +84,7 @@ export class AdminRefundController {
     return this.refundService.approveRefund(
       BigInt(refundId),
       dto.approved,
-      dto.rejectReason
+      dto.adminNote
     )
   }
 }

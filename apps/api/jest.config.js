@@ -14,7 +14,7 @@ module.exports = {
   },
   extensionsToTreatAsEsm: ['.ts'],
   transformIgnorePatterns: [
-    'node_modules/(?!(@nestjs|@prisma|prisma)/)'
+    'node_modules/(?!(@nestjs|@prisma|prisma|uuid|class-transformer|class-validator|type-fest)/)'
   ],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {

@@ -33,6 +33,7 @@ model User {
   tagIds          BigInt[]  @default([]) // 用户自我标签 ID 快照
   identity        String? // 注册身份: C/B/S
   level           String    @default("normal") // 注册级别
+  roles           String[]  @default(["user"]) // 用户角色: user/admin
   douyinPayCode   String? // 收款码(抖音)
   status          Int       @default(1) // 0禁用 1正常 2待完善
   lastLoginAt     DateTime?
@@ -1108,6 +1109,8 @@ model ShopRefund {
   status             String    @default("pending")
   wechatRefundId     String?   @unique
   approvedByAdminId  BigInt?
+  approvedAt         DateTime?
+  adminNotes         String?
   completedAt        DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt

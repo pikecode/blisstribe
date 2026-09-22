@@ -9,6 +9,7 @@ import { UploadModule } from './upload/upload.module'
 import { StatsModule } from './stats/stats.module'
 import { PrismaModule } from './common/prisma.module'
 import { RedisModule } from './common/redis.module'
+import { CommonModule } from './common/common.module'
 
 import { InvitationModule } from './invitation/invitation.module'
 import { BannerModule } from './banner/banner.module'
@@ -25,6 +26,7 @@ import { ShopModule } from './shop/shop.module'
     ScheduleModule.forRoot(),
     PrismaModule,
     RedisModule,
+    CommonModule,
     AuthModule,
     UserModule,
     AdminModule,

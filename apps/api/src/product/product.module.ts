@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { PrismaModule } from '../common/prisma.module'
 import { AdminModule } from '../admin/admin.module'
+import { AuthModule } from '../auth/auth.module'
 import { ProductService } from './product.service'
 import {
   AssessmentTemplateAdminController,
@@ -16,7 +17,7 @@ import {
 } from './product.controller'
 
 @Module({
-  imports: [PrismaModule, AdminModule],
+  imports: [PrismaModule, AdminModule, AuthModule],
   controllers: [
     ProductController,
     ProductModuleController,

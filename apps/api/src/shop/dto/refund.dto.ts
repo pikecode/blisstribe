@@ -20,6 +20,8 @@ export class RefundResponseDto {
   status!: string
   wechatRefundNo?: string
   refundedAt?: Date
+  approvedAt?: Date
+  adminNotes?: string
   createdAt!: Date
   updatedAt!: Date
 }

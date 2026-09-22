@@ -189,4 +189,38 @@ export class CartService {
 
     return this.getCart(userId)
   }
+
+  async getOrCreateCart(userId: bigint): Promise<any> {
+    return this.getCart(userId)
+  }
+
+  async addToCart(userId: bigint, dto: AddCartItemDto): Promise<any> {
+    return this.addItem(userId, dto)
+  }
+
+  async updateCartItemQuantity(userId: bigint, productId: bigint, quantity: number): Promise<any> {
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new BadRequestException('商品数量必须大于0')
+    }
+
+    const cart = await this.cartRepository.findByUserId(userId)
+    if (!cart) {
+      throw new NotFoundException('购物车不存在')
+    }
+
+    const item = cart.items.find(i => i.productId === productId)
+    if (!item) {
+      throw new BadRequestException('该商品不在购物车中')
+    }
+
+    const product = item.product
+    const available = product.totalStock - product.reservedStock - product.soldStock
+
+    if (quantity > available) {
+      throw new BadRequestException('库存不足')
+    }
+
+    await this.cartRepository.updateItem(cart.id, productId, quantity)
+    return this.getCart(userId)
+  }
 }
