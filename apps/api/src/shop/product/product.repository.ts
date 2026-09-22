@@ -25,6 +25,43 @@ export class ProductRepository {
     })
   }
 
+  async findWithPagination(params: {
+    page?: number
+    pageSize?: number
+    categoryId?: bigint
+    keyword?: string
+  }): Promise<{ list: ShopProduct[]; total: number }> {
+    const page = params.page || 1
+    const pageSize = params.pageSize || 20
+    const skip = (page - 1) * pageSize
+
+    const where: any = {
+      deletedAt: null,
+    }
+
+    if (params.categoryId !== undefined) {
+      where.categoryId = params.categoryId
+    }
+
+    if (params.keyword) {
+      where.name = {
+        contains: params.keyword,
+      }
+    }
+
+    const [list, total] = await Promise.all([
+      this.prisma.shopProduct.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+      }),
+      this.prisma.shopProduct.count({ where }),
+    ])
+
+    return { list, total }
+  }
+
   async findById(id: bigint): Promise<ShopProduct | null> {
     return this.prisma.shopProduct.findUnique({
       where: { id },

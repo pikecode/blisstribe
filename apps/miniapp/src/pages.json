@@ -128,6 +128,19 @@
       "style": {
         "navigationBarTitleText": "我的客户"
       }
+    },
+    {
+      "path": "pages/shop/index",
+      "style": {
+        "navigationBarTitleText": "商城首页",
+        "navigationStyle": "default"
+      }
+    },
+    {
+      "path": "pages/shop/list",
+      "style": {
+        "navigationBarTitleText": "商品列表"
+      }
     }
   ],
   "globalStyle": {

@@ -60,15 +60,24 @@ export class AdminOrderController {
   @Get('orders')
   async listOrders(
     @Query('status') status?: string,
+    @Query('paymentStatus') paymentStatus?: string,
+    @Query('fulfillmentStatus') fulfillmentStatus?: string,
+    @Query('keyword') keyword?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string
   ) {
     const offset = page ? (parseInt(page, 10) - 1) * parseInt(limit || '20', 10) : 0
     const limit_ = limit ? parseInt(limit, 10) : 20
 
-    // TODO: Implement admin list with all orders (consider pagination optimization)
-    return this.listAdminOrders({
+    return this.orderService.listAdminOrders({
       status,
+      paymentStatus,
+      fulfillmentStatus,
+      keyword,
+      startDate,
+      endDate,
       offset,
       limit: limit_,
     })
@@ -76,21 +85,14 @@ export class AdminOrderController {
 
   @Get('orders/:id')
   async getOrderDetail(@Param('id') orderId: string) {
-    return this.orderService.getOrderByOrderNo(orderId)
+    return this.orderService.getOrderDetailByOrderNo(orderId)
   }
 
   @Post('orders/:id/ship')
-  async shipOrder(@Param('id') orderId: string) {
-    // TODO: Implement shipping logic
-    return { message: 'Shipping endpoint - to be implemented' }
-  }
-
-  private async listAdminOrders(filters: {
-    status?: string
-    offset: number
-    limit: number
-  }) {
-    // TODO: Implement proper admin order listing
-    return { orders: [], total: 0 }
+  async shipOrder(
+    @Param('id') orderId: string,
+    @Body() dto: { trackingNo: string; logisticsCompany?: string }
+  ) {
+    return this.orderService.shipOrder(BigInt(orderId), dto)
   }
 }

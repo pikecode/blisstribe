@@ -224,4 +224,151 @@ export class OrderService {
       data: { paymentStatus },
     })
   }
+
+  async listAdminOrders(filters: {
+    status?: string
+    paymentStatus?: string
+    fulfillmentStatus?: string
+    keyword?: string
+    startDate?: string
+    endDate?: string
+    offset: number
+    limit: number
+  }) {
+    const {
+      status,
+      paymentStatus,
+      fulfillmentStatus,
+      keyword,
+      startDate,
+      endDate,
+      offset,
+      limit,
+    } = filters
+
+    const where: any = {}
+
+    if (status) {
+      where.status = status
+    }
+
+    if (paymentStatus) {
+      where.paymentStatus = paymentStatus
+    }
+
+    if (fulfillmentStatus) {
+      where.fulfillmentStatus = fulfillmentStatus
+    }
+
+    if (keyword) {
+      where.OR = [
+        { orderNo: { contains: keyword } },
+        { user: { nickname: { contains: keyword } } },
+        { user: { phoneMasked: { contains: keyword } } },
+      ]
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {}
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate)
+      }
+      if (endDate) {
+        const endDateTime = new Date(endDate)
+        endDateTime.setHours(23, 59, 59, 999)
+        where.createdAt.lte = endDateTime
+      }
+    }
+
+    const [orders, total] = await Promise.all([
+      this.prisma.shopOrder.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              nickname: true,
+              phoneMasked: true,
+            },
+          },
+          items: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.shopOrder.count({ where }),
+    ])
+
+    return {
+      orders,
+      total,
+      page: Math.floor(offset / limit) + 1,
+      pageSize: limit,
+    }
+  }
+
+  async getOrderDetailByOrderNo(orderNo: string) {
+    const order = await this.prisma.shopOrder.findUnique({
+      where: { orderNo },
+      include: {
+        user: {
+          select: {
+            id: true,
+            nickname: true,
+            phoneMasked: true,
+          },
+        },
+        items: true,
+        payments: true,
+        refunds: true,
+      },
+    })
+
+    if (!order) {
+      throw new NotFoundException('Order not found')
+    }
+
+    return order
+  }
+
+  async shipOrder(
+    orderId: bigint,
+    dto: { trackingNo: string; logisticsCompany?: string }
+  ) {
+    const order = await this.orderRepository.findById(orderId)
+
+    if (!order) {
+      throw new NotFoundException('Order not found')
+    }
+
+    if (order.paymentStatus !== 'paid') {
+      throw new BadRequestException('Order payment not completed')
+    }
+
+    if (order.fulfillmentStatus !== 'pending') {
+      throw new BadRequestException('Order has already been shipped or completed')
+    }
+
+    const updated = await this.prisma.shopOrder.update({
+      where: { id: orderId },
+      data: {
+        trackingNo: dto.trackingNo,
+        fulfillmentStatus: 'shipped',
+        shippedAt: new Date(),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            nickname: true,
+            phoneMasked: true,
+          },
+        },
+        items: true,
+      },
+    })
+
+    return updated
+  }
 }

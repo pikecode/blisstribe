@@ -10,12 +10,35 @@ export class ProductService {
     private categoryRepository: CategoryRepository
   ) {}
 
-  async getAllProducts(categoryId?: bigint): Promise<any[]> {
-    let categoryIdBig: bigint | undefined
-    if (categoryId !== undefined) {
-      categoryIdBig = typeof categoryId === 'bigint' ? categoryId : BigInt(categoryId)
+  async getAllProducts(params?: {
+    page?: number
+    pageSize?: number
+    categoryId?: string | bigint
+    keyword?: string
+  }): Promise<any> {
+    if (!params) {
+      return this.productRepository.findAll()
     }
-    return this.productRepository.findAll(categoryIdBig)
+
+    const categoryIdBig = params.categoryId
+      ? typeof params.categoryId === 'bigint'
+        ? params.categoryId
+        : BigInt(params.categoryId)
+      : undefined
+
+    const result = await this.productRepository.findWithPagination({
+      page: params.page,
+      pageSize: params.pageSize,
+      categoryId: categoryIdBig,
+      keyword: params.keyword,
+    })
+
+    return {
+      list: result.list,
+      total: result.total,
+      page: params.page || 1,
+      pageSize: params.pageSize || 20,
+    }
   }
 
   async getPublishedProducts(categoryId?: bigint): Promise<any[]> {
