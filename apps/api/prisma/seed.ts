@@ -1143,12 +1143,15 @@ async function main(): Promise<void> {
       where: { productId: demoProduct.id, userId: demoUser.id },
       select: { id: true },
     })
+    const needTagNames = ['睡眠改善', '重点改善', '线上咨询']
+    const needTagIds = await tagIdsByNames(needTagNames, healthModule.id)
     const leadData = {
       productId: demoProduct.id,
       userId: demoUser.id,
       partnerId: null,
       sourceScene: 'seed_demo',
-      needTags: ['睡眠改善', '重点改善', '线上咨询'],
+      needTags: needTagNames,
+      needTagIds,
       message: '最近入睡慢，白天精力不足，希望先线上了解。\n需求评估：你现在最想改善什么：睡眠质量；这个问题现在到什么程度：已经影响生活；你更偏好哪种服务方式：线上咨询',
       status: 'contacted',
       followUpNote: '已电话沟通，用户希望先拿到 7 天作息建议。',

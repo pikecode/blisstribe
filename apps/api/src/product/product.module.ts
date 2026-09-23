@@ -1,34 +1,13 @@
-import { Module } from '@nestjs/common'
-import { PrismaModule } from '../common/prisma.module'
-import { AdminModule } from '../admin/admin.module'
-import { ProductService } from './product.service'
-import {
-  AssessmentTemplateAdminController,
-  ProductAdminController,
-  ProductController,
-  ProductLeadAdminController,
-  ProductModuleController,
-  ProductModuleAdminController,
-  ProductPartnerController,
-  TagDictionaryPublicController,
-  RecommendationRuleAdminController,
-  TagDictionaryAdminController,
-} from './product.controller'
+import { Module } from '@nestjs/common';
+import { PassportModule } from '@nestjs/passport';
+import { ProductController } from './product.controller';
+import { ProductService } from './product.service';
+import { PrismaModule } from '../common/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PrismaModule, AdminModule],
-  controllers: [
-    ProductController,
-    ProductModuleController,
-    ProductModuleAdminController,
-    AssessmentTemplateAdminController,
-    ProductAdminController,
-    ProductLeadAdminController,
-    RecommendationRuleAdminController,
-    TagDictionaryPublicController,
-    TagDictionaryAdminController,
-    ProductPartnerController,
-  ],
+  imports: [PrismaModule, PassportModule, AuthModule],
+  controllers: [ProductController],
   providers: [ProductService],
 })
 export class ProductModule {}

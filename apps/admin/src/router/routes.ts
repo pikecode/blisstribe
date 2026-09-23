@@ -109,6 +109,38 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/product/leads.vue'),
         meta: { title: '咨询线索', icon: 'Tickets' },
       },
+      {
+        path: 'shop',
+        name: 'Shop',
+        redirect: '/shop/categories',
+        meta: { title: '商城管理', icon: 'ShoppingCart' },
+        children: [
+          {
+            path: 'categories',
+            name: 'ShopCategories',
+            component: () => import('@/views/shop/category.vue'),
+            meta: { title: '分类管理', icon: 'CollectionTag' },
+          },
+          {
+            path: 'products',
+            name: 'ShopProducts',
+            component: () => import('@/views/shop/product.vue'),
+            meta: { title: '商品管理', icon: 'Goods' },
+          },
+          {
+            path: 'orders',
+            name: 'ShopOrders',
+            component: () => import('@/views/shop/order.vue'),
+            meta: { title: '订单管理', icon: 'List' },
+          },
+          {
+            path: 'refunds',
+            name: 'ShopRefunds',
+            component: () => import('@/views/shop/refund.vue'),
+            meta: { title: '退款管理', icon: 'Delete' },
+          },
+        ],
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

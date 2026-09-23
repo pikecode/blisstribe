@@ -1,11 +1,10 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { PassportModule } from '@nestjs/passport'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { JwtStrategy } from './jwt.strategy'
-
 import { InvitationModule } from '../invitation/invitation.module'
 
 @Module({
@@ -19,10 +18,10 @@ import { InvitationModule } from '../invitation/invitation.module'
         signOptions: { expiresIn: config.get<string>('ACCESS_TOKEN_EXPIRES', '2h') },
       }),
     }),
-    InvitationModule,
+    forwardRef(() => InvitationModule),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, PassportModule, JwtStrategy],
 })
 export class AuthModule {}
