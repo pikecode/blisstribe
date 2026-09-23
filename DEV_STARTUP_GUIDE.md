@@ -6,7 +6,7 @@
 
 ```bash
 # 进入项目目录
-cd /Users/peakom/workbd/blisstribe/.claude/worktrees/shop-phase1
+cd /Users/peakom/workbd/blisstribe
 
 # 运行初始化脚本（自动处理端口冲突、启动 Docker、创建测试数据）
 bash scripts/dev-startup.sh
@@ -183,7 +183,7 @@ pnpm prisma db seed
 
 ```bash
 # 项目根目录
-cd /Users/peakom/workbd/blisstribe/.claude/worktrees/shop-phase1
+cd /Users/peakom/workbd/blisstribe
 
 # 初始化开发环境
 bash scripts/dev-startup.sh
