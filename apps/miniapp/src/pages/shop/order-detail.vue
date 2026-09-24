@@ -9,22 +9,6 @@
       <view class="order-detail__retry" @tap="loadOrder">重新加载</view>
     </view>
 
-    <view v-else-if="paymentSuccess" class="order-detail__success-mask">
-      <view class="order-detail__success">
-        <view class="order-detail__success-icon">✓</view>
-        <text class="order-detail__success-title">支付成功</text>
-        <text class="order-detail__success-desc">您的订单已成功支付</text>
-        <view class="order-detail__order-no-display">
-          <text class="order-detail__order-no-label">订单号</text>
-          <text class="order-detail__order-no-value">{{ order?.orderNo }}</text>
-        </view>
-        <view class="order-detail__success-actions">
-          <view class="order-detail__success-btn" @tap="goToOrderDetail">查看订单</view>
-          <view class="order-detail__success-btn order-detail__success-btn--secondary" @tap="goToOrderList">返回首页</view>
-        </view>
-      </view>
-    </view>
-
     <view v-else-if="order" class="order-detail__content">
       <!-- 支付加载状态 -->
       <view v-if="paymentLoading" class="order-detail__payment-loading">
@@ -44,13 +28,13 @@
         <text class="order-section__title">订单商品</text>
         <view v-for="item in order.items" :key="item.id" class="order-product">
           <view class="order-product__info">
-            <text class="order-product__title">{{ item.productTitle }}</text>
+            <text class="order-product__title">{{ item.productName }}</text>
             <view class="order-product__meta">
               <text>数量：{{ item.quantity }}</text>
-              <text>单价：¥{{ (item.price / 100).toFixed(2) }}</text>
+              <text>单价：¥{{ (item.unitPriceFen / 100).toFixed(2) }}</text>
             </view>
           </view>
-          <text class="order-product__subtotal">¥{{ (item.subtotal / 100).toFixed(2) }}</text>
+          <text class="order-product__subtotal">¥{{ (item.subtotalFen / 100).toFixed(2) }}</text>
         </view>
       </view>
 
@@ -61,12 +45,6 @@
           <view class="logistics-info__item">
             <text class="logistics-info__label">物流单号</text>
             <text class="logistics-info__value">{{ order.trackingNo }}</text>
-          </view>
-          <view v-if="order.trackingUrl" class="logistics-info__item">
-            <view class="logistics-info__link" @tap="viewTracking">
-              <text>查看物流详情</text>
-              <text class="logistics-info__arrow">></text>
-            </view>
           </view>
         </view>
       </view>
@@ -85,7 +63,7 @@
           </view>
           <view class="order-summary__row order-summary__row--total">
             <text class="order-summary__label">总计</text>
-            <text class="order-summary__total">¥{{ (order.totalAmount / 100).toFixed(2) }}</text>
+            <text class="order-summary__total">¥{{ (order.paymentAmountFen / 100).toFixed(2) }}</text>
           </view>
         </view>
       </view>
@@ -96,11 +74,7 @@
           <view class="order-actions__button order-actions__button--secondary" @tap="handleCancel">取消订单</view>
           <view class="order-actions__button order-actions__button--primary" @tap="handlePay">立即支付</view>
         </view>
-        <view v-else-if="order.status === 'completed'" class="order-actions__group">
-          <view class="order-actions__button order-actions__button--secondary" @tap="handleReview">写评价</view>
-          <view class="order-actions__button order-actions__button--secondary" @tap="handleRefund">申请退款</view>
-        </view>
-        <view v-else class="order-actions__group">
+        <view v-else-if="canRequestRefund" class="order-actions__group">
           <view class="order-actions__button order-actions__button--secondary" @tap="handleRefund">申请退款</view>
         </view>
       </view>
@@ -117,13 +91,15 @@ import { shopApi } from '@/api/modules/shop'
 const order = ref<Order | null>(null)
 const loading = ref(false)
 const loadError = ref(false)
-const orderId = ref<number>(0)
+const orderId = ref('')
 const paymentLoading = ref(false)
-const paymentSuccess = ref(false)
+const canRequestRefund = computed(() =>
+  order.value?.paymentStatus === 'paid' && order.value.fulfillmentStatus === 'pending'
+)
 
 const itemTotal = computed(() => {
   if (!order.value) return 0
-  return order.value.items.reduce((sum, item) => sum + item.subtotal, 0)
+  return order.value.items.reduce((sum, item) => sum + item.subtotalFen, 0)
 })
 
 function statusText(status: OrderStatus): string {
@@ -133,7 +109,7 @@ function statusText(status: OrderStatus): string {
     shipped: '已发货',
     completed: '已完成',
   }
-  return map[status]
+  return map[status] || status
 }
 
 function statusClass(status: OrderStatus): string {
@@ -143,7 +119,7 @@ function statusClass(status: OrderStatus): string {
     shipped: 'order-status-card__status--primary',
     completed: 'order-status-card__status--success',
   }
-  return map[status]
+  return map[status] || status
 }
 
 function formatDate(value: string): string {
@@ -153,7 +129,7 @@ function formatDate(value: string): string {
 }
 
 async function loadOrder(): Promise<void> {
-  if (orderId.value === 0) return
+  if (!orderId.value) return
 
   loading.value = true
   loadError.value = false
@@ -168,15 +144,10 @@ async function loadOrder(): Promise<void> {
   }
 }
 
-function viewTracking(): void {
-  if (!order.value?.trackingUrl) return
-  uni.openURL({ url: order.value.trackingUrl })
-}
-
 function handlePay(): void {
   uni.showModal({
     title: '确认支付',
-    content: `确认支付 ¥${(order.value?.totalAmount ?? 0 / 100).toFixed(2)}？`,
+    content: `确认支付 ¥${((order.value?.paymentAmountFen ?? 0) / 100).toFixed(2)}？`,
     success(res) {
       if (res.confirm) {
         processPayment()
@@ -189,47 +160,17 @@ async function processPayment(): Promise<void> {
   if (!order.value) return
 
   paymentLoading.value = true
-
   try {
-    const paymentData = await shopApi.createPayment(order.value.id)
-    const { prepayId, outTradeNo } = paymentData
-
-    try {
-      await uni.requestPayment({
-        timeStamp: String(Math.floor(Date.now() / 1000)),
-        nonceStr: generateNonceStr(),
-        package: `prepay_id=${prepayId}`,
-        signType: 'RSA',
-        paySign: outTradeNo,
-      })
-
-      paymentSuccess.value = true
-      uni.showToast({ title: '支付成功', icon: 'success' })
-    } catch (paymentErr: any) {
-      if (paymentErr?.errMsg?.includes('cancel')) {
-        uni.showToast({ title: '已取消支付', icon: 'none' })
-      } else {
-        uni.showToast({ title: '支付失败，请重试', icon: 'none' })
-      }
+    await shopApi.createPayment(order.value.id)
+    await loadOrder()
+    if (order.value?.paymentStatus !== 'paid') {
+      uni.showToast({ title: '支付渠道暂未配置，请稍后重试', icon: 'none' })
     }
-  } catch (err) {
-    uni.showToast({ title: '创建支付失败，请重试', icon: 'none' })
+  } catch {
+    uni.showToast({ title: '微信支付暂不可用，请稍后重试', icon: 'none' })
   } finally {
     paymentLoading.value = false
   }
-}
-
-function generateNonceStr(): string {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-}
-
-function goToOrderDetail(): void {
-  paymentSuccess.value = false
-  loadOrder()
-}
-
-function goToOrderList(): void {
-  uni.navigateTo({ url: '/pages/shop/orders' })
 }
 
 function handleCancel(): void {
@@ -259,16 +200,13 @@ async function cancelOrder(): Promise<void> {
 }
 
 function handleRefund(): void {
-  uni.showToast({ title: '退款功能开发中', icon: 'none' })
-}
-
-function handleReview(): void {
-  uni.showToast({ title: '评价功能开发中', icon: 'none' })
+  if (!order.value || !canRequestRefund.value) return
+  uni.navigateTo({ url: `/pages/shop/refund-request?id=${order.value.id}` })
 }
 
 onLoad((options) => {
   if (options?.id) {
-    orderId.value = Number(options.id)
+    orderId.value = String(options.id)
     loadOrder()
   }
 })

@@ -20,11 +20,11 @@
       </view>
 
       <!-- Refund List -->
-      <view v-if="refunds.length > 0" class="refund-list__content">
-        <view v-for="refund in refunds" :key="refund.id" class="refund-list__item" @tap="goToDetail(refund.id)">
+      <view v-if="filteredRefunds.length > 0" class="refund-list__content">
+        <view v-for="refund in filteredRefunds" :key="refund.id" class="refund-list__item" @tap="goToDetail(refund.id)">
           <view class="refund-list__item-header">
             <text class="refund-list__item-status">{{ shopApi.getRefundStatusLabel(refund.status) }}</text>
-            <text class="refund-list__item-amount">¥{{ formatAmount(refund.amountInFen) }}</text>
+            <text class="refund-list__item-amount">¥{{ formatAmount(refund.requestedAmountFen) }}</text>
           </view>
           <text class="refund-list__item-reason">{{ refund.reason || '无' }}</text>
           <text class="refund-list__item-date">{{ formatDate(refund.createdAt) }}</text>
@@ -45,18 +45,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { shopApi } from '@/api/modules/shop'
+import type { RefundResponse } from '@/api/modules/shop'
 import { useAuthStore } from '@/stores/modules/auth'
 import RefundStatus from '@/components/business/RefundStatus.vue'
 
 const authStore = useAuthStore()
 const selectedFilter = ref<string>('all')
-const refunds = ref<any[]>([])
+const refunds = ref<RefundResponse[]>([])
 const loading = ref(false)
 
 const filterTabs = [
   { label: '全部', value: 'all' },
   { label: '待审核', value: 'pending' },
-  { label: '已批准', value: 'approved' },
+  { label: '处理中', value: 'processing' },
   { label: '已拒绝', value: 'rejected' },
   { label: '已完成', value: 'success' },
 ]
@@ -101,7 +102,7 @@ async function loadRefunds() {
   try {
     const result = await shopApi.getUserRefunds({
       page: 1,
-      limit: 50,
+      pageSize: 50,
     })
     refunds.value = result.refunds
   } catch (error) {

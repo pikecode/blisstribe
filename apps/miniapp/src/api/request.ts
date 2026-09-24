@@ -5,7 +5,7 @@ import type { ApiResponse } from '@blisstribe/shared'
 
 export interface RequestOptions {
   url: string
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   data?: Record<string, unknown> | unknown
   header?: Record<string, string>
   loading?: boolean
@@ -30,7 +30,7 @@ export function request<T>(options: RequestOptions): Promise<T> {
 
     uni.request({
       url: `${APP_CONFIG.apiBaseUrl}${options.url}`,
-      method: options.method || 'GET',
+      method: (options.method || 'GET') as never,
       data: options.data as never,
       header: {
         'Content-Type': 'application/json',

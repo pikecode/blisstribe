@@ -27,7 +27,8 @@ export class PaymentController {
   ): Promise<{ prepayId: string; outTradeNo: string }> {
     const orderId = BigInt(id)
     const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip || '127.0.0.1'
-    return this.paymentService.createPayment(orderId, clientIp)
+    const userId = BigInt((req as Request & { user: { id: string | number } }).user.id)
+    return this.paymentService.createPayment(orderId, userId, clientIp)
   }
 }
 

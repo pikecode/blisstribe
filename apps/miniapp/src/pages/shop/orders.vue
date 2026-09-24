@@ -28,7 +28,7 @@
 
     <view v-else-if="orders.length === 0" class="orders__state orders__state--empty">
       <text>暂无订单</text>
-      <text class="orders__empty-desc">你还没有{{ statusText }}订单</text>
+      <text class="orders__empty-desc">你还没有{{ filterStatusText }}订单</text>
     </view>
 
     <view v-else class="orders__list">
@@ -41,10 +41,10 @@
         <view class="order-card__items">
           <view v-for="(item, index) in order.items.slice(0, 2)" :key="item.id" class="order-item">
             <view class="order-item__info">
-              <text class="order-item__title">{{ item.productTitle }}</text>
+              <text class="order-item__title">{{ item.productName }}</text>
               <text class="order-item__meta">x{{ item.quantity }}</text>
             </view>
-            <text class="order-item__price">¥{{ (item.subtotal / 100).toFixed(2) }}</text>
+            <text class="order-item__price">¥{{ (item.subtotalFen / 100).toFixed(2) }}</text>
           </view>
           <view v-if="order.items.length > 2" class="order-item order-item--more">
             <text>还有 {{ order.items.length - 2 }} 件商品</text>
@@ -54,7 +54,7 @@
         <view class="order-card__footer">
           <view>
             <text class="order-card__date">{{ formatDate(order.createdAt) }}</text>
-            <text class="order-card__amount">合计：<text class="order-card__total">¥{{ (order.totalAmount / 100).toFixed(2) }}</text></text>
+            <text class="order-card__amount">实付：<text class="order-card__total">¥{{ (order.paymentAmountFen / 100).toFixed(2) }}</text></text>
           </view>
           <view class="order-card__actions">
             <view v-if="order.status === 'pending_payment'" class="order-card__action order-card__action--primary" @tap.stop="handlePayment(order.id)">立即支付</view>
@@ -74,6 +74,7 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { orderApi, type Order, type OrderStatus } from '@/api/modules/order'
+import { shopApi } from '@/api/modules/shop'
 
 type FilterStatus = OrderStatus | ''
 
@@ -93,7 +94,7 @@ const statusTabs: Array<{ label: string; value: FilterStatus }> = [
   { label: '已完成', value: 'completed' },
 ]
 
-const statusText = computed(() => {
+const filterStatusText = computed(() => {
   const map: Record<FilterStatus, string> = {
     '': '',
     'pending_payment': '待支付',
@@ -177,15 +178,20 @@ function changeStatus(status: FilterStatus): void {
   loadOrders()
 }
 
-function goDetail(id: number): void {
+function goDetail(id: string): void {
   uni.navigateTo({ url: `/pages/shop/order-detail?id=${id}` })
 }
 
-function handlePayment(id: number): void {
-  uni.showToast({ title: '支付功能开发中', icon: 'none' })
+async function handlePayment(id: string): Promise<void> {
+  try {
+    await shopApi.createPayment(id)
+    await loadOrders()
+  } catch {
+    uni.showToast({ title: '微信支付暂不可用，请稍后重试', icon: 'none' })
+  }
 }
 
-function handleCancel(id: number): void {
+function handleCancel(id: string): void {
   uni.showModal({
     title: '取消订单',
     content: '确定要取消这个订单吗？',
@@ -197,7 +203,7 @@ function handleCancel(id: number): void {
   })
 }
 
-async function cancelOrder(id: number): Promise<void> {
+async function cancelOrder(id: string): Promise<void> {
   try {
     await orderApi.cancel(id)
     uni.showToast({ title: '订单已取消', icon: 'success' })

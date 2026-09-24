@@ -317,21 +317,8 @@
             </el-radio-group>
           </el-form-item>
 
-          <el-form-item v-if="approvalForm.decision === 'approve'" label="批准金额" required>
-            <div class="amount-input">
-              <span class="amount-prefix">¥</span>
-              <el-input-number
-                v-model="approvalForm.approvedAmount"
-                :precision="2"
-                :min="0"
-                :max="currentRefund.requestAmountFen / 100"
-                :step="0.01"
-                style="width: 100%"
-              />
-            </div>
-            <div class="amount-hint">
-              最大可批准: ¥{{ (currentRefund.requestAmountFen / 100).toFixed(2) }}
-            </div>
+          <el-form-item v-if="approvalForm.decision === 'approve'" label="退款金额">
+            <span>整单退款：¥{{ (currentRefund.requestAmountFen / 100).toFixed(2) }}</span>
           </el-form-item>
 
           <el-form-item v-if="approvalForm.decision === 'reject'" label="拒绝原因" required>
@@ -398,7 +385,6 @@ const approvalDialogVisible = ref(false)
 const approvalFormRef = ref()
 const approvalForm = ref({
   decision: '',
-  approvedAmount: 0,
   rejectionReason: '',
   remark: '',
 })
@@ -417,6 +403,7 @@ const statusMap: Record<string, { text: string; type: string }> = {
   approved: { text: '已批准', type: 'success' },
   rejected: { text: '已拒绝', type: 'danger' },
   processing: { text: '处理中', type: 'info' },
+  success: { text: '退款成功', type: 'success' },
   completed: { text: '已完成', type: 'success' },
   failed: { text: '失败', type: 'danger' },
 }
@@ -479,7 +466,6 @@ const openApprovalDialog = async (row: Refund): Promise<void> => {
 const resetApprovalForm = (): void => {
   approvalForm.value = {
     decision: '',
-    approvedAmount: currentRefund.value?.requestAmountFen ? currentRefund.value.requestAmountFen / 100 : 0,
     rejectionReason: '',
     remark: '',
   }
@@ -492,11 +478,6 @@ const submitApproval = async (): Promise<void> => {
     return
   }
 
-  if (approvalForm.value.decision === 'approve' && approvalForm.value.approvedAmount === 0) {
-    ElMessage.warning('请输入批准金额')
-    return
-  }
-
   if (approvalForm.value.decision === 'reject' && !approvalForm.value.rejectionReason.trim()) {
     ElMessage.warning('拒绝时必须填写拒绝原因')
     return
@@ -506,14 +487,13 @@ const submitApproval = async (): Promise<void> => {
   try {
     if (approvalForm.value.decision === 'approve') {
       await refundApi.approveRefund(currentRefund.value.id, {
-        approvedAmountFen: Math.round(approvalForm.value.approvedAmount * 100),
-        remark: approvalForm.value.remark || undefined,
+        approved: true,
+        adminNote: approvalForm.value.remark || undefined,
       })
-      ElMessage.success('已批准退款')
+      ElMessage.success('退款申请已提交至支付渠道')
     } else {
       await refundApi.rejectRefund(currentRefund.value.id, {
-        rejectionReason: approvalForm.value.rejectionReason,
-        remark: approvalForm.value.remark || undefined,
+        rejectReason: approvalForm.value.rejectionReason,
       })
       ElMessage.success('已拒绝退款')
     }

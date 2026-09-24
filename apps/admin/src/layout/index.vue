@@ -182,6 +182,7 @@ const menuSections: MenuSection[] = [
     items: [
       { path: '/shop/categories', title: '商品分类', icon: CollectionTag, desc: '维护商城商品分类' },
       { path: '/shop/products', title: '商品管理', icon: Goods, desc: '维护商城商品信息、库存、价格' },
+      { path: '/shop/orders', title: '订单管理', icon: Tickets, desc: '查看订单详情、发货和状态管理' },
     ],
   },
   {

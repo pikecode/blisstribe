@@ -1,30 +1,37 @@
 import { request } from '@/api/request'
 
-export type OrderStatus = 'pending_payment' | 'paid' | 'shipped' | 'completed'
+export type OrderStatus = string
 
 export interface OrderItem {
-  id: number
-  orderId: number
-  productId: number
-  productTitle: string
+  id: string
+  orderId: string
+  productId: string
+  productImage?: string | null
+  productName: string
   quantity: number
-  price: number
-  subtotal: number
+  unitPriceFen: number
+  subtotalFen: number
 }
 
 export interface Order {
-  id: number
+  id: string
   orderNo: string
+  userId: string
   status: OrderStatus
-  totalAmount: number
-  paymentAmount: number
+  paymentStatus: string
+  fulfillmentStatus: string
+  totalAmountFen: number
+  paymentAmountFen: number
+  refundedAmountFen: number
+  receiverName?: string
+  receiverPhone?: string
+  shippingAddress?: string
+  trackingNo?: string
   createdAt: string
   updatedAt: string
-  items: OrderItem[]
-  trackingNo?: string
-  trackingUrl?: string
   shippedAt?: string
   completedAt?: string
+  items: OrderItem[]
 }
 
 export interface OrderListResult {
@@ -32,25 +39,21 @@ export interface OrderListResult {
   total: number
   page: number
   pageSize: number
+  hasMore: boolean
 }
 
 export interface OrderListParams {
-  status?: OrderStatus | ''
+  status?: string
   page?: number
   pageSize?: number
 }
 
 export interface CreateOrderParams {
-  items: Array<{
-    productId: number
-    quantity: number
-    priceInFen: number
-  }>
-  totalInFen: number
+  items: Array<{ productId: string; quantity: number }>
+  receiverName: string
+  receiverPhone: string
+  shippingAddress: string
   remark?: string
-  shippingAddress?: string
-  recipientPhone?: string
-  recipientName?: string
 }
 
 export const orderApi = {
@@ -62,7 +65,7 @@ export const orderApi = {
     })
   },
 
-  detail(id: number): Promise<Order> {
+  detail(id: string): Promise<Order> {
     return request<Order>({
       url: `/shop/orders/${id}`,
       method: 'GET',
@@ -77,8 +80,8 @@ export const orderApi = {
     })
   },
 
-  cancel(id: number): Promise<void> {
-    return request<void>({
+  cancel(id: string): Promise<Order> {
+    return request<Order>({
       url: `/shop/orders/${id}/cancel`,
       method: 'POST',
     })

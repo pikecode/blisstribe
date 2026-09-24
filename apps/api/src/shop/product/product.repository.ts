@@ -30,6 +30,7 @@ export class ProductRepository {
     pageSize?: number
     categoryId?: bigint
     keyword?: string
+    status?: number
   }): Promise<{ list: ShopProduct[]; total: number }> {
     const page = params.page || 1
     const pageSize = params.pageSize || 20
@@ -37,6 +38,10 @@ export class ProductRepository {
 
     const where: any = {
       deletedAt: null,
+    }
+
+    if (params.status !== undefined) {
+      where.status = params.status
     }
 
     if (params.categoryId !== undefined) {
@@ -65,6 +70,12 @@ export class ProductRepository {
   async findById(id: bigint): Promise<ShopProduct | null> {
     return this.prisma.shopProduct.findUnique({
       where: { id },
+    })
+  }
+
+  async findPublishedById(id: bigint): Promise<ShopProduct | null> {
+    return this.prisma.shopProduct.findFirst({
+      where: { id, status: 1, deletedAt: null },
     })
   }
 

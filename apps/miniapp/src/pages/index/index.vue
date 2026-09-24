@@ -23,6 +23,15 @@
       </view>
     </view>
 
+    <view class="index__shop-entry" @tap="goShop">
+      <view class="index__shop-copy">
+        <text class="index__shop-kicker">精选好物</text>
+        <text class="index__shop-title">逛逛部落商城</text>
+        <text class="index__shop-desc">发现适合你的商品与服务</text>
+      </view>
+      <text class="index__shop-arrow">去逛逛 ›</text>
+    </view>
+
     <view class="index__section">
       <view class="app-section-head">
         <view>
@@ -233,6 +242,7 @@ const goProducts = () => {
   const moduleCode = productModules.value[0]?.code || 'health'
   uni.navigateTo({ url: `/pages/products/index?moduleCode=${moduleCode}` })
 }
+const goShop = () => uni.switchTab({ url: '/pages/shop/index' })
 const goProductDetail = (id: number) => {
   const product = recommendedProducts.value.find((item) => item.id === id)
   if (product) {
@@ -484,6 +494,53 @@ onShow(async () => {
 
   &__section {
     margin: 0 28rpx 34rpx;
+  }
+
+  &__shop-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20rpx;
+    min-height: 142rpx;
+    margin: 0 28rpx 34rpx;
+    padding: 22rpx 26rpx;
+    border-left: 6rpx solid #17834a;
+    border-radius: 12rpx;
+    background: #eaf5ed;
+  }
+
+  &__shop-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__shop-kicker {
+    color: #287448;
+    font-size: 21rpx;
+    line-height: 30rpx;
+  }
+
+  &__shop-title {
+    margin-top: 3rpx;
+    color: #173b27;
+    font-size: 30rpx;
+    font-weight: 750;
+    line-height: 42rpx;
+  }
+
+  &__shop-desc {
+    margin-top: 2rpx;
+    color: #54715e;
+    font-size: 22rpx;
+    line-height: 32rpx;
+  }
+
+  &__shop-arrow {
+    flex-shrink: 0;
+    color: #176c3c;
+    font-size: 23rpx;
+    font-weight: 650;
   }
 
   &__activity-list {

@@ -41,20 +41,62 @@ export class ProductService {
     }
   }
 
-  async getPublishedProducts(categoryId?: bigint): Promise<any[]> {
+  async getPublishedProducts(categoryId?: bigint): Promise<any> {
     let categoryIdBig: bigint | undefined
     if (categoryId !== undefined) {
       categoryIdBig = typeof categoryId === 'bigint' ? categoryId : BigInt(categoryId)
     }
-    return this.productRepository.findAll(categoryIdBig, 1)
+    return this.getPublishedProductsPage({ categoryId: categoryIdBig })
   }
 
   async getProductById(id: bigint): Promise<any> {
-    const product = await this.productRepository.findById(id)
+    const product = await this.productRepository.findPublishedById(id)
     if (!product) {
       throw new NotFoundException('商品不存在')
     }
-    return product
+    return this.toPublicProduct(product)
+  }
+
+  async getPublishedProductsPage(params: {
+    page?: number
+    pageSize?: number
+    categoryId?: bigint
+    keyword?: string
+  }) {
+    const page = Math.max(1, params.page || 1)
+    const pageSize = Math.min(100, Math.max(1, params.pageSize || 20))
+    const result = await this.productRepository.findWithPagination({
+      page,
+      pageSize,
+      categoryId: params.categoryId,
+      keyword: params.keyword?.trim() || undefined,
+      status: 1,
+    })
+    return {
+      list: result.list.map((product) => this.toPublicProduct(product)),
+      total: result.total,
+      page,
+      pageSize,
+      hasMore: page * pageSize < result.total,
+    }
+  }
+
+  private toPublicProduct(product: {
+    id: bigint
+    totalStock: number
+    reservedStock: number
+    soldStock: number
+    [key: string]: any
+  }) {
+    const available = Math.max(
+      0,
+      product.totalStock - product.reservedStock - product.soldStock
+    )
+    return {
+      ...product,
+      available,
+      stockStatus: available === 0 ? 'sold_out' : available <= 5 ? 'limited' : 'available',
+    }
   }
 
   async createProduct(dto: CreateProductDto): Promise<any> {

@@ -12,7 +12,7 @@ export interface Refund {
   approvedAmountFen?: number
   reason: string
   reasonSummary?: string
-  status: 'pending' | 'approved' | 'rejected' | 'processing' | 'completed' | 'failed'
+  status: 'pending' | 'approved' | 'rejected' | 'processing' | 'success' | 'completed' | 'failed'
   rejectionReason?: string
   remark?: string
   createdAt: string
@@ -32,13 +32,12 @@ export interface RefundListResult {
 }
 
 export interface ApproveRefundDto {
-  approvedAmountFen: number
-  remark?: string
+  approved: true
+  adminNote?: string
 }
 
 export interface RejectRefundDto {
-  rejectionReason: string
-  remark?: string
+  rejectReason: string
 }
 
 export const refundApi = {
@@ -69,13 +68,4 @@ export const refundApi = {
     return request.post(`/admin/shop/refunds/${id}/reject`, data)
   },
 
-  // Export refunds
-  exportRefunds(params: {
-    status?: string
-    keyword?: string
-    startDate?: string
-    endDate?: string
-  }) {
-    return request.get('/admin/shop/refunds/export', { params, responseType: 'blob' })
-  },
 }

@@ -21,9 +21,17 @@ export class CreateCategoryDto {
   @IsOptional()
   @Min(0)
   sortOrder?: number
+
+  @IsInt()
+  @IsOptional()
+  status?: number
 }
 
 export class UpdateCategoryDto {
+  @IsString()
+  @IsOptional()
+  code?: string
+
   @IsString()
   @IsOptional()
   name?: string

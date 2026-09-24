@@ -47,7 +47,7 @@ export class AdminCategoryController {
   @Get()
   @UseGuards(AdminJwtGuard)
   async getAllCategories() {
-    return this.categoryService.getAllCategories()
+    return this.categoryService.getAllCategories(true)
   }
 
   @Post()

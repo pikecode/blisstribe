@@ -66,6 +66,18 @@ docker compose -f docker-compose.prod.yml exec -T api pnpm --filter @blisstribe/
 - 备份恢复演练。
 - 敏感数据字段检查。
 
+### 2.5 微信支付
+
+当前微信支付 V3 适配器尚未实现真实统一下单、回调验签/解密和退款请求；即使填入以下配置，API 仍会失败关闭。此项完成并通过联调前，不得开放真实支付或退款，也不得将商城标记为支付闭环已上线。
+
+- [ ] 配置 `WECHAT_APP_ID`、`WECHAT_MCH_ID`、`WECHAT_API_V3_KEY`。
+- [ ] 通过密钥系统注入 `WECHAT_MCH_PRIVATE_KEY`，并配置 `WECHAT_MCH_CERT_SERIAL_NO` 与 `WECHAT_PLATFORM_PUBLIC_KEY`；不得提交真实密钥、私钥或证书。
+- [ ] 配置 `API_BASE_URL` 为带 `/api/v1` 的公网 HTTPS API 基址；微信支付通知地址应为 `<API_BASE_URL>/shop/webhooks/wechat-pay`。
+- [ ] 在微信商户平台配置并验证支付通知 URL；确认生产回调可访问且请求体原文可用于验签。
+- [ ] 使用测试商户环境或受控小额交易完成下单、签名参数、支付回调验签/解密、金额校验、重复回调和超时关闭验证。
+- [ ] 完成退款申请、审核、退款通知及重复通知验证，并确认失败/未知结果有人工核对和可恢复流程。
+- [ ] 确认应用端只在获得真实签名参数后调用 `wx.requestPayment`，支付结果以服务端订单状态为准。
+
 ## 3. 发布验收
 
 本地发布：

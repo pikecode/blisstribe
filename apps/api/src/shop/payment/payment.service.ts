@@ -17,7 +17,11 @@ export class PaymentService {
     private wechatPayService: WechatPayService
   ) {}
 
-  async createPayment(orderId: bigint, clientIp: string): Promise<{ prepayId: string; outTradeNo: string }> {
+  async createPayment(
+    orderId: bigint,
+    userId: bigint,
+    clientIp: string
+  ): Promise<{ prepayId: string; outTradeNo: string }> {
     // Find order via OrderRepository.findById()
     const order = await this.orderRepository.findById(orderId)
 
@@ -26,8 +30,14 @@ export class PaymentService {
       throw new NotFoundException('订单不存在')
     }
 
-    // Validate: paymentStatus === 'unpaid'
-    if (order.paymentStatus !== 'unpaid') {
+    if (order.userId !== userId) {
+      throw new NotFoundException('订单不存在')
+    }
+    if (
+      order.status !== 'pending_payment' ||
+      order.paymentStatus !== 'unpaid' ||
+      order.expiresAt <= new Date()
+    ) {
       throw new BadRequestException('订单状态不支持支付')
     }
 
@@ -36,7 +46,7 @@ export class PaymentService {
       outTradeNo: order.orderNo,
       amount: order.paymentAmountFen,
       description: `BlissTribe订单${order.orderNo}`,
-      notifyUrl: `${process.env.API_BASE_URL || 'http://localhost:3000'}/shop/webhooks/wechat-pay`,
+      notifyUrl: `${process.env.API_BASE_URL || 'http://localhost:3000/api/v1'}/shop/webhooks/wechat-pay`,
       clientIp,
     })
 
@@ -84,47 +94,55 @@ export class PaymentService {
 
     // Use $transaction() for atomic updates
     await this.prisma.$transaction(async (tx: any) => {
-      // Check if payment already processed (idempotency)
-      const existingPayment = await tx.shopPayment.findFirst({
-        where: {
-          orderId: order.id,
-          wechatTransactionId: transactionId,
-        },
-      })
-
-      // If found, return early (duplicate callback)
-      if (existingPayment) {
-        return
+      const payment = await tx.shopPayment.findUnique({ where: { outTradeNo } })
+      if (!payment || payment.orderId !== order.id) {
+        throw new BadRequestException('支付记录不存在')
+      }
+      if (payment.status === 'success') {
+        if (payment.wechatTransactionId === transactionId) return
+        throw new BadRequestException('订单已由其他交易完成支付')
       }
 
-      // Update shopPayment
-      await tx.shopPayment.update({
-        where: { outTradeNo },
+      const now = new Date()
+      const paidOrder = await tx.shopOrder.updateMany({
+        where: {
+          id: order.id,
+          status: 'pending_payment',
+          paymentStatus: 'unpaid',
+        },
+        data: {
+          status: 'paid',
+          paymentStatus: 'paid',
+          paidAt: now,
+        },
+      })
+      if (paidOrder.count !== 1) {
+        throw new BadRequestException('订单状态已变化，无法确认支付')
+      }
+
+      const updatedPayment = await tx.shopPayment.updateMany({
+        where: { id: payment.id, status: 'pending' },
         data: {
           wechatTransactionId: transactionId,
           status: 'success',
-          paidAt: new Date(),
+          paidAt: now,
         },
       })
+      if (updatedPayment.count !== 1) {
+        throw new BadRequestException('支付记录状态已变化')
+      }
 
-      // Update shopOrder - only update payment status, not order status
-      await tx.shopOrder.update({
-        where: { id: order.id },
-        data: {
-          paymentStatus: 'paid',
-          paidAt: new Date(),
-        },
-      })
-
-      // For each order.items, update shopProduct
       for (const item of order.items) {
-        await tx.shopProduct.update({
-          where: { id: item.productId },
+        const updatedProduct = await tx.shopProduct.updateMany({
+          where: { id: item.productId, reservedStock: { gte: item.quantity } },
           data: {
             reservedStock: { decrement: item.quantity },
             soldStock: { increment: item.quantity },
           },
         })
+        if (updatedProduct.count !== 1) {
+          throw new BadRequestException('预留库存状态异常')
+        }
       }
     })
 

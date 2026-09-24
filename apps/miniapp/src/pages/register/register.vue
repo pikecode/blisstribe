@@ -17,13 +17,15 @@
 
     <!-- Step 1: 基础信息 -->
     <view v-if="step === 1" class="register__form">
-      <view class="register__avatar" @tap="chooseAvatar">
-        <view class="register__avatar-preview">
-          <image v-if="form.avatar" :src="form.avatar" class="register__avatar-img" mode="aspectFill" />
-          <view v-else class="register__avatar-placeholder">👤</view>
+      <view class="register__avatar">
+        <view class="register__avatar-select" @tap="chooseAvatar">
+          <view class="register__avatar-preview">
+            <image v-if="form.avatar" :src="form.avatar" class="register__avatar-img" mode="aspectFill" />
+            <view v-else class="register__avatar-placeholder">👤</view>
+          </view>
+          <text class="register__avatar-tip">点击头像从相册上传（选填）</text>
         </view>
-        <text class="register__avatar-tip">点击上传头像（选填）</text>
-        <button class="register__avatar-wx-btn" open-type="chooseAvatar" @tap.stop @chooseavatar="onChooseWxAvatar">
+        <button class="register__avatar-wx-btn" open-type="chooseAvatar" @chooseavatar="onChooseWxAvatar">
           选择微信头像
         </button>
       </view>
@@ -363,7 +365,11 @@ function onInviteCodeInput(e: InputEvent) {
 
 async function onChooseWxAvatar(e: unknown): Promise<void> {
   const avatarUrl = (e as { detail?: { avatarUrl?: string } }).detail?.avatarUrl
-  if (avatarUrl) await uploadRegisterAvatar(avatarUrl)
+  if (!avatarUrl) {
+    uni.showToast({ title: '未获取到微信头像', icon: 'none' })
+    return
+  }
+  await uploadRegisterAvatar(avatarUrl)
 }
 
 function applyWxProfile(): void {
@@ -438,6 +444,11 @@ async function uploadRegisterAvatar(filePath: string): Promise<void> {
   try {
     const uploaded = await userApi.uploadRegisterAvatar(filePath, authStore.tempToken)
     form.avatar = uploaded.url
+  } catch (error) {
+    uni.showToast({
+      title: error instanceof Error ? error.message : '头像上传失败，请重试',
+      icon: 'none',
+    })
   } finally {
     uni.hideLoading()
   }
@@ -644,6 +655,11 @@ onLoad((options) => {
     flex-direction: column;
     align-items: center;
     padding: 28rpx 0;
+    &-select {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
     &-preview {
       width: 140rpx;
       height: 140rpx;

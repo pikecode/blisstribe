@@ -18,122 +18,114 @@ export class OrderService {
   ) {}
 
   async createOrder(userId: bigint, dto: CreateOrderDto) {
-    // Validate receiver info
-    if (
-      !dto.receiverName ||
-      !dto.receiverPhone ||
-      !dto.shippingAddress
-    ) {
-      throw new BadRequestException('Incomplete receiver information')
+    if (!dto.receiverName?.trim() || !dto.receiverPhone?.trim() || !dto.shippingAddress?.trim()) {
+      throw new BadRequestException('收货信息不完整')
+    }
+    const receiverName = dto.receiverName.trim()
+    const receiverPhone = dto.receiverPhone.trim()
+    const shippingAddress = dto.shippingAddress.trim()
+    if (!Array.isArray(dto.items) || dto.items.length === 0) {
+      throw new BadRequestException('订单商品不能为空')
     }
 
-    // Validate items
-    if (!dto.items || dto.items.length === 0) {
-      throw new BadRequestException('Items array cannot be empty')
+    const quantities = new Map<bigint, number>()
+    for (const item of dto.items) {
+      let productId: bigint
+      try {
+        productId = BigInt(item.productId)
+      } catch {
+        throw new BadRequestException('商品 ID 无效')
+      }
+      if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0) {
+        throw new BadRequestException('商品数量必须为正整数')
+      }
+      const quantity = (quantities.get(productId) || 0) + item.quantity
+      if (!Number.isSafeInteger(quantity)) {
+        throw new BadRequestException('商品数量超出限制')
+      }
+      quantities.set(productId, quantity)
     }
 
-    // Use transaction for atomicity
-    const order = await this.prisma.$transaction(async (tx: any) => {
-      let totalAmountFen = 0n
-      const orderItems: any[] = []
+    return this.prisma.$transaction(async (tx: any) => {
+      let totalAmountFen = 0
+      const orderItems: Array<Record<string, unknown>> = []
 
-      // Validate and reserve stock for each item
-      for (const item of dto.items) {
-        // Query product (without include to avoid nested queries)
-        const product = await tx.shopProduct.findUnique({
-          where: { id: item.productId },
-        })
-
-        // Validate product exists
-        if (!product) {
-          throw new NotFoundException(
-            `Product not found: ${item.productId}`
-          )
+      for (const [productId, quantity] of [...quantities].sort(([a], [b]) => a < b ? -1 : 1)) {
+        const locked = await tx.$queryRaw`
+          SELECT "id" FROM "ShopProduct" WHERE "id" = ${productId} FOR UPDATE
+        `
+        if (!Array.isArray(locked) || locked.length === 0) {
+          throw new NotFoundException(`商品不存在：${productId}`)
         }
 
-        // Validate product is published
+        const product = await tx.shopProduct.findUnique({ where: { id: productId } })
+        if (!product || product.deletedAt) {
+          throw new NotFoundException(`商品不存在：${productId}`)
+        }
         if (product.status !== 1) {
-          throw new BadRequestException(
-            `Product is not published: ${product.name}`
-          )
+          throw new BadRequestException(`商品已下架：${product.name}`)
         }
 
-        // Validate product is not deleted
-        if (product.deletedAt) {
-          throw new BadRequestException(
-            `Product has been deleted: ${product.name}`
-          )
+        const available = product.totalStock - product.reservedStock - product.soldStock
+        if (available < quantity) {
+          throw new BadRequestException(`商品库存不足：${product.name}`)
+        }
+        if (!Number.isSafeInteger(product.priceFen) || product.priceFen <= 0) {
+          throw new BadRequestException(`商品价格无效：${product.name}`)
         }
 
-        // Calculate available stock
-        const available =
-          product.totalStock - product.reservedStock - product.soldStock
-
-        // Validate sufficient stock
-        if (available < item.quantity) {
-          throw new BadRequestException(
-            `Insufficient stock for ${product.name}. Available: ${available}, Requested: ${item.quantity}`
-          )
+        const subtotalFen = product.priceFen * quantity
+        totalAmountFen += subtotalFen
+        if (!Number.isSafeInteger(subtotalFen) || !Number.isSafeInteger(totalAmountFen)) {
+          throw new BadRequestException('订单金额超出限制')
         }
 
-        // Update product: reserve stock
         await tx.shopProduct.update({
-          where: { id: item.productId },
-          data: {
-            reservedStock: {
-              increment: item.quantity,
-            },
-          },
+          where: { id: productId },
+          data: { reservedStock: { increment: quantity } },
         })
-
-        // Accumulate total amount
-        totalAmountFen +=
-          BigInt(product.priceFen) * BigInt(item.quantity)
-
-        // Prepare order item
         orderItems.push({
-          productId: item.productId,
-          quantity: item.quantity,
-          priceFen: product.priceFen,
+          productId,
+          productName: product.name,
+          productImage: product.images[0] || null,
+          unitPriceFen: product.priceFen,
+          quantity,
+          subtotalFen,
         })
       }
 
-      // Generate order number
-      const orderNo = OrderNoGenerator.generate()
-
-      // Calculate expiration (15 minutes from now)
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
-
-      // Create order with items in same transaction
       const createdOrder = await tx.shopOrder.create({
         data: {
           userId,
-          orderNo,
+          orderNo: OrderNoGenerator.generate(),
           status: 'pending_payment',
           paymentStatus: 'unpaid',
           fulfillmentStatus: 'pending',
-          totalAmountFen: totalAmountFen,
-          receiverName: dto.receiverName,
-          receiverPhone: dto.receiverPhone,
-          shippingAddress: dto.shippingAddress,
-          remark: dto.remark,
-          expiresAt,
-          items: {
-            create: orderItems,
-          },
+          totalAmountFen,
+          discountAmountFen: 0,
+          paymentAmountFen: totalAmountFen,
+          receiverName,
+          receiverPhone,
+          shippingAddress,
+          remark: dto.remark?.trim(),
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+          items: { create: orderItems },
         },
-        include: {
-          items: true,
-        },
+        include: { items: true },
       })
+
+      const cart = await tx.shopCart.findUnique({
+        where: { userId },
+        select: { id: true },
+      })
+      if (cart) {
+        await tx.shopCartItem.deleteMany({
+          where: { cartId: cart.id, productId: { in: [...quantities.keys()] } },
+        })
+      }
 
       return createdOrder
     })
-
-    // Clear cart after successful order creation
-    await this.cartService.clearCart(userId)
-
-    return order
   }
 
   async getOrderDetail(orderId: bigint, userId: bigint) {
@@ -152,16 +144,22 @@ export class OrderService {
 
   async getUserOrders(
     userId: bigint,
-    filters: { status?: string; page?: number; limit?: number }
+    filters: { status?: string; page?: number; pageSize?: number; limit?: number }
   ) {
-    const { status, page = 1, limit = 20 } = filters
-    const offset = (page - 1) * limit
-
-    return this.orderRepository.findUserOrders(userId, {
-      status,
-      offset,
-      limit,
+    const page = Math.max(1, filters.page || 1)
+    const pageSize = Math.min(100, Math.max(1, filters.pageSize || filters.limit || 20))
+    const result = await this.orderRepository.findUserOrders(userId, {
+      status: filters.status,
+      offset: (page - 1) * pageSize,
+      limit: pageSize,
     })
+    return {
+      list: result.orders,
+      total: result.total,
+      page,
+      pageSize,
+      hasMore: page * pageSize < result.total,
+    }
   }
 
   async cancelOrder(orderId: bigint, userId: bigint) {
@@ -176,36 +174,26 @@ export class OrderService {
       throw new BadRequestException('Cannot cancel other user orders')
     }
 
-    // Check status is pending_payment
-    if (order.status !== 'pending_payment') {
-      throw new BadRequestException(
-        `Cannot cancel order in ${order.status} status`
-      )
-    }
-
-    // Use transaction to release reserved stock
     await this.prisma.$transaction(async (tx: any) => {
-      // Release stock for each item
-      for (const item of order.items) {
-        await tx.shopProduct.update({
-          where: { id: item.productId },
-          data: {
-            reservedStock: {
-              decrement: item.quantity,
-            },
-          },
-        })
-      }
-
-      // Update order status
-      await tx.shopOrder.update({
-        where: { id: orderId },
+      const changed = await tx.shopOrder.updateMany({
+        where: { id: orderId, userId, status: 'pending_payment', paymentStatus: 'unpaid' },
         data: {
           status: 'cancelled',
           cancelledAt: new Date(),
           cancelReason: 'User cancelled',
         },
       })
+      if (changed.count !== 1) {
+        throw new BadRequestException(`订单当前状态不可取消：${order.status}`)
+      }
+
+      for (const item of order.items) {
+        const released = await tx.shopProduct.updateMany({
+          where: { id: item.productId, reservedStock: { gte: item.quantity } },
+          data: { reservedStock: { decrement: item.quantity } },
+        })
+        if (released.count !== 1) throw new BadRequestException('预留库存状态异常')
+      }
     })
 
     return this.orderRepository.findById(orderId)

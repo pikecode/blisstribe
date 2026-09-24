@@ -21,10 +21,36 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, SuccessRespons
       map((data) => ({
         code: 200,
         message: ErrorMessage[200] || 'success',
-        data,
+        data: this.convertBigIntToString(data),
         timestamp: Date.now(),
       }))
     )
+  }
+
+  private convertBigIntToString(data: any): any {
+    if (data === null || data === undefined) {
+      return data
+    }
+
+    if (typeof data === 'bigint') {
+      return data.toString()
+    }
+
+    if (Array.isArray(data)) {
+      return data.map(item => this.convertBigIntToString(item))
+    }
+
+    if (typeof data === 'object') {
+      const result: any = {}
+      for (const key in data) {
+        if (data.hasOwnProperty(key)) {
+          result[key] = this.convertBigIntToString(data[key])
+        }
+      }
+      return result
+    }
+
+    return data
   }
 }
 

@@ -141,6 +141,54 @@
       "style": {
         "navigationBarTitleText": "商品列表"
       }
+    },
+    {
+      "path": "pages/shop/detail",
+      "style": {
+        "navigationBarTitleText": "商品详情"
+      }
+    },
+    {
+      "path": "pages/shop/cart",
+      "style": {
+        "navigationBarTitleText": "购物车"
+      }
+    },
+    {
+      "path": "pages/shop/checkout",
+      "style": {
+        "navigationBarTitleText": "确认订单"
+      }
+    },
+    {
+      "path": "pages/shop/orders",
+      "style": {
+        "navigationBarTitleText": "我的订单"
+      }
+    },
+    {
+      "path": "pages/shop/order-detail",
+      "style": {
+        "navigationBarTitleText": "订单详情"
+      }
+    },
+    {
+      "path": "pages/shop/refund-request",
+      "style": {
+        "navigationBarTitleText": "申请退款"
+      }
+    },
+    {
+      "path": "pages/shop/refund-list",
+      "style": {
+        "navigationBarTitleText": "我的退款"
+      }
+    },
+    {
+      "path": "pages/shop/refund-detail",
+      "style": {
+        "navigationBarTitleText": "退款详情"
+      }
     }
   ],
   "globalStyle": {
@@ -160,6 +208,12 @@
         "text": "首页",
         "iconPath": "static/tabbar/home.png",
         "selectedIconPath": "static/tabbar/home-active.png"
+      },
+      {
+        "pagePath": "pages/shop/index",
+        "text": "商城",
+        "iconPath": "static/tabbar/shop.png",
+        "selectedIconPath": "static/tabbar/shop-active.png"
       },
       {
         "pagePath": "pages/profile/index",

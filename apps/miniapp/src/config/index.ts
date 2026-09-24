@@ -3,7 +3,7 @@ export const APP_CONFIG = {
   appName: '隐途心悦部落',
   version: '1.0.0',
   // API 基础地址，通过环境变量注入
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://api.ytxybl.com/api/v1',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api/v1',
   // 微信小程序 appid（需在 manifest.json 同步配置）
   wxAppId: 'wx79953fe2080835f6',
 } as const

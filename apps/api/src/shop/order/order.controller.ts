@@ -30,13 +30,18 @@ export class OrderController {
     @Request() req: any,
     @Query('status') status?: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('pageSize') pageSize?: string,
+    @Query('limit') legacyLimit?: string
   ) {
     const userId = BigInt(req.user.id)
     return this.orderService.getUserOrders(userId, {
       status,
       page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : 20,
+      pageSize: pageSize
+        ? parseInt(pageSize, 10)
+        : legacyLimit
+          ? parseInt(legacyLimit, 10)
+          : 20,
     })
   }
 

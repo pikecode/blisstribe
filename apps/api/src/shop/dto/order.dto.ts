@@ -1,4 +1,4 @@
-import { IsInt, IsString, IsOptional, IsNotEmpty, Min, IsArray } from 'class-validator'
+import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator'
 
 export class CartItemForCheckout {
   @IsNotEmpty()
@@ -8,11 +8,6 @@ export class CartItemForCheckout {
   @IsNotEmpty()
   @Min(1)
   quantity!: number
-
-  @IsInt()
-  @IsNotEmpty()
-  @Min(0)
-  unitPriceFen!: number
 }
 
 export class CreateOrderDto {
@@ -20,25 +15,20 @@ export class CreateOrderDto {
   @IsNotEmpty()
   items!: CartItemForCheckout[]
 
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  discountAmountFen?: number
-
   @IsString()
   @IsOptional()
   remark?: string
 
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   shippingAddress?: string
 
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   receiverPhone?: string
 
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   receiverName?: string
 }
 

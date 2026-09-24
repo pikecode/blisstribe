@@ -3,7 +3,7 @@ import { IsInt, IsString, IsOptional, IsNotEmpty, Min, IsBoolean } from 'class-v
 export class CreateRefundDto {
   @IsInt()
   @IsNotEmpty()
-  @Min(0)
+  @Min(1)
   amountInFen!: number
 
   @IsString()

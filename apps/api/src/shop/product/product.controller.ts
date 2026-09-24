@@ -18,9 +18,19 @@ export class ProductController {
   constructor(private productService: ProductService) {}
 
   @Get()
-  async getPublishedProducts(@Query('categoryId') categoryId?: string) {
+  async getPublishedProducts(
+    @Query('categoryId') categoryId?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('keyword') keyword?: string
+  ) {
     const categoryIdBig = categoryId ? BigInt(categoryId) : undefined
-    return this.productService.getPublishedProducts(categoryIdBig)
+    return this.productService.getPublishedProductsPage({
+      categoryId: categoryIdBig,
+      page: page ? parseInt(page, 10) : undefined,
+      pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
+      keyword,
+    })
   }
 
   @Get(':id')

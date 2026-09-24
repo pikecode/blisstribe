@@ -50,21 +50,12 @@
         <!-- Product title -->
         <text class="product-info__name">{{ product.name }}</text>
 
-        <!-- Product title (if different from name) -->
-        <view v-if="product.title && product.title !== product.name" class="product-info__subtitle">
-          <text>{{ product.title }}</text>
-        </view>
-
         <!-- Product description -->
         <view v-if="product.description" class="product-info__description">
           <text class="product-info__description-label">商品描述</text>
           <text class="product-info__description-text">{{ product.description }}</text>
         </view>
 
-        <!-- Product summary (if available) -->
-        <view v-if="product.summary" class="product-info__summary">
-          <text class="product-info__summary-text">{{ product.summary }}</text>
-        </view>
       </view>
 
       <!-- Quantity selector -->
@@ -77,7 +68,7 @@
           <view class="product-quantity__input">
             <input type="number" v-model.number="quantity" class="product-quantity__field" min="1" />
           </view>
-          <view class="product-quantity__btn" @tap="increaseQuantity">
+          <view class="product-quantity__btn" :class="{ disabled: quantity >= product.available }" @tap="increaseQuantity">
             <text>+</text>
           </view>
         </view>
@@ -103,13 +94,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { onLoad, useRouter } from '@dcloudio/uni-app'
+import { ref, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { shopApi, type ShopProduct } from '@/api/modules/shop'
 import { cartApi } from '@/api/modules/cart'
 import { useCartStore } from '@/stores/modules/cart'
 
-const router = useRouter()
 const cartStore = useCartStore()
 
 const product = ref<ShopProduct | null>(null)
@@ -118,7 +108,7 @@ const loadError = ref(false)
 const addingToCart = ref(false)
 const currentImageIndex = ref(0)
 const quantity = ref(1)
-const productId = ref<number>(0)
+const productId = ref('')
 
 const priceYuan = computed(() => {
   if (!product.value) return '0.00'
@@ -143,7 +133,7 @@ function onImageChange(event: any) {
 }
 
 function increaseQuantity() {
-  quantity.value++
+  if (product.value && quantity.value < product.value.available) quantity.value++
 }
 
 function decreaseQuantity() {
@@ -209,7 +199,7 @@ function goBack() {
 
 onLoad((option: any) => {
   if (option && option.id) {
-    productId.value = parseInt(option.id, 10)
+    productId.value = String(option.id)
     loadProduct()
   }
 })

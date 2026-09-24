@@ -30,23 +30,29 @@ export class ExpiredOrderTask {
       for (const order of expiredOrders) {
         try {
           await this.prisma.$transaction(async (tx) => {
-            // Release reserved inventory
-            for (const item of order.items) {
-              await tx.shopProduct.update({
-                where: { id: item.productId },
-                data: { reservedStock: { decrement: item.quantity } }
-              })
-            }
-
-            // Mark order as cancelled
-            await tx.shopOrder.update({
-              where: { id: order.id },
+            const claimed = await tx.shopOrder.updateMany({
+              where: {
+                id: order.id,
+                status: 'pending_payment',
+                expiresAt: { lt: now },
+              },
               data: {
                 status: 'cancelled',
                 cancelledAt: now,
-                cancelReason: 'Order expired (unpaid for 15 minutes)'
-              }
+                cancelReason: 'Order expired (unpaid for 15 minutes)',
+              },
             })
+            if (claimed.count !== 1) return
+
+            for (const item of order.items) {
+              const released = await tx.shopProduct.updateMany({
+                where: { id: item.productId, reservedStock: { gte: item.quantity } },
+                data: { reservedStock: { decrement: item.quantity } }
+              })
+              if (released.count !== 1) {
+                throw new Error(`Reserved stock mismatch for product ${item.productId}`)
+              }
+            }
           })
         } catch (error) {
           this.logger.error(

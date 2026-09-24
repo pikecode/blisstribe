@@ -475,24 +475,22 @@ const resetShipForm = () => {
 }
 
 // 取消订单确认
-const cancelOrderConfirm = () => {
-  if (!selectedOrder.value) return
+const cancelOrderConfirm = (row: ShopOrder) => {
   ElMessageBox.confirm('确认取消此订单吗？', '警告', {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'warning',
   }).then(() => {
-    cancelOrder()
+    cancelOrder(row)
   }).catch(() => {
     // 用户取消操作
   })
 }
 
 // 取消订单
-const cancelOrder = async () => {
-  if (!selectedOrder.value) return
+const cancelOrder = async (order: ShopOrder) => {
   try {
-    await shopOrderApi.cancelOrder(selectedOrder.value.id, '后台取消')
+    await shopOrderApi.cancelOrder(order.id, '后台取消')
     ElMessage.success('取消订单成功')
     loadOrders()
   } catch (error) {

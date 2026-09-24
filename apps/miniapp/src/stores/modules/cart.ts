@@ -5,7 +5,7 @@ import type { Cart, CartItem } from '@/api/modules/cart'
 
 export const useCartStore = defineStore('cart', () => {
   const cart = ref<Cart | null>(null)
-  const selectedItemIds = ref<Set<bigint>>(new Set())
+  const selectedItemIds = ref<Set<string>>(new Set())
 
   const items = computed(() => cart.value?.items || [])
   const itemCount = computed(() => items.value.length)
@@ -58,7 +58,7 @@ export const useCartStore = defineStore('cart', () => {
     storage.remove('cart')
   }
 
-  function toggleItem(itemId: bigint): void {
+  function toggleItem(itemId: string): void {
     if (selectedItemIds.value.has(itemId)) {
       selectedItemIds.value.delete(itemId)
     } else {
@@ -82,14 +82,14 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
-  function removeItem(itemId: bigint): void {
+  function removeItem(itemId: string): void {
     if (!cart.value) return
     cart.value.items = cart.value.items.filter(item => item.id !== itemId)
     selectedItemIds.value.delete(itemId)
     setCart(cart.value)
   }
 
-  function updateItemQuantity(itemId: bigint, quantity: number): void {
+  function updateItemQuantity(itemId: string, quantity: number): void {
     if (!cart.value) return
     const item = cart.value.items.find(i => i.id === itemId)
     if (item) {

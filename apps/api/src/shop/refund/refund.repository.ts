@@ -12,6 +12,19 @@ export class RefundRepository {
     })
   }
 
+  async findAdminById(id: bigint) {
+    return this.prisma.shopRefund.findUnique({
+      where: { id },
+      include: {
+        order: {
+          include: {
+            user: { select: { id: true, nickname: true, phoneMasked: true } },
+          },
+        },
+      },
+    })
+  }
+
   async findByRefundNo(refundNo: string): Promise<ShopRefund | null> {
     return this.prisma.shopRefund.findUnique({
       where: { refundNo },
@@ -65,7 +78,7 @@ export class RefundRepository {
     offset: number
     status?: string
   }): Promise<{
-    refunds: ShopRefund[]
+    refunds: any[]
     total: number
   }> {
     const where: any = {}
@@ -77,6 +90,13 @@ export class RefundRepository {
     const [refunds, total] = await Promise.all([
       this.prisma.shopRefund.findMany({
         where,
+        include: {
+          order: {
+            include: {
+              user: { select: { id: true, nickname: true, phoneMasked: true } },
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
         take: filters.limit,
         skip: filters.offset,

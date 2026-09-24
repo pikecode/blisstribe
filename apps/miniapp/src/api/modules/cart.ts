@@ -1,7 +1,7 @@
 import { request } from '@/api/request'
 
 export interface CartProduct {
-  id: bigint
+  id: string
   name: string
   images: string[]
   priceFen: number
@@ -10,15 +10,15 @@ export interface CartProduct {
 }
 
 export interface CartItem {
-  id: bigint
-  productId: bigint
+  id: string
+  productId: string
   quantity: number
   product: CartProduct
 }
 
 export interface Cart {
-  id: bigint
-  userId: bigint
+  id: string
+  userId: string
   items: CartItem[]
   totalQuantity: number
   totalAmount: number
@@ -38,7 +38,7 @@ export const cartApi = {
   /**
    * Add item to cart
    */
-  addItem(productId: bigint | number, quantity: number): Promise<Cart> {
+  addItem(productId: string, quantity: number): Promise<Cart> {
     return request({
       url: '/shop/cart/items',
       method: 'POST',
@@ -52,7 +52,7 @@ export const cartApi = {
   /**
    * Update item quantity
    */
-  updateItem(itemId: bigint | number, quantity: number): Promise<Cart> {
+  updateItem(itemId: string, quantity: number): Promise<Cart> {
     return request({
       url: `/shop/cart/items/${itemId}`,
       method: 'PATCH',
@@ -65,7 +65,7 @@ export const cartApi = {
   /**
    * Remove item from cart
    */
-  removeItem(itemId: bigint | number): Promise<Cart> {
+  removeItem(itemId: string): Promise<Cart> {
     return request({
       url: `/shop/cart/items/${itemId}`,
       method: 'DELETE',

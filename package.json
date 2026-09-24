@@ -25,8 +25,11 @@
   },
   "devDependencies": {
     "concurrently": "^10.0.3",
-    "typescript": "^5.4.0",
+    "typescript": "^5.9.3",
     "wait-on": "^9.0.10"
   },
-  "packageManager": "pnpm@10.22.0"
+  "packageManager": "pnpm@10.22.0",
+  "dependencies": {
+    "@nestjs/schedule": "^12.0.2"
+  }
 }

@@ -23,35 +23,10 @@
       </scroll-view>
     </view>
 
-    <!-- Featured Products Carousel -->
-    <view v-if="featuredProducts.length > 0" class="featured-section">
-      <swiper
-        class="featured-carousel"
-        autoplay
-        :interval="3000"
-        :circular="true"
-        @change="onSwiperChange"
-      >
-        <swiper-item v-for="product in featuredProducts" :key="product.id">
-          <view class="swiper-item" @click="goToDetail(product.id)">
-            <image
-              v-if="product.images && product.images.length > 0"
-              :src="product.images[0]"
-              class="featured-image"
-              mode="aspectFill"
-            />
-          </view>
-        </swiper-item>
-      </swiper>
-      <view class="carousel-indicator">
-        <text>{{ currentSwiperIndex + 1 }} / {{ featuredProducts.length }}</text>
-      </view>
-    </view>
-
-    <!-- Hot Products Section -->
+    <!-- Product List -->
     <view class="hot-products-section">
       <view class="section-header">
-        <text class="section-title">热销商品</text>
+        <text class="section-title">全部商品</text>
       </view>
 
       <view v-if="loadingHot && hotProducts.length === 0" class="loading-container">
@@ -93,10 +68,8 @@ import { shopApi, type ShopCategory, type ShopProduct } from '@/api/modules/shop
 import ProductCard from '@/components/shop/ProductCard.vue'
 
 const categories = ref<ShopCategory[]>([])
-const featuredProducts = ref<ShopProduct[]>([])
 const hotProducts = ref<ShopProduct[]>([])
-const selectedCategoryId = ref<number | null>(null)
-const currentSwiperIndex = ref(0)
+const selectedCategoryId = ref<string | null>(null)
 
 const currentPage = ref(1)
 const hasMore = ref(true)
@@ -106,7 +79,6 @@ const errorHot = ref('')
 
 onMounted(async () => {
   await loadCategories()
-  await loadFeaturedProducts()
   await loadHotProducts()
 })
 
@@ -116,15 +88,6 @@ async function loadCategories() {
     categories.value = res || []
   } catch (err) {
     console.error('Failed to load categories:', err)
-  }
-}
-
-async function loadFeaturedProducts() {
-  try {
-    const res = await shopApi.products({ featured: true, pageSize: 5 })
-    featuredProducts.value = res.list || []
-  } catch (err) {
-    console.error('Failed to load featured products:', err)
   }
 }
 
@@ -182,7 +145,7 @@ async function loadMore() {
   }
 }
 
-function selectCategory(categoryId: number) {
+function selectCategory(categoryId: string) {
   selectedCategoryId.value = categoryId
   currentPage.value = 1
   hasMore.value = true
@@ -196,15 +159,12 @@ function navigateToSearch() {
   })
 }
 
-function goToDetail(productId: number) {
+function goToDetail(productId: string) {
   uni.navigateTo({
-    url: `/pages/products/detail?id=${productId}`,
+    url: `/pages/shop/detail?id=${productId}`,
   })
 }
 
-function onSwiperChange(e: any) {
-  currentSwiperIndex.value = e.detail.current
-}
 </script>
 
 <style scoped lang="scss">
@@ -253,8 +213,6 @@ function onSwiperChange(e: any) {
   display: flex;
   padding: 0 8px;
   white-space: nowrap;
-  scroll-with-animation;
-
   &::-webkit-scrollbar {
     display: none;
   }
@@ -273,38 +231,6 @@ function onSwiperChange(e: any) {
     background: #ff6b6b;
     color: #fff;
   }
-}
-
-.featured-section {
-  background: #fff;
-  margin: 8px 0;
-  position: relative;
-}
-
-.featured-carousel {
-  width: 100%;
-  height: 180px;
-}
-
-.swiper-item {
-  width: 100%;
-  height: 100%;
-}
-
-.featured-image {
-  width: 100%;
-  height: 100%;
-}
-
-.carousel-indicator {
-  position: absolute;
-  bottom: 10px;
-  right: 12px;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
 }
 
 .hot-products-section {

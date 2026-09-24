@@ -17,7 +17,7 @@
         <view class="refund-detail__section">
           <text class="refund-detail__section-title">退款金额</text>
           <view class="refund-detail__amount-box">
-            <text class="refund-detail__amount">¥{{ formatAmount(refund.amountInFen) }}</text>
+            <text class="refund-detail__amount">¥{{ formatAmount(refund.requestedAmountFen) }}</text>
           </view>
 
           <text class="refund-detail__section-title" style="margin-top: 24rpx">订单信息</text>
@@ -29,13 +29,13 @@
             <text class="refund-detail__label">申请原因</text>
             <text class="refund-detail__value">{{ refund.reason || '无' }}</text>
           </view>
-          <view v-if="refund.wechatRefundNo" class="refund-detail__info-item">
+          <view v-if="refund.wechatRefundId" class="refund-detail__info-item">
             <text class="refund-detail__label">退款单号</text>
-            <text class="refund-detail__value">{{ refund.wechatRefundNo }}</text>
+            <text class="refund-detail__value">{{ refund.wechatRefundId }}</text>
           </view>
-          <view v-if="refund.refundedAt" class="refund-detail__info-item">
+          <view v-if="refund.completedAt" class="refund-detail__info-item">
             <text class="refund-detail__label">到账时间</text>
-            <text class="refund-detail__value">{{ formatDateTime(refund.refundedAt) }}</text>
+            <text class="refund-detail__value">{{ formatDateTime(refund.completedAt) }}</text>
           </view>
         </view>
 
@@ -48,18 +48,15 @@
               <text class="refund-detail__timeline-label">已提交申请</text>
               <text class="refund-detail__timeline-time">{{ formatDateTime(refund.createdAt) }}</text>
             </view>
-            <view
-              class="refund-detail__timeline-item"
-              :class="{ completed: isStatusAfter(['approved', 'success', 'completed']) }"
-            >
+            <view class="refund-detail__timeline-item" :class="{ completed: isStatusAfter(['processing', 'success']) }">
               <view class="refund-detail__timeline-dot"></view>
               <text class="refund-detail__timeline-label">审核中</text>
-              <text v-if="refund.status === 'approved'" class="refund-detail__timeline-time">处理中...</text>
+              <text v-if="refund.status === 'processing'" class="refund-detail__timeline-time">处理中...</text>
             </view>
-            <view class="refund-detail__timeline-item" :class="{ completed: refund.status === 'success' || refund.status === 'completed' }">
+            <view class="refund-detail__timeline-item" :class="{ completed: refund.status === 'success' }">
               <view class="refund-detail__timeline-dot"></view>
               <text class="refund-detail__timeline-label">退款完成</text>
-              <text v-if="refund.refundedAt" class="refund-detail__timeline-time">{{ formatDateTime(refund.refundedAt) }}</text>
+              <text v-if="refund.completedAt" class="refund-detail__timeline-time">{{ formatDateTime(refund.completedAt) }}</text>
             </view>
           </view>
         </view>
@@ -70,14 +67,17 @@
           <text v-if="refund.status === 'pending'" class="refund-detail__tips-item">
             • 您的退款申请正在审核中，通常在24小时内完成。请耐心等待
           </text>
-          <text v-else-if="refund.status === 'approved'" class="refund-detail__tips-item">
+          <text v-else-if="refund.status === 'processing'" class="refund-detail__tips-item">
             • 申请已批准，退款将在3-5个工作日内到达您的账户
           </text>
           <text v-else-if="refund.status === 'rejected'" class="refund-detail__tips-item">
             • 您的退款申请已被拒绝。如有疑问，请联系客服
           </text>
-          <text v-else-if="refund.status === 'success' || refund.status === 'completed'" class="refund-detail__tips-item">
+          <text v-else-if="refund.status === 'success'" class="refund-detail__tips-item">
             • 退款已到账，请检查您的账户。如未收到，请联系客服
+          </text>
+          <text v-else-if="refund.status === 'failed'" class="refund-detail__tips-item">
+            • 退款未完成，请联系客服处理
           </text>
         </view>
 
@@ -99,13 +99,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { shopApi } from '@/api/modules/shop'
+import { shopApi, type RefundResponse } from '@/api/modules/shop'
 import { useAuthStore } from '@/stores/modules/auth'
 import RefundStatus from '@/components/business/RefundStatus.vue'
 
 const authStore = useAuthStore()
-const refundId = ref<string | number>('')
-const refund = ref<any>(null)
+const refundId = ref('')
+const refund = ref<RefundResponse | null>(null)
 
 function formatAmount(amountFen: number): string {
   return (amountFen / 100).toFixed(2)

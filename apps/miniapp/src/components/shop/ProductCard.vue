@@ -12,18 +12,24 @@
     <view class="product-info">
       <view class="product-name" @click="goToDetail">{{ product.name }}</view>
       <view class="product-price">¥{{ formatPrice(product.priceFen) }}</view>
-      <button class="add-cart-btn" @click.stop="handleAddToCart">加入购物车</button>
+      <button class="add-cart-btn" :disabled="adding || product.available < 1" @click.stop="handleAddToCart">
+        {{ adding ? '添加中...' : product.available < 1 ? '已售罄' : '加入购物车' }}
+      </button>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { defineProps } from 'vue'
+import { ref } from 'vue'
 import type { ShopProduct } from '@/api/modules/shop'
+import { cartApi } from '@/api/modules/cart'
+import { useCartStore } from '@/stores/modules/cart'
 
 const props = defineProps<{
   product: ShopProduct
 }>()
+const adding = ref(false)
+const cartStore = useCartStore()
 
 function formatPrice(priceFen: number): string {
   return (priceFen / 100).toFixed(2)
@@ -31,15 +37,21 @@ function formatPrice(priceFen: number): string {
 
 function goToDetail() {
   uni.navigateTo({
-    url: `/pages/products/detail?id=${props.product.id}`,
+    url: `/pages/shop/detail?id=${props.product.id}`,
   })
 }
 
-function handleAddToCart() {
-  uni.showToast({
-    title: '已添加到购物车',
-    icon: 'success',
-  })
+async function handleAddToCart() {
+  if (adding.value || props.product.available < 1) return
+  adding.value = true
+  try {
+    cartStore.setCart(await cartApi.addItem(props.product.id, 1))
+    uni.showToast({ title: '已加入购物车', icon: 'success' })
+  } catch {
+    uni.showToast({ title: '加入购物车失败', icon: 'none' })
+  } finally {
+    adding.value = false
+  }
 }
 </script>
 

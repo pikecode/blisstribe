@@ -956,13 +956,15 @@ model ProductLeadCleanup {
 
 // 商品分类
 model ShopCategory {
-  id        BigInt   @id @default(autoincrement())
-  code      String   @unique
-  name      String
-  sortOrder Int      @default(0)
-  status    Int      @default(1) // 0停用 1启用
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          BigInt   @id @default(autoincrement())
+  code        String   @unique
+  name        String
+  description String?
+  imageUrl    String?
+  sortOrder   Int      @default(0)
+  status      Int      @default(1) // 0停用 1启用
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   products ShopProduct[]
 

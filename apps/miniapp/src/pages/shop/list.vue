@@ -3,7 +3,7 @@
     <!-- Header with search and sort -->
     <view class="shop-list__header">
       <view class="shop-list__search-bar">
-        <view class="shop-list__search" @tap="goSearch">
+        <view class="shop-list__search">
           <text class="shop-list__search-icon">🔍</text>
           <input
             v-model="searchInput"
@@ -30,8 +30,8 @@
             v-for="cat in categories"
             :key="cat.id"
             class="shop-list__category-item"
-            :class="{ active: selectedCategory === cat.code }"
-            @tap="selectCategory(cat.code)"
+            :class="{ active: selectedCategory === cat.id }"
+            @tap="selectCategory(cat.id)"
           >
             {{ cat.name }}
           </view>
@@ -104,21 +104,21 @@
         >
           <view class="product-card__image-wrapper">
             <image
-              v-if="product.coverUrl"
-              :src="product.coverUrl"
+              v-if="product.images[0]"
+              :src="product.images[0]"
               class="product-card__image"
               mode="aspectFill"
             />
             <view v-else class="product-card__image product-card__image--empty">
-              <text>{{ product.module.name }}</text>
+              <text>商城商品</text>
             </view>
             <text v-if="product.stockStatus === 'sold_out'" class="product-card__sold-out">已售罄</text>
           </view>
 
           <view class="product-card__info">
-            <text class="product-card__title">{{ product.title }}</text>
-            <text v-if="product.priceText" class="product-card__price">{{ product.priceText }}</text>
-            <text class="product-card__type">{{ productTypeText(product.productType) }}</text>
+            <text class="product-card__title">{{ product.name }}</text>
+            <text class="product-card__price">¥{{ (product.priceFen / 100).toFixed(2) }}</text>
+            <text class="product-card__type">{{ product.available }} 件可售</text>
           </view>
         </view>
       </view>
@@ -134,15 +134,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { onLoad, onShow, useRoute } from '@dcloudio/uni-app'
-import { productApi, type Product, productTypeText, type ProductModule } from '@/api/modules/product'
-import { reportProductEvent } from '@/utils/analytics'
-
-const route = useRoute()
+import { computed, ref } from 'vue'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { shopApi, type ShopCategory, type ShopProduct } from '@/api/modules/shop'
 
 // State
-const products = ref<Product[]>([])
+const products = ref<ShopProduct[]>([])
 const loading = ref(false)
 const loadError = ref(false)
 const refreshing = ref(false)
@@ -154,35 +151,22 @@ const sortBy = ref<'default' | 'price-asc' | 'price-desc'>('default')
 
 const currentPage = ref(1)
 const pageSize = 10
-const total = ref(0)
-const categories = ref<ProductModule[]>([])
+const hasMore = ref(false)
+const categories = ref<ShopCategory[]>([])
 
-const hasMore = computed(() => products.value.length < total.value)
 const sortedProducts = computed(() => {
   if (sortBy.value === 'default') return products.value
   return [...products.value].sort((a, b) => {
-    const priceA = parsePrice(a.priceText)
-    const priceB = parsePrice(b.priceText)
+    const priceA = a.priceFen
+    const priceB = b.priceFen
     return sortBy.value === 'price-asc' ? priceA - priceB : priceB - priceA
   })
 })
 
-watch(sortBy, () => {
-  // Sorting is done in computed, UI updates automatically
-})
-
-// Helper to parse price from string like "¥100-200" or "¥100"
-function parsePrice(priceText: string): number {
-  if (!priceText) return 0
-  const match = priceText.match(/\d+/)
-  return match ? parseInt(match[0], 10) : 0
-}
-
 // Load categories
 async function loadCategories() {
   try {
-    const modules = await productApi.modules()
-    categories.value = modules.filter((m) => m.showOnHome || m.code === 'health')
+    categories.value = await shopApi.categories()
   } catch (err) {
     console.error('Failed to load categories:', err)
   }
@@ -198,48 +182,27 @@ async function loadProducts(page = 1, isRefresh = false) {
     }
     loadError.value = false
 
-    const params: Record<string, any> = {
+    const params: { page: number; pageSize: number; categoryId?: string; keyword?: string } = {
       page,
       pageSize,
     }
 
     if (selectedCategory.value) {
-      params.moduleCode = selectedCategory.value
+      params.categoryId = selectedCategory.value
     }
+    if (searchInput.value.trim()) params.keyword = searchInput.value.trim()
 
-    if (searchInput.value) {
-      // Note: The API doesn't have direct search param, so we filter client-side
-      params.search = searchInput.value
-    }
-
-    const result = await productApi.list(params)
-
-    // Client-side search filtering if needed
-    let filtered = result.list
-    if (searchInput.value) {
-      const query = searchInput.value.toLowerCase()
-      filtered = result.list.filter(
-        (p) =>
-          p.title.toLowerCase().includes(query) ||
-          p.summary.toLowerCase().includes(query) ||
-          p.tags.some((t) => t.toLowerCase().includes(query))
-      )
-    }
+    const result = await shopApi.products(params)
 
     if (isRefresh || page === 1) {
-      products.value = filtered
+      products.value = result.list
     } else {
-      products.value.push(...filtered)
+      products.value.push(...result.list)
     }
 
-    total.value = result.total
+    hasMore.value = result.hasMore
     currentPage.value = page
 
-    reportProductEvent({
-      eventType: 'impression',
-      sourceScene: 'shop_list',
-      tags: searchInput.value ? [searchInput.value] : undefined,
-    })
   } catch (err) {
     console.error('Failed to load products:', err)
     loadError.value = true
@@ -263,8 +226,8 @@ function handleLoadMore() {
   }
 }
 
-function selectCategory(code?: string) {
-  selectedCategory.value = code || ''
+function selectCategory(id?: string) {
+  selectedCategory.value = id || ''
   currentPage.value = 1
   products.value = []
   loadProducts(1)
@@ -280,18 +243,9 @@ function handleSearch() {
   loadProducts(1)
 }
 
-function goSearch() {
-  uni.navigateTo({ url: '/pages/index/index?search=1' })
-}
+function goDetail(id: string) {
+  uni.navigateTo({ url: `/pages/shop/detail?id=${id}` })
 
-function goDetail(id: number) {
-  uni.navigateTo({ url: `/pages/products/detail?id=${id}` })
-
-  reportProductEvent({
-    eventType: 'click',
-    productId: id,
-    sourceScene: 'shop_list',
-  })
 }
 
 // Route query handling (from home page search)
@@ -302,6 +256,7 @@ onLoad((options: any) => {
   if (options.category) {
     selectedCategory.value = decodeURIComponent(options.category)
   }
+  if (options.query) searchInput.value = decodeURIComponent(options.query)
 })
 
 onShow(() => {

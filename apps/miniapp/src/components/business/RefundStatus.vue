@@ -23,10 +23,10 @@ const props = withDefaults(defineProps<Props>(), {
 const statusIcon = computed(() => {
   const icons: Record<string, string> = {
     pending: '⏳',
-    approved: '✓',
+    processing: '↻',
     rejected: '✕',
     success: '✓',
-    completed: '✓',
+    failed: '!',
   }
   return icons[props.status] || '•'
 })
@@ -34,10 +34,10 @@ const statusIcon = computed(() => {
 const statusLabel = computed(() => {
   const labels: Record<string, string> = {
     pending: '待审核',
-    approved: '已批准，退款处理中',
+    processing: '退款处理中',
     rejected: '已拒绝',
     success: '退款已到账',
-    completed: '退款已到账',
+    failed: '退款失败，请联系客服',
   }
   return labels[props.status] || props.status
 })
@@ -94,7 +94,7 @@ const statusLabel = computed(() => {
     }
   }
 
-  &--approved {
+  &--processing {
     background: #d1fae5;
     border-left-color: #10b981;
 
@@ -107,7 +107,8 @@ const statusLabel = computed(() => {
     }
   }
 
-  &--rejected {
+  &--rejected,
+  &--failed {
     background: #fee2e2;
     border-left-color: #ef4444;
 
@@ -124,8 +125,7 @@ const statusLabel = computed(() => {
     }
   }
 
-  &--success,
-  &--completed {
+  &--success {
     background: #d1fae5;
     border-left-color: #10b981;
 

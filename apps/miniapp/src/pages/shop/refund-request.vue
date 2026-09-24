@@ -7,7 +7,7 @@
       </view>
 
       <!-- Order Info Section -->
-      <view v-if="order" class="refund-request__section">
+      <view v-if="order && canRequestRefund" class="refund-request__section">
         <text class="refund-request__section-title">订单信息</text>
         <view class="refund-request__info-item">
           <text class="refund-request__label">订单号</text>
@@ -17,6 +17,9 @@
           <text class="refund-request__label">应付金额</text>
           <text class="refund-request__value">¥{{ formatAmount(order.paymentAmountFen) }}</text>
         </view>
+      </view>
+      <view v-else-if="order" class="refund-request__tips">
+        <text class="refund-request__tips-item">仅支持已支付且尚未发货的订单申请整单退款。</text>
       </view>
 
       <!-- Form Section -->
@@ -111,14 +114,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { shopApi } from '@/api/modules/shop'
+import { shopApi, type ShopOrder } from '@/api/modules/shop'
 import { useAuthStore } from '@/stores/modules/auth'
 
 type UniValueEvent = { detail?: { value?: string | number } }
 
 const authStore = useAuthStore()
-const orderId = ref<string | number>('')
-const order = ref<any>(null)
+const orderId = ref('')
+const order = ref<ShopOrder | null>(null)
 const selectedReason = ref('')
 const description = ref('')
 const submitting = ref(false)
@@ -131,9 +134,12 @@ const refundReasons = shopApi.getRefundReasons()
 const refundAmount = computed(() => {
   return order.value?.paymentAmountFen || 0
 })
+const canRequestRefund = computed(() =>
+  order.value?.paymentStatus === 'paid' && order.value.fulfillmentStatus === 'pending'
+)
 
 const canSubmit = computed(() => {
-  return selectedReason.value && description.value.trim() && !submitting.value
+  return canRequestRefund.value && selectedReason.value && description.value.trim() && !submitting.value
 })
 
 function formatAmount(amountFen: number): string {
@@ -170,12 +176,12 @@ function validateForm(): boolean {
 }
 
 async function submitRefund() {
-  if (!validateForm() || !orderId.value) return
+  if (!validateForm() || !orderId.value || !canRequestRefund.value) return
 
   submitting.value = true
   try {
     await shopApi.requestRefund(orderId.value, {
-      reason: selectedReason.value,
+      reason: `${selectedReason.value}：${description.value.trim()}`,
       amountInFen: refundAmount.value,
     })
     // Add custom description as additional note

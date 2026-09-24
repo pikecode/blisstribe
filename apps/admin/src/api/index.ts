@@ -1,6 +1,15 @@
 import request from '@/utils/request'
 export * from './refund'
 
+export const authApi = {
+  login(data: { username: string; password: string }) {
+    return request.post<{ token: string; admin: { id: number; username: string; nickname: string; avatar?: string } }>('/admin/login', data)
+  },
+  getProfile() {
+    return request.get<{ id: number; username: string; nickname: string; avatar?: string }>('/admin/profile')
+  },
+}
+
 export const statsApi = {
   overview() {
     return request.get<{

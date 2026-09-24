@@ -94,6 +94,27 @@
     </view>
 
     <view class="profile__panel profile__menu">
+      <view class="profile__menu-item" @tap="goShop">
+        <view>
+          <text class="profile__menu-title">部落商城</text>
+          <text class="profile__menu-desc">浏览精选商品</text>
+        </view>
+        <text class="profile__chevron">›</text>
+      </view>
+      <view class="profile__menu-item" @tap="goShopCart">
+        <view>
+          <text class="profile__menu-title">购物车</text>
+          <text class="profile__menu-desc">查看已选商品</text>
+        </view>
+        <text class="profile__chevron">›</text>
+      </view>
+      <view class="profile__menu-item" @tap="goShopOrders">
+        <view>
+          <text class="profile__menu-title">我的订单</text>
+          <text class="profile__menu-desc">查看订单与物流</text>
+        </view>
+        <text class="profile__chevron">›</text>
+      </view>
       <view class="profile__menu-item" @tap="goInvite">
         <view>
           <text class="profile__menu-title">邀请好友</text>
@@ -392,6 +413,18 @@ function goProductLeads(): void {
 
 function goActivityRegistrations(): void {
   requireLogin(() => uni.navigateTo({ url: '/pages/profile/activity-registrations' }))
+}
+
+function goShop(): void {
+  uni.switchTab({ url: '/pages/shop/index' })
+}
+
+function goShopCart(): void {
+  requireLogin(() => uni.navigateTo({ url: '/pages/shop/cart' }))
+}
+
+function goShopOrders(): void {
+  requireLogin(() => uni.navigateTo({ url: '/pages/shop/orders' }))
 }
 
 function goPartner(): void {

@@ -13,6 +13,12 @@ export class CategoryRepository {
     })
   }
 
+  async findAllForAdmin(): Promise<ShopCategory[]> {
+    return this.prisma.shopCategory.findMany({
+      orderBy: { sortOrder: 'asc' },
+    })
+  }
+
   async findById(id: bigint): Promise<ShopCategory | null> {
     return this.prisma.shopCategory.findUnique({
       where: { id },
@@ -31,6 +37,7 @@ export class CategoryRepository {
     description?: string
     imageUrl?: string
     sortOrder?: number
+    status?: number
   }): Promise<ShopCategory> {
     return this.prisma.shopCategory.create({
       data,
@@ -40,6 +47,7 @@ export class CategoryRepository {
   async update(
     id: bigint,
     data: {
+      code?: string
       name?: string
       description?: string
       imageUrl?: string

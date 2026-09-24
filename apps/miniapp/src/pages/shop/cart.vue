@@ -31,7 +31,7 @@
 
       <!-- Items List -->
       <view class="cart__items">
-        <view v-for="item in cartStore.items" :key="Number(item.id)" class="cart__item">
+        <view v-for="item in cartStore.items" :key="item.id" class="cart__item">
           <view class="cart__item-select">
             <checkbox
               :checked="cartStore.selectedItemIds.has(item.id)"
@@ -116,7 +116,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onLoad, computed } from 'vue'
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/stores/modules/auth'
 import { useCartStore } from '@/stores/modules/cart'
 import { cartApi, fenToYuan, type CartItem } from '@/api/modules/cart'
@@ -176,7 +177,7 @@ async function decreaseQuantity(item: CartItem) {
   }
 }
 
-async function deleteItem(itemId: bigint) {
+async function deleteItem(itemId: string) {
   uni.showModal({
     title: '确认删除',
     content: '确定要删除此商品吗？',
@@ -241,16 +242,16 @@ function checkout() {
   // Navigate to checkout page with selected items
   const selectedItems = cartStore.selectedItems
   uni.navigateTo({
-    url: `/pages/shop/checkout?items=${JSON.stringify(selectedItems.map(item => ({
-      id: Number(item.id),
-      productId: Number(item.productId),
+    url: `/pages/shop/checkout?items=${encodeURIComponent(JSON.stringify(selectedItems.map(item => ({
+      id: item.id,
+      productId: item.productId,
       quantity: item.quantity,
-    })))}`,
+    }))))}`,
   })
 }
 
 function goProducts() {
-  uni.redirectTo({ url: '/pages/products/index' })
+  uni.redirectTo({ url: '/pages/shop/list' })
 }
 
 onLoad(() => {

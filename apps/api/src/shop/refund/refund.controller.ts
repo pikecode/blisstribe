@@ -37,13 +37,18 @@ export class RefundController {
     @Request() req: any,
     @Query('status') status?: string,
     @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
     @Query('limit') limit?: string
   ) {
     const userId = BigInt(req.user.id)
     return this.refundService.getUserRefunds(userId, {
       status,
       page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : 20,
+      limit: pageSize
+        ? parseInt(pageSize, 10)
+        : limit
+          ? parseInt(limit, 10)
+          : 20,
     })
   }
 
@@ -64,12 +69,17 @@ export class AdminRefundController {
   async listRefunds(
     @Query('status') status?: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('pageSize') pageSize?: string,
+    @Query('limit') legacyLimit?: string
   ) {
     return this.refundService.getAllRefunds({
       status,
       page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : 20,
+      pageSize: pageSize
+        ? parseInt(pageSize, 10)
+        : legacyLimit
+          ? parseInt(legacyLimit, 10)
+          : 20,
     })
   }
 
@@ -82,13 +92,36 @@ export class AdminRefundController {
   @Post(':id/approve')
   @UseGuards(AdminJwtGuard)
   async approveRefund(
+    @Request() req: any,
     @Param('id') refundId: string,
     @Body() dto: ApproveRefundDto
   ) {
+    const adminId = BigInt(req.user.adminId)
+    if (!dto.approved) {
+      return this.refundService.rejectRefund(
+        BigInt(refundId),
+        adminId,
+        dto.adminNote
+      )
+    }
     return this.refundService.approveRefund(
       BigInt(refundId),
-      dto.approved,
+      adminId,
       dto.adminNote
+    )
+  }
+
+  @Post(':id/reject')
+  @UseGuards(AdminJwtGuard)
+  async rejectRefund(
+    @Request() req: any,
+    @Param('id') refundId: string,
+    @Body() dto: { rejectReason?: string }
+  ) {
+    return this.refundService.rejectRefund(
+      BigInt(refundId),
+      BigInt(req.user.adminId),
+      dto.rejectReason
     )
   }
 }

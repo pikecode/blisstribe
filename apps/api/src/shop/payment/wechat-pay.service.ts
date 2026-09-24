@@ -1,18 +1,9 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import * as crypto from 'crypto'
 
 @Injectable()
 export class WechatPayService {
-  private appId: string
-  private mchId: string
-  private apiKey: string
-
-  constructor(private configService: ConfigService) {
-    this.appId = this.configService.get<string>('WECHAT_APP_ID') || ''
-    this.mchId = this.configService.get<string>('WECHAT_MCH_ID') || ''
-    this.apiKey = this.configService.get<string>('WECHAT_API_KEY') || ''
-  }
+  constructor(private configService: ConfigService) {}
 
   async createPrepay(params: {
     outTradeNo: string
@@ -21,10 +12,8 @@ export class WechatPayService {
     notifyUrl: string
     clientIp: string
   }): Promise<{ prepayId: string }> {
-    // TODO: Call WeChat Pay V3 SDK unified order endpoint
-    // This is a stub for implementation
-    const prepayId = `prepay_id_${params.outTradeNo}_${Date.now()}`
-    return { prepayId }
+    void params
+    throw this.unavailable()
   }
 
   verifyNotifySignature(body: string, headers: {
@@ -32,11 +21,9 @@ export class WechatPayService {
     'wechat-pay-nonce': string
     'wechat-pay-signature': string
   }): boolean {
-    // TODO: Verify callback signature using headers and API key
-    // This is a stub for implementation
-    // In production, implement WeChat Pay signature verification
-    // Signature = SHA256(timestamp + '\n' + nonce + '\n' + body + '\n', apiKey)
-    return true
+    void body
+    void headers
+    return false
   }
 
   async decryptNotify(encryptedData: {
@@ -45,10 +32,8 @@ export class WechatPayService {
     associated_data: string
     nonce: string
   }): Promise<any> {
-    // TODO: Decrypt callback payload using apiKey
-    // This is a stub for implementation
-    // In production, implement AES-128-GCM decryption with WeChat's API key
-    return encryptedData
+    void encryptedData
+    throw this.unavailable()
   }
 
   async refund(params: {
@@ -57,9 +42,23 @@ export class WechatPayService {
     amount: number
     reason: string
   }): Promise<{ refundId: string }> {
-    // TODO: Call WeChat refund endpoint
-    // This is a stub for implementation
-    const refundId = `refund_id_${params.transactionId}_${Date.now()}`
-    return { refundId }
+    void params
+    throw this.unavailable()
+  }
+
+  private unavailable(): ServiceUnavailableException {
+    const hasMerchantConfig = Boolean(
+      this.configService.get<string>('WECHAT_APP_ID') &&
+      this.configService.get<string>('WECHAT_MCH_ID') &&
+      this.configService.get<string>('WECHAT_API_V3_KEY') &&
+      this.configService.get<string>('WECHAT_MCH_PRIVATE_KEY') &&
+      this.configService.get<string>('WECHAT_MCH_CERT_SERIAL_NO') &&
+      this.configService.get<string>('WECHAT_PLATFORM_PUBLIC_KEY')
+    )
+    return new ServiceUnavailableException(
+      hasMerchantConfig
+        ? '微信支付适配器尚未实现'
+        : '微信支付未配置，当前环境不可发起真实交易'
+    )
   }
 }
