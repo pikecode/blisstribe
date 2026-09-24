@@ -46,6 +46,20 @@ export class WechatPayService {
     throw this.unavailable()
   }
 
+  async queryTrade(outTradeNo: string): Promise<{
+    tradeState: string
+    transactionId?: string
+    amountFen?: number
+  }> {
+    void outTradeNo
+    throw this.unavailable()
+  }
+
+  async closeTrade(outTradeNo: string): Promise<{ tradeState: string }> {
+    void outTradeNo
+    throw this.unavailable()
+  }
+
   private unavailable(): ServiceUnavailableException {
     const hasMerchantConfig = Boolean(
       this.configService.get<string>('WECHAT_APP_ID') &&

@@ -7,8 +7,8 @@ describe('OrderService.createOrder', () => {
   const productId = 7n
 
   function setup(product: Record<string, unknown>) {
-    const tx = {
-      $queryRaw: jest.fn().mockResolvedValue([{
+    const tx: any = {
+      $queryRaw: jest.fn(async () => [{
         id: productId,
         priceFen: 1250,
         totalStock: 10,
@@ -21,7 +21,7 @@ describe('OrderService.createOrder', () => {
         ...product,
       }]),
       shopProduct: {
-        findUnique: jest.fn().mockImplementation(async () => ({
+        findUnique: jest.fn(async () => ({
           id: productId,
           priceFen: 1250,
           totalStock: 10,
@@ -33,33 +33,35 @@ describe('OrderService.createOrder', () => {
           images: ['product.jpg'],
           ...product,
         })),
-        update: jest.fn().mockResolvedValue({}),
+        update: jest.fn(async () => ({})),
       },
       shopOrder: {
-        create: jest.fn().mockImplementation(async ({ data }) => ({
+        create: jest.fn(async ({ data }: { data: any }) => ({
           id: 99n,
           ...data,
           items: data.items.create,
         })),
       },
       shopCart: {
-        findUnique: jest.fn().mockResolvedValue({ id: 12n }),
+        findUnique: jest.fn(async () => ({ id: 12n })),
       },
       shopCartItem: {
-        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        deleteMany: jest.fn(async () => ({ count: 1 })),
       },
     }
     const prisma = {
       $transaction: jest.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
     }
-    const cartService = { clearCart: jest.fn().mockResolvedValue(undefined) }
+    const cartService = { clearCart: jest.fn(async () => undefined) }
+    const paymentService = { closeUnpaidOrder: jest.fn(async () => 'closed') }
     const orderService = new OrderService(
       prisma as never,
       {} as never,
-      cartService as never
+      cartService as never,
+      paymentService as never
     )
 
-    return { orderService, tx, prisma, cartService }
+    return { orderService, tx, prisma, cartService, paymentService }
   }
 
   const validOrder = {

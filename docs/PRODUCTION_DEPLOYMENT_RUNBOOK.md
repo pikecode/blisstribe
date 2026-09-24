@@ -2,6 +2,8 @@
 
 本文档记录 2026-09-02 实际部署到 `47.99.183.31` 的生产环境基线。后续部署、回滚、排障优先参考本文档，再结合 `docs/DEPLOYMENT.md` 的通用策略。
 
+**运行方式更正（2026-09-24）：** 当前生产使用宿主机 Nginx、`blisstribe-api.service`、宿主机 PostgreSQL 和 Redis；旧 Docker Compose 章节仅作历史记录，不代表当前服务状态。当前发布和回滚以第 13 节为准。
+
 ## 1. 当前生产基线
 
 ### 1.1 服务器与访问入口
@@ -24,10 +26,10 @@ ssh blisstribe-prod
 
 ```text
 公网只开放：22、80、443
-API 容器端口：仅绑定 127.0.0.1:14000
-Admin 容器端口：仅绑定 127.0.0.1:18080
-PostgreSQL：仅绑定 127.0.0.1:15432
-Redis：仅绑定 127.0.0.1:16379
+API：systemd 服务监听 127.0.0.1:14000
+Admin：静态文件由 Nginx 提供
+PostgreSQL：宿主机服务，仅本机访问
+Redis：宿主机服务，仅本机访问
 ```
 
 当前 UFW 入站规则：
@@ -38,7 +40,7 @@ OpenSSH
 443/tcp
 ```
 
-### 1.2 容器拓扑
+### 1.2 历史 Docker Compose 拓扑（已停用）
 
 生产环境使用 Docker Compose 单机部署：
 
@@ -63,14 +65,15 @@ PostgreSQL：postgres:15-alpine
 Redis：redis:7-alpine
 ```
 
-### 1.3 关键文件
+### 1.3 当前宿主机关键文件
 
 服务器：
 
 ```text
-/opt/blisstribe/docker-compose.prod.yml
-/opt/blisstribe/.env
-/opt/blisstribe/.env.production
+/opt/blisstribe/current
+/opt/blisstribe/releases/
+/etc/blisstribe/api.env
+/var/lib/blisstribe/uploads/
 /etc/nginx/sites-enabled/api.ytxybl.com
 /etc/nginx/sites-enabled/admin.ytxybl.com
 /etc/letsencrypt/live/api.ytxybl.com/
@@ -79,9 +82,10 @@ Redis：redis:7-alpine
 本地仓库：
 
 ```text
-docker-compose.prod.yml
-Dockerfile.api
-Dockerfile.admin
+scripts/deploy-host.sh
+deploy/systemd/blisstribe-api.service
+deploy/nginx/host-api.conf
+deploy/nginx/host-admin.conf
 apps/api/src/main.ts
 apps/miniapp/.env
 apps/miniapp/.env.development
@@ -277,7 +281,7 @@ systemctl is-active certbot.timer
 certbot renew --dry-run
 ```
 
-## 5. 发布流程
+## 5. 历史 Docker 镜像发布流程（已停用）
 
 当前实际使用的是“本地构建 linux/amd64 镜像，`docker save` 传到服务器，服务器 `docker load` 后重启容器”。这是临时可靠方案；后续稳定后建议迁移到 ACR 或 CI/CD。
 
@@ -366,20 +370,20 @@ ssh blisstribe-prod 'cd /opt/blisstribe && docker compose --env-file .env -f doc
 
 ## 6. 数据库迁移与 Seed
 
-部署后执行迁移：
+生产当前由宿主机发布脚本执行迁移，不要使用旧 Compose 命令：
 
 ```bash
-ssh blisstribe-prod
-cd /opt/blisstribe
-docker compose --env-file .env -f docker-compose.prod.yml exec -T api \
-  pnpm --filter @blisstribe/api exec prisma migrate deploy
+./scripts/deploy-host.sh
 ```
+
+默认 `CUTOVER=1` 会对 `/etc/blisstribe/api.env` 指向的生产数据库执行 `prisma migrate deploy`，然后切换版本并重启 API。只有完成数据库备份、隔离恢复验证、迁移 SQL 审查和维护窗口确认后才能执行。`CUTOVER=0` 只构建/同步，不执行生产迁移或切换。
 
 首次初始化数据时执行 seed：
 
 ```bash
-docker compose --env-file .env -f docker-compose.prod.yml exec -T api \
-  pnpm --filter @blisstribe/api prisma:seed
+ssh blisstribe-prod 'cd /opt/blisstribe/current && \
+  set -a && . /etc/blisstribe/api.env && set +a && \
+  pnpm --filter @blisstribe/api prisma:seed'
 ```
 
 注意：
@@ -389,22 +393,20 @@ docker compose --env-file .env -f docker-compose.prod.yml exec -T api \
 
 ## 7. 发布验收
 
-### 7.1 容器状态
+### 7.1 宿主机服务状态
 
 ```bash
 ssh blisstribe-prod
-cd /opt/blisstribe
-docker compose --env-file .env -f docker-compose.prod.yml ps
-docker logs --tail 100 blisstribe-prod-api
+systemctl is-active blisstribe-api postgresql redis-server nginx
+curl -fsS http://127.0.0.1:14000/api/v1/agreements/current/user
 ```
 
-期望：
+期望：服务均为 `active`，本机 API 健康探测成功。
 
-```text
-blisstribe-prod-api：Up
-blisstribe-prod-admin：Up
-blisstribe-prod-db：healthy
-blisstribe-prod-redis：healthy
+查看 API 日志：
+
+```bash
+journalctl -u blisstribe-api --since "30 minutes ago" --no-pager
 ```
 
 ### 7.2 公网 HTTP 验收
@@ -499,17 +501,16 @@ downloadFile 合法域名：https://api.ytxybl.com
 1. URL 是否返回 `200` 和正确 `Content-Type`。
 2. `downloadFile 合法域名` 是否包含 `https://api.ytxybl.com`。
 3. 图片 URL 是否仍指向旧域名或 `localhost`。
-4. API 容器 `/app/uploads` 是否有对应文件。
+4. 宿主机 `/var/lib/blisstribe/uploads` 是否有对应文件。
 
 ## 9. 常见问题
 
 ### 9.1 `/uploads/*.jpg` 返回 404
 
-检查文件是否在容器卷里：
+检查宿主机上传目录：
 
 ```bash
-ssh blisstribe-prod
-docker exec blisstribe-prod-api sh -lc 'ls -la /app/uploads | head'
+ssh blisstribe-prod 'ls -la /var/lib/blisstribe/uploads | head'
 ```
 
 检查 URL：
@@ -564,21 +565,10 @@ CORS_ORIGIN=*
 
 ## 10. 回滚
 
-回滚 API：
+宿主机生产 API 回滚：
 
 ```bash
-ssh blisstribe-prod
-cd /opt/blisstribe
-cp .env .env.bak.$(date +%Y%m%d%H%M%S)
-sed -i "s/^API_IMAGE=.*/API_IMAGE=blisstribe-api:<previous-tag>/" .env
-docker compose --env-file .env -f docker-compose.prod.yml up -d api
-```
-
-回滚 Admin：
-
-```bash
-sed -i "s/^ADMIN_IMAGE=.*/ADMIN_IMAGE=blisstribe-admin:<previous-tag>/" .env
-docker compose --env-file .env -f docker-compose.prod.yml up -d admin
+ssh blisstribe-prod 'ln -sfn /opt/blisstribe/releases/<previous-tag> /opt/blisstribe/current && systemctl restart blisstribe-api'
 ```
 
 数据库迁移不自动回滚。涉及 schema 变更时，部署前必须先备份数据库。
@@ -591,25 +581,25 @@ docker compose --env-file .env -f docker-compose.prod.yml up -d admin
 - 修改服务器 root 密码。
 - 确认 SSH key 登录可用后，关闭 root 密码登录。
 - 为 PostgreSQL 配置定时备份和恢复演练。
-- 定期清理旧 Docker 镜像，避免磁盘占满。
+- 定期清理旧发布目录，避免磁盘占满。
 
 建议逐步完成：
 
 - 创建非 root 部署用户。
-- 接入镜像仓库，替代 `docker save | ssh docker load`。
+- 为发布和回滚增加可审计的自动化记录。
 - 增加应用健康检查接口。
 - 增加 Nginx 访问日志轮转和 API 错误日志监控。
 
 ## 12. 工程原则
 
-- KISS：当前阶段采用单机 Docker Compose + 宿主机 Nginx，链路清晰，排障成本低。
+- KISS：当前生产采用单机宿主机服务、Nginx 和 systemd，链路清晰，排障成本低。
 - YAGNI：暂不引入 Kubernetes、服务网格、复杂 CI/CD，先保证手动部署可重复。
 - SOLID：Dockerfile 负责构建，Compose 负责编排，Nginx 负责公网入口，环境变量负责配置，职责边界清晰。
 - DRY：域名、端口、镜像标签集中在 Compose 和服务器 `.env` 管理，小程序 API 地址集中到环境文件和 `APP_CONFIG` fallback。
 
-## 13. 宿主机部署方案
+## 13. 当前宿主机部署
 
-如果生产环境禁止 Docker，保留宿主机 Nginx 和现有域名，API 使用 systemd 运行，Admin 构建为静态文件，PostgreSQL 和 Redis 使用系统服务。
+截至 2026-09-24，生产采用宿主机 Nginx 和现有域名，API 使用 systemd 运行，Admin 构建为静态文件，PostgreSQL 和 Redis 使用系统服务。
 
 ### 13.1 服务器初始化
 
@@ -669,7 +659,7 @@ nginx -t && systemctl reload nginx
 ./scripts/deploy-host.sh
 ```
 
-脚本会同步代码、在服务器构建、执行 Prisma 迁移、切换 `/opt/blisstribe/current` 并重启 API。Admin 静态文件由 Nginx 直接读取，不需要单独的 Admin 进程。
+默认脚本会同步代码、在服务器构建、执行 Prisma 迁移、切换 `/opt/blisstribe/current` 并重启 API。Admin 静态文件由 Nginx 直接读取，不需要单独的 Admin 进程。`CUTOVER=0` 会跳过生产迁移和版本切换。
 
 只构建和同步、不切换生产：
 

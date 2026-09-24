@@ -45,19 +45,19 @@ ssh "$SSH_HOST" "cd '$RELEASE_DIR' && \
   pnpm --filter @blisstribe/api exec prisma generate && \
   pnpm --filter @blisstribe/api build"
 
-log "执行数据库迁移"
-ssh "$SSH_HOST" "cd '$RELEASE_DIR' && \
-  set -a && . /etc/blisstribe/api.env && set +a && \
-  pnpm --filter @blisstribe/api exec prisma migrate deploy"
-
 if [ "$CUTOVER" = "1" ]; then
+  log "执行数据库迁移"
+  ssh "$SSH_HOST" "cd '$RELEASE_DIR' && \
+    set -a && . /etc/blisstribe/api.env && set +a && \
+    pnpm --filter @blisstribe/api exec prisma migrate deploy"
+
   log "切换当前版本并重启 API"
   ssh "$SSH_HOST" "ln -sfn '$RELEASE_DIR' '$SERVER_DIR/current' && \
     systemctl restart blisstribe-api && \
     systemctl is-active --quiet blisstribe-api && \
     curl -fsS http://127.0.0.1:14000/api/v1/agreements/current/user >/dev/null"
 else
-  log "已完成构建，跳过生产切换: CUTOVER=$CUTOVER"
+  log "已完成构建，跳过生产数据库迁移和版本切换: CUTOVER=$CUTOVER"
 fi
 
 log "发布完成: $TAG"

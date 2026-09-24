@@ -312,9 +312,11 @@ reservedStock -= quantity（释放预留库存）
 
 ## 迁移和版本管理
 
-- 初始迁移文件：`0_init_shop_tables/migration.sql`
+- 商城结构通过增量迁移 `20260924000100_add_shop_module_and_sync_schema` 创建；生产截至 2026-09-24 尚未应用该迁移。
+- 旧 `0_init_shop_tables/migration.sql` 是重复的全库快照，不属于有效迁移基线，已从活动迁移目录移除。生产 migration history 不包含它；本地/其他环境如有该迁移记录，须单独核对和协调，禁止直接重置或伪造迁移状态。
 - 所有迁移文件放在 `apps/api/prisma/migrations/` 目录
-- 迁移可重复执行，使用 Prisma 的 `prisma migrate` 命令
+- 迁移由 Prisma `migrate deploy` 按历史顺序执行，不应假设 SQL 可重复执行。
+- 新迁移已在空数据库全链路和生产 schema-only 副本验证；生产执行仍需备份恢复演练、SQL 审查、审批及维护窗口。
 
 ## 相关文档
 

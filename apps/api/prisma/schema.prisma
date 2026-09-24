@@ -71,8 +71,8 @@ model UserAssessment {
   userId         BigInt
   moduleCode     String
   assessmentType String
-  tags           String[]
-  tagIds         BigInt[]
+  tags           String[] @default([])
+  tagIds         BigInt[] @default([])
   tagWeights     Json     @default("{}")
   summary        String   @default("")
   answers        Json     @default("{}")
@@ -390,7 +390,7 @@ model ProductModule {
   sortOrder         Int       @default(0)
   status            Int       @default(1) // 0停用 1启用
   createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  updatedAt         DateTime  @default(now()) @updatedAt
   deletedAt         DateTime?
 
   products             Product[]
@@ -487,7 +487,7 @@ model VenueFacility {
   status      Int       @default(1) // 0停用 1启用
   sortOrder   Int       @default(0)
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime  @default(now()) @updatedAt
   deletedAt   DateTime?
 
   venues VenueFacilityOnVenue[]
@@ -645,7 +645,7 @@ model AssessmentOption {
   label      String
   value      String
   tags       String[]
-  tagIds     BigInt[]
+  tagIds     BigInt[] @default([])
   tagWeights Json     @default("{}")
   sortOrder  Int      @default(0)
   createdAt  DateTime @default(now())
@@ -664,7 +664,7 @@ model AssessmentRecommendationRule {
   productId       BigInt
   name            String
   conditionTags   String[]
-  conditionTagIds BigInt[]
+  conditionTagIds BigInt[]  @default([])
   scoreBoost      Int       @default(0)
   reason          String    @default("")
   status          Int       @default(1) // 0停用 1启用
@@ -701,17 +701,17 @@ model Product {
   deliveryText        String    @default("")
   afterSaleText       String    @default("")
   stockStatus         String    @default("available") // available/limited/sold_out
-  tags                String[]
-  tagIds              BigInt[]
-  primaryTagIds       BigInt[]
-  secondaryTagIds     BigInt[]
-  excludeTagIds       BigInt[]
+  tags                String[]  @default([])
+  tagIds              BigInt[]  @default([])
+  primaryTagIds       BigInt[]  @default([])
+  secondaryTagIds     BigInt[]  @default([])
+  excludeTagIds       BigInt[]  @default([])
   priority            Int       @default(0)
   sortOrder           Int       @default(0)
   status              Int       @default(0) // 0草稿 1上架 2下架
   publishedAt         DateTime?
   createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  updatedAt           DateTime  @default(now()) @updatedAt
   deletedAt           DateTime?
 
   module               ProductModule                  @relation(fields: [moduleId], references: [id], onDelete: Restrict)
@@ -739,7 +739,7 @@ model RecommendationEvent {
   recommendationForm String   @default("")
   eventType          String
   sourceScene        String   @default("")
-  tags               String[]
+  tags               String[] @default([])
   tagIds             BigInt[]
   score              Int?
   matchReason        String   @default("") // 推荐理由：为什么推荐这个产品
@@ -765,6 +765,9 @@ model RecommendationEvent {
   @@index([moduleId, createdAt])
   @@index([productId, createdAt])
   @@index([activityId, createdAt])
+  @@index([productType, createdAt])
+  @@index([recommendationForm, createdAt])
+  @@index([eventType, createdAt])
   @@index([clicked, createdAt])
   @@index([converted, createdAt])
   @@index([createdAt])
@@ -778,8 +781,8 @@ model ProductLead {
   partnerId        BigInt?
   sourceInviteCode String?
   sourceScene      String    @default("miniapp")
-  needTags         String[]
-  needTagIds       BigInt[]
+  needTags         String[]  @default([])
+  needTagIds       BigInt[]  @default([])
   message          String    @default("")
   status           String    @default("new") // new/contacted/qualified/converted/invalid
   followUpNote     String    @default("")
@@ -787,7 +790,7 @@ model ProductLead {
   archived         Boolean   @default(false) // Phase 4: 是否已存档
   archivedAt       DateTime? // 存档时间
   createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  updatedAt        DateTime  @default(now()) @updatedAt
 
   product   Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -910,7 +913,7 @@ model RecommendationConfig {
 
   status    Int      @default(1) // 1启用 0禁用
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@index([status])
 }
@@ -934,7 +937,7 @@ model RecommendationMetrics {
   bySourceType  Json @default("{}") // 按来源分类
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@unique([moduleCode, date])
   @@index([moduleCode, date])
@@ -1056,6 +1059,7 @@ model ShopOrder {
   items    ShopOrderItem[]
   payments ShopPayment[]
   refunds  ShopRefund[]
+  paymentExceptions ShopPaymentException[]
 
   @@index([userId, createdAt])
   @@index([status, expiresAt])
@@ -1097,6 +1101,25 @@ model ShopPayment {
 
   @@index([orderId, status])
   @@index([outTradeNo])
+}
+
+model ShopPaymentException {
+  id                  BigInt    @id @default(autoincrement())
+  eventKey            String    @unique
+  orderId             BigInt
+  outTradeNo          String
+  wechatTransactionId String
+  amountFen           Int
+  status              String    @default("pending_review")
+  resolutionNote      String?
+  resolvedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  order ShopOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([orderId, createdAt])
 }
 
 // 退款记录

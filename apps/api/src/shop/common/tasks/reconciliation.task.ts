@@ -50,6 +50,23 @@ export class ReconciliationTask {
         )
       }
 
+      const paymentExceptions = await this.prisma.shopPaymentException.findMany({
+        where: { status: 'pending_review' },
+        select: {
+          outTradeNo: true,
+          wechatTransactionId: true,
+          amountFen: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+      if (paymentExceptions.length) {
+        this.logger.error(
+          `Late successful payments require manual review: ${paymentExceptions
+            .map((event) => `${event.outTradeNo}/${event.wechatTransactionId}/${event.amountFen}`)
+            .join(', ')}`
+        )
+      }
+
       this.logger.log('Payment reconciliation completed')
     } catch (error) {
       this.logger.error(

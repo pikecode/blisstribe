@@ -105,6 +105,7 @@ const itemTotal = computed(() => {
 function statusText(status: OrderStatus): string {
   const map: Record<OrderStatus, string> = {
     pending_payment: '待支付',
+    closing: '确认支付状态中',
     paid: '已支付',
     shipped: '已发货',
     completed: '已完成',
@@ -115,6 +116,7 @@ function statusText(status: OrderStatus): string {
 function statusClass(status: OrderStatus): string {
   const map: Record<OrderStatus, string> = {
     pending_payment: 'order-status-card__status--warning',
+    closing: 'order-status-card__status--warning',
     paid: 'order-status-card__status--info',
     shipped: 'order-status-card__status--primary',
     completed: 'order-status-card__status--success',

@@ -24,6 +24,7 @@
           @change="handleSearch"
         >
           <el-option label="待支付" value="pending_payment" />
+          <el-option label="确认支付状态中" value="closing" />
           <el-option label="已支付" value="paid" />
           <el-option label="处理中" value="processing" />
           <el-option label="已发货" value="shipped" />
@@ -502,6 +503,7 @@ const cancelOrder = async (order: ShopOrder) => {
 const getOrderStatusText = (status: string) => {
   const statusMap: Record<string, string> = {
     pending_payment: '待支付',
+    closing: '确认支付状态中',
     paid: '已支付',
     processing: '处理中',
     shipped: '已发货',
@@ -514,6 +516,7 @@ const getOrderStatusText = (status: string) => {
 const getOrderStatusType = (status: string) => {
   const typeMap: Record<string, string> = {
     pending_payment: 'warning',
+    closing: 'warning',
     paid: 'info',
     processing: 'info',
     shipped: 'success',

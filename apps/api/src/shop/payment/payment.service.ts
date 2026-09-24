@@ -93,21 +93,36 @@ export class PaymentService {
     }
 
     // Use $transaction() for atomic updates
-    await this.prisma.$transaction(async (tx: any) => {
+    const result = await this.prisma.$transaction(async (tx: any) => {
       const payment = await tx.shopPayment.findUnique({ where: { outTradeNo } })
-      if (!payment || payment.orderId !== order.id) {
-        throw new BadRequestException('支付记录不存在')
+      if (payment && payment.orderId !== order.id) {
+        throw new BadRequestException('支付记录与订单不匹配')
       }
-      if (payment.status === 'success') {
+      if (payment?.status === 'success') {
         if (payment.wechatTransactionId === transactionId) return
         throw new BadRequestException('订单已由其他交易完成支付')
       }
 
       const now = new Date()
+      if (order.status === 'cancelled' || order.paymentStatus !== 'unpaid') {
+        await tx.shopPaymentException.upsert({
+          where: { eventKey: `wechat:${transactionId}` },
+          create: {
+            eventKey: `wechat:${transactionId}`,
+            orderId: order.id,
+            outTradeNo,
+            wechatTransactionId: transactionId,
+            amountFen: amountTotal,
+          },
+          update: {},
+        })
+        return 'late_payment'
+      }
+
       const paidOrder = await tx.shopOrder.updateMany({
         where: {
           id: order.id,
-          status: 'pending_payment',
+          status: { in: ['pending_payment', 'closing'] },
           paymentStatus: 'unpaid',
         },
         data: {
@@ -117,19 +132,47 @@ export class PaymentService {
         },
       })
       if (paidOrder.count !== 1) {
+        const currentOrder = await tx.shopOrder.findUnique({ where: { id: order.id } })
+        if (currentOrder?.status === 'cancelled') {
+          await tx.shopPaymentException.upsert({
+            where: { eventKey: `wechat:${transactionId}` },
+            create: {
+              eventKey: `wechat:${transactionId}`,
+              orderId: order.id,
+              outTradeNo,
+              wechatTransactionId: transactionId,
+              amountFen: amountTotal,
+            },
+            update: {},
+          })
+          return 'late_payment'
+        }
         throw new BadRequestException('订单状态已变化，无法确认支付')
       }
 
-      const updatedPayment = await tx.shopPayment.updateMany({
-        where: { id: payment.id, status: 'pending' },
-        data: {
-          wechatTransactionId: transactionId,
-          status: 'success',
-          paidAt: now,
-        },
-      })
-      if (updatedPayment.count !== 1) {
-        throw new BadRequestException('支付记录状态已变化')
+      if (payment) {
+        const updatedPayment = await tx.shopPayment.updateMany({
+          where: { id: payment.id, status: 'pending' },
+          data: {
+            wechatTransactionId: transactionId,
+            status: 'success',
+            paidAt: now,
+          },
+        })
+        if (updatedPayment.count !== 1) {
+          throw new BadRequestException('支付记录状态已变化')
+        }
+      } else {
+        await tx.shopPayment.create({
+          data: {
+            orderId: order.id,
+            outTradeNo,
+            wechatTransactionId: transactionId,
+            amountFen: amountTotal,
+            status: 'success',
+            paidAt: now,
+          },
+        })
       }
 
       for (const item of order.items) {
@@ -144,9 +187,72 @@ export class PaymentService {
           throw new BadRequestException('预留库存状态异常')
         }
       }
+      return 'paid'
     })
 
-    return { message: 'success' }
+    return { message: result === 'late_payment' ? 'payment_exception_recorded' : 'success' }
+  }
+
+  async closeUnpaidOrder(
+    orderId: bigint,
+    reason: string
+  ): Promise<'closed' | 'paid' | 'pending'> {
+    const order = await this.prisma.shopOrder.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    })
+    if (!order) throw new NotFoundException('订单不存在')
+    if (order.status === 'cancelled') return 'closed'
+    if (order.paymentStatus === 'paid') return 'paid'
+    if (!['pending_payment', 'closing'].includes(order.status)) return 'pending'
+
+    if (order.status === 'pending_payment') {
+      const claimed = await this.prisma.shopOrder.updateMany({
+        where: { id: orderId, status: 'pending_payment', paymentStatus: 'unpaid' },
+        data: { status: 'closing' },
+      })
+      if (claimed.count !== 1) return 'pending'
+    }
+
+    const trade = await this.wechatPayService.queryTrade(order.orderNo)
+    if (trade.tradeState === 'SUCCESS') {
+      if (!trade.transactionId || trade.amountFen === undefined) return 'pending'
+      await this.handleWechatNotify({
+        out_trade_no: order.orderNo,
+        transaction_id: trade.transactionId,
+        amount: { total: trade.amountFen },
+      })
+      return 'paid'
+    }
+
+    let finalTradeState = trade.tradeState
+    if (trade.tradeState === 'NOTPAY') {
+      finalTradeState = (await this.wechatPayService.closeTrade(order.orderNo)).tradeState
+    }
+    if (!['CLOSED', 'REVOKED', 'PAYERROR'].includes(finalTradeState)) return 'pending'
+
+    await this.prisma.$transaction(async (tx: any) => {
+      const cancelled = await tx.shopOrder.updateMany({
+        where: { id: orderId, status: 'closing', paymentStatus: 'unpaid' },
+        data: {
+          status: 'cancelled',
+          cancelledAt: new Date(),
+          cancelReason: reason,
+        },
+      })
+      if (cancelled.count !== 1) return
+
+      for (const item of order.items) {
+        const released = await tx.shopProduct.updateMany({
+          where: { id: item.productId, reservedStock: { gte: item.quantity } },
+          data: { reservedStock: { decrement: item.quantity } },
+        })
+        if (released.count !== 1) {
+          throw new BadRequestException('预留库存状态异常')
+        }
+      }
+    })
+    return 'closed'
   }
 
   async processRefund(

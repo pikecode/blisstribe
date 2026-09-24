@@ -4,12 +4,10 @@
 
 ## 1. 当前发布基线
 
-- 发布方式：本地执行 `pnpm deploy:acr`。
-- 本机推送镜像：ACR 公网地址。
-- 服务器拉取镜像：ACR VPC 内网地址。
+- 当前生产方式：宿主机部署；本地执行 `./scripts/deploy-host.sh`。
 - 服务器目录：`/opt/blisstribe`。
-- 服务器入口：Admin 容器监听宿主机 `80`。
-- API 调试口：宿主机 `14000`，正式访问优先走 Admin Nginx 的 `/api/` 代理。
+- API：`blisstribe-api.service` 监听宿主机 `14000`，由 Nginx 反向代理。
+- Admin：静态文件由宿主机 Nginx 提供。
 
 ## 2. 必做项
 
@@ -24,11 +22,11 @@ TCP 80
 暂不建议公网放行：
 
 ```text
-TCP 15432  # Postgres
-TCP 16379  # Redis
+TCP 5432   # 宿主机 PostgreSQL，仅本机访问
+TCP 6379   # 宿主机 Redis，仅本机访问
 ```
 
-API 调试口 `14000` 只在需要临时排查时放行，正式环境建议关闭公网入口。
+API `14000` 仅绑定本机回环地址，由 Nginx 代理；PostgreSQL、Redis 和 API 端口均不得开放公网访问。
 
 ### 2.2 域名与 HTTPS
 
@@ -52,12 +50,48 @@ API 调试口 `14000` 只在需要临时排查时放行，正式环境建议关�
 
 ### 2.4 数据库
 
-上线前执行：
+**迁移门禁：** 2026-09-24 只读核验确认生产由宿主机 systemd/Nginx/PostgreSQL/Redis 运行，API 本机探测 HTTP 200；旧 Docker Compose 容器停止不代表生产停机。生产 migration history 有 23 条已完成迁移、无回滚记录，最新为 `20260901100000_add_venue_facility_dictionary`；无 `0_init_shop_tables` 记录，且无 `Shop%` 表。最终迁移 SQL 已与 Prisma 生成的差异核对；生产 schema-only 副本和空白隔离库均迁移成功，迁移后 Schema diff 为空。`ProductLead.archived`、`RecommendationEvent.clicked/converted` 当前允许 NULL，但生产 NULL 行数均为 0。生产尚未执行新迁移；执行前仍须完成实际数据库备份及隔离恢复演练、审批和维护窗口确认。
+
+恢复流程已用不含业务数据的生产 schema-only 副本完成演练，恢复后 Schema diff 为空；这不替代发布前对实际生产备份进行恢复和数据校验。
+
+生产侧核验只读取以下记录，不要手工更新 `_prisma_migrations`：
+
+```sql
+SELECT migration_name, checksum, started_at, finished_at, rolled_back_at, applied_steps_count
+FROM "_prisma_migrations"
+WHERE migration_name IN ('0_init_shop_tables', '20260701081229_init')
+ORDER BY started_at;
+```
+
+如生产基线变化或迁移内容调整，重新核对实际列定义、NULL 行数和 migration history；约束数据不满足时，先设计并验证回填方案。
+
+生产数据库备份与恢复演练（在服务器执行备份；恢复目标必须是隔离实例，禁止覆盖生产库）：
 
 ```bash
 ssh blisstribe-prod
-cd /opt/blisstribe
-docker compose -f docker-compose.prod.yml exec -T api pnpm --filter @blisstribe/api exec prisma migrate deploy
+set -a
+. /etc/blisstribe/api.env
+set +a
+DB_URL="${DATABASE_URL%%\?*}"
+umask 077
+BACKUP_FILE="/var/backups/blisstribe/pre-migration-$(date -u +%Y%m%dT%H%M%SZ).dump"
+mkdir -p /var/backups/blisstribe
+pg_dump "$DB_URL" --format=custom --file="$BACKUP_FILE"
+pg_restore --list "$BACKUP_FILE" >/dev/null
+```
+
+将备份在隔离 PostgreSQL 实例恢复并校验核心表/记录及应用连通性后，记录备份文件、校验结果、恢复目标和执行人。恢复命令示例（`RESTORE_DATABASE_URL` 必须指向隔离目标库）：
+
+```bash
+pg_restore --exit-on-error --dbname="$RESTORE_DATABASE_URL" "$BACKUP_FILE"
+```
+
+生产迁移前必须确认目标环境、备份恢复演练、迁移 SQL 审查结果和维护窗口。实际发布脚本 `./scripts/deploy-host.sh` 在默认 `CUTOVER=1` 时会执行 `prisma migrate deploy`，因此只有全部门禁通过后才能运行；`CUTOVER=0` 仅构建/同步，不迁移、不切换。不得把本地 `migrate status` 当作生产验证。
+
+上线前执行：
+
+```bash
+./scripts/deploy-host.sh
 ```
 
 正式运营前补充：
@@ -140,7 +174,7 @@ apps/miniapp/dist/dev/mp-weixin
 
 ## 5. 工程原则
 
-- KISS：单机 Docker Compose + ACR 足够支撑当前阶段。
+- KISS：单机宿主机服务 + Nginx 足够支撑当前阶段。
 - YAGNI：暂不引入 Kubernetes、服务网格和全自动 CI/CD。
 - SOLID：API、Admin、小程序、共享包保持独立边界。
 - DRY：发布流程统一走 `scripts/deploy-acr.sh`，不要手工复制散落命令。

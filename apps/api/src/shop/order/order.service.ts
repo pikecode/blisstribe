@@ -8,13 +8,15 @@ import { OrderRepository } from './order.repository'
 import { OrderNoGenerator } from './order-no.generator'
 import { CartService } from '../cart/cart.service'
 import { CreateOrderDto } from '../dto/order.dto'
+import { PaymentService } from '../payment/payment.service'
 
 @Injectable()
 export class OrderService {
   constructor(
     private prisma: PrismaService,
     private orderRepository: OrderRepository,
-    private cartService: CartService
+    private cartService: CartService,
+    private paymentService: PaymentService
   ) {}
 
   async createOrder(userId: bigint, dto: CreateOrderDto) {
@@ -174,27 +176,10 @@ export class OrderService {
       throw new BadRequestException('Cannot cancel other user orders')
     }
 
-    await this.prisma.$transaction(async (tx: any) => {
-      const changed = await tx.shopOrder.updateMany({
-        where: { id: orderId, userId, status: 'pending_payment', paymentStatus: 'unpaid' },
-        data: {
-          status: 'cancelled',
-          cancelledAt: new Date(),
-          cancelReason: 'User cancelled',
-        },
-      })
-      if (changed.count !== 1) {
-        throw new BadRequestException(`订单当前状态不可取消：${order.status}`)
-      }
-
-      for (const item of order.items) {
-        const released = await tx.shopProduct.updateMany({
-          where: { id: item.productId, reservedStock: { gte: item.quantity } },
-          data: { reservedStock: { decrement: item.quantity } },
-        })
-        if (released.count !== 1) throw new BadRequestException('预留库存状态异常')
-      }
-    })
+    if (order.status !== 'pending_payment' || order.paymentStatus !== 'unpaid') {
+      throw new BadRequestException(`订单当前状态不可取消：${order.status}`)
+    }
+    await this.paymentService.closeUnpaidOrder(orderId, 'User cancelled')
 
     return this.orderRepository.findById(orderId)
   }
