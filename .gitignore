@@ -37,6 +37,8 @@ apps/admin/.env
 apps/api/.omc/
 .gstack/
 .playwright-mcp/
+# 浏览器自动化生成的本地页面快照
+.playwright-cli/
 
 # Local verification screenshots
 admin-ui-refresh-*.png
