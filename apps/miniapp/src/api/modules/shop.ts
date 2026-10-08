@@ -17,15 +17,29 @@ export interface ShopProduct {
   description?: string | null
   images: string[]
   priceFen: number
+  priceMaxFen: number
   totalStock: number
   reservedStock: number
   soldStock: number
   available: number
   stockStatus: 'available' | 'limited' | 'sold_out'
+  skus: ShopProductSku[]
   sortOrder: number
   status: number
   createdAt: string
   updatedAt: string
+}
+
+export interface ShopProductSku {
+  id: string
+  skuCode: string
+  specifications: Record<string, string>
+  priceFen: number
+  totalStock: number
+  reservedStock: number
+  soldStock: number
+  available: number
+  enabled: boolean
 }
 
 export interface ShopProductListResult {
@@ -60,7 +74,10 @@ export interface OrderItem {
   id: string
   orderId: string
   productId: string
+  skuId: string
   productImage?: string | null
+  skuCode: string
+  skuSpecifications: Record<string, string>
   quantity: number
   unitPriceFen: number
   subtotalFen: number
@@ -170,10 +187,32 @@ export const shopApi = {
     return labels[status] || status
   },
 
-  createPayment(orderId: string) {
-    return request<{ prepayId: string; outTradeNo: string }>({
+  async createPayment(orderId: string) {
+    const { code } = await uni.login({ provider: 'weixin' })
+    const result = await request<{
+      mock: boolean
+      status?: 'paid'
+      prepayId: string
+      outTradeNo: string
+      paymentParams?: {
+        timeStamp: string
+        nonceStr: string
+        package: string
+        signType: 'RSA'
+        paySign: string
+      }
+    }>({
       url: `/shop/orders/${orderId}/payment`,
       method: 'POST',
+      data: { code },
     })
+    if (result.mock) return result
+
+    if (!result.paymentParams) throw new Error('支付参数缺失')
+    await uni.requestPayment({
+      provider: 'wxpay',
+      ...result.paymentParams,
+    })
+    return result
   },
 }

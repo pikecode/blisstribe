@@ -4,6 +4,7 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common'
+import { Reflector } from '@nestjs/core'
 import { map, Observable } from 'rxjs'
 import { ErrorCode, ErrorMessage } from '@blisstribe/shared'
 
@@ -16,7 +17,17 @@ export interface SuccessResponse<T> {
 
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<T, SuccessResponse<T>> {
-  intercept(_context: ExecutionContext, next: CallHandler<T>): Observable<SuccessResponse<T>> {
+  constructor(private readonly reflector: Reflector) {}
+
+  intercept(context: ExecutionContext, next: CallHandler<T>): Observable<SuccessResponse<T>> {
+    if (
+      this.reflector.getAllAndOverride<boolean>('skipResponseEnvelope', [
+        context.getHandler(),
+        context.getClass(),
+      ])
+    ) {
+      return next.handle() as Observable<SuccessResponse<T>>
+    }
     return next.handle().pipe(
       map((data) => ({
         code: 200,
@@ -34,6 +45,10 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, SuccessRespons
 
     if (typeof data === 'bigint') {
       return data.toString()
+    }
+
+    if (data instanceof Date) {
+      return data.toISOString()
     }
 
     if (Array.isArray(data)) {

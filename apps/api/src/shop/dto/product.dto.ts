@@ -1,4 +1,40 @@
-import { IsString, IsInt, IsOptional, IsNotEmpty, Min, IsArray } from 'class-validator'
+import {
+  IsString,
+  IsInt,
+  IsOptional,
+  IsNotEmpty,
+  Min,
+  IsArray,
+  IsBoolean,
+  IsObject,
+  ValidateNested,
+} from 'class-validator'
+import { Type } from 'class-transformer'
+
+export class ProductSkuDto {
+  @IsString()
+  @IsOptional()
+  id?: string
+
+  @IsString()
+  @IsOptional()
+  skuCode?: string
+
+  @IsObject()
+  specifications!: Record<string, string>
+
+  @IsInt()
+  @Min(1)
+  priceFen!: number
+
+  @IsInt()
+  @Min(0)
+  totalStock!: number
+
+  @IsBoolean()
+  @IsOptional()
+  enabled?: boolean
+}
 
 export class CreateProductDto {
   @IsInt()
@@ -18,15 +54,10 @@ export class CreateProductDto {
   @IsNotEmpty()
   images!: string[]
 
-  @IsInt()
-  @IsNotEmpty()
-  @Min(1)
-  priceFen!: number
-
-  @IsInt()
-  @IsNotEmpty()
-  @Min(0)
-  totalStock!: number
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductSkuDto)
+  skus!: ProductSkuDto[]
 
   @IsInt()
   @IsOptional()
@@ -35,6 +66,10 @@ export class CreateProductDto {
 }
 
 export class UpdateProductDto {
+  @IsInt()
+  @IsOptional()
+  categoryId?: number
+
   @IsString()
   @IsOptional()
   name?: string
@@ -48,15 +83,11 @@ export class UpdateProductDto {
   @IsOptional()
   images?: string[]
 
-  @IsInt()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductSkuDto)
   @IsOptional()
-  @Min(1)
-  priceFen?: number
-
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  totalStock?: number
+  skus?: ProductSkuDto[]
 
   @IsInt()
   @IsOptional()
@@ -75,9 +106,21 @@ export class ProductResponseDto {
   description?: string
   images!: string[]
   priceFen!: number
+  priceMaxFen!: number
   totalStock!: number
   reservedStock!: number
   soldStock!: number
+  skus!: Array<{
+    id: bigint
+    skuCode: string
+    specifications: Record<string, string>
+    priceFen: number
+    totalStock: number
+    reservedStock: number
+    soldStock: number
+    available: number
+    enabled: boolean
+  }>
   status!: number
   sortOrder!: number
   createdAt!: Date
@@ -89,6 +132,7 @@ export class ProductListDto {
   categoryId!: number
   name!: string
   priceFen!: number
+  priceMaxFen!: number
   images!: string[]
   totalStock!: number
   reservedStock!: number

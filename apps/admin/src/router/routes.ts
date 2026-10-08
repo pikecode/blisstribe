@@ -139,6 +139,12 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/shop/refund.vue'),
             meta: { title: '退款管理', icon: 'Delete' },
           },
+          {
+            path: 'payment-exceptions',
+            name: 'ShopPaymentExceptions',
+            component: () => import('@/views/shop/payment-exceptions.vue'),
+            meta: { title: '支付异常核查', icon: 'Warning' },
+          },
         ],
       },
     ],

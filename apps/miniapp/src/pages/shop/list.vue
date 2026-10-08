@@ -4,7 +4,7 @@
     <view class="shop-list__header">
       <view class="shop-list__search-bar">
         <view class="shop-list__search">
-          <text class="shop-list__search-icon">🔍</text>
+          <view class="shop-list__search-icon"></view>
           <input
             v-model="searchInput"
             type="text"
@@ -117,7 +117,12 @@
 
           <view class="product-card__info">
             <text class="product-card__title">{{ product.name }}</text>
-            <text class="product-card__price">¥{{ (product.priceFen / 100).toFixed(2) }}</text>
+            <text class="product-card__price">
+              ¥{{ (product.priceFen / 100).toFixed(2) }}
+              <template v-if="product.priceMaxFen !== product.priceFen">
+                - ¥{{ (product.priceMaxFen / 100).toFixed(2) }}
+              </template>
+            </text>
             <text class="product-card__type">{{ product.available }} 件可售</text>
           </view>
         </view>
@@ -272,38 +277,53 @@ onShow(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f7;
+  background-color: var(--color-bg);
 }
 
 .shop-list__header {
-  background-color: #fff;
-  padding: 12px 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(180deg, #f0faf4 0%, #fff 100%);
+  padding: 24rpx;
+  box-shadow: var(--shadow-sm);
 }
 
 .shop-list__search-bar {
-  margin-bottom: 12px;
+  margin-bottom: 22rpx;
 }
 
 .shop-list__search {
   display: flex;
   align-items: center;
-  background-color: #f5f5f7;
-  border-radius: 8px;
-  padding: 0 12px;
-  height: 40px;
+  background-color: #fff;
+  border-radius: 20rpx;
+  padding: 0 24rpx;
+  height: 80rpx;
+  border: 1rpx solid rgba(7, 193, 96, 0.12);
 }
 
 .shop-list__search-icon {
-  font-size: 16px;
-  margin-right: 8px;
-  color: #999;
+  width: 22rpx;
+  height: 22rpx;
+  margin-right: 18rpx;
+  border: 3rpx solid var(--color-text-tertiary);
+  border-radius: 50%;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: -8rpx;
+    bottom: -5rpx;
+    width: 10rpx;
+    height: 3rpx;
+    background: var(--color-text-tertiary);
+    transform: rotate(45deg);
+  }
 }
 
 .shop-list__search-input {
   flex: 1;
-  font-size: 14px;
-  color: #333;
+  font-size: 26rpx;
+  color: var(--color-text);
   background: transparent;
   border: none;
   outline: none;
@@ -315,7 +335,7 @@ onShow(() => {
 }
 
 .shop-list__categories {
-  margin-bottom: 12px;
+  margin-bottom: 22rpx;
 }
 
 .shop-list__category-scroll {
@@ -329,17 +349,17 @@ onShow(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 16px;
-  background-color: #f5f5f7;
-  border-radius: 20px;
-  font-size: 14px;
-  color: #666;
+  padding: 14rpx 26rpx;
+  background-color: var(--color-bg-gray);
+  border-radius: var(--radius-round);
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
   transition: all 0.3s ease;
 
   &.active {
-    background-color: #333;
+    background-color: var(--color-primary);
     color: #fff;
   }
 }
@@ -347,23 +367,23 @@ onShow(() => {
 .shop-list__sort-bar {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 12rpx;
 }
 
 .shop-list__sort-item {
   flex: 1;
   text-align: center;
-  padding: 8px;
-  font-size: 13px;
-  color: #666;
-  border-radius: 6px;
-  background-color: #f5f5f7;
+  padding: 14rpx 8rpx;
+  font-size: 23rpx;
+  color: var(--color-text-secondary);
+  border-radius: 12rpx;
+  background-color: var(--color-bg-gray);
   transition: all 0.3s ease;
 
   &.active {
-    background-color: #e8f5e9;
-    color: #2e7d32;
-    font-weight: 500;
+    background-color: var(--color-primary-light);
+    color: #078447;
+    font-weight: 700;
   }
 }
 

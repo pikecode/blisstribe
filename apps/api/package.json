@@ -8,10 +8,12 @@
     "start": "node dist/main",
     "type-check": "tsc --noEmit",
     "test": "jest",
+    "test:shop-unit": "jest --config jest.shop-unit.config.js --runInBand",
     "test:watch": "jest --watch",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
+    "prisma:seed-shop-demo": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed-shop-demo.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {

@@ -2,12 +2,12 @@
 
 **日期**：2026-09-21  
 **版本**：2.0  
-**状态**：现行商城架构基线；第一阶段代码已实现，真实支付与生产验收未完成
+**状态**：现行商城架构基线；第一阶段核心代码已实现，真实支付适配器代码已在当前工作区接入但尚未提交、商户联调或生产验收
 **取代**：`docs/shop-module-design.md`（历史初稿，仅作需求背景）
 **实施记录**：`docs/plans/2026-09-23-shop-module-completion.md`
 **后续计划**：`docs/plans/2026-09-24-shop-next-stage-plan.md`
 
-> 本文是商城唯一现行架构基线。功能代码已具备不等于交易能力已上线：微信支付 V3 适配器尚未实现，支付与退款仍受失败关闭保护。任何“已完成”均须区分代码实现、集成验证和生产启用状态。
+> 本文是商城唯一现行架构基线。SKU 方案已确认并进入实现，代码与迁移仍需完成隔离验证；SKU 不代表交易已上线。微信支付 V3 适配器尚未完成商户联调，支付开关保持关闭。任何“已完成”均须区分代码实现、集成验证和生产启用状态。
 
 ---
 
@@ -31,7 +31,7 @@
 - 多商家合并结算；
 - 微信支付自动分账；
 - 商家提现；
-- 复杂 SKU；
+- SKU 规格、价格与库存（单独 SKU 记录，当前实施中）；
 - 课程/场地自动预约履约；
 - 优惠券、秒杀、拼团和个性化推荐；
 - Elasticsearch 和独立消息队列。
@@ -146,10 +146,6 @@ model ShopProduct {
   name           String
   description    String?
   images         String[]
-  priceFen       Int
-  totalStock     Int      @default(0)
-  reservedStock  Int      @default(0)
-  soldStock      Int      @default(0)
   status         Int      @default(0) // 0草稿 1上架 2下架
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
@@ -157,7 +153,7 @@ model ShopProduct {
   deletedAt      DateTime?
 
   category  ShopCategory    @relation(fields: [categoryId], references: [id])
-  cartItems ShopCartItem[]
+  skus      ShopProductSku[]
   orderItems ShopOrderItem[]
 
   @@index([categoryId, status, sortOrder])
@@ -165,12 +161,30 @@ model ShopProduct {
 }
 ```
 
-第一阶段明确为“一商品一价格、无规格”。如果出现颜色、尺寸或套餐，再新增 `ShopProductSku`，不提前引入 SKU 层。
+每个商品至少有一个 SKU。无规格商品使用空规格默认 SKU；有规格商品以 JSON 保存属性组合，并为每个 SKU 独立维护价格和库存。
+
+```prisma
+model ShopProductSku {
+  id               BigInt   @id @default(autoincrement())
+  productId        BigInt
+  skuCode          String   @unique
+  specifications   Json     @default("{}")
+  specificationKey String
+  priceFen         Int
+  totalStock       Int      @default(0)
+  reservedStock    Int      @default(0)
+  soldStock        Int      @default(0)
+  enabled          Boolean  @default(true)
+
+  product ShopProduct @relation(fields: [productId], references: [id])
+  @@unique([productId, specificationKey])
+}
+```
 
 库存可用量计算为：
 
 ```text
-availableStock = totalStock - reservedStock - soldStock
+skuAvailableStock = sku.totalStock - sku.reservedStock - sku.soldStock
 ```
 
 不单独保存 `available`，避免冗余字段失真。
@@ -191,19 +205,19 @@ model ShopCart {
 model ShopCartItem {
   id        BigInt   @id @default(autoincrement())
   cartId    BigInt
-  productId BigInt
+  skuId     BigInt
   quantity  Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   cart    ShopCart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product ShopProduct @relation(fields: [productId], references: [id])
+  sku ShopProductSku @relation(fields: [skuId], references: [id])
 
-  @@unique([cartId, productId])
+  @@unique([cartId, skuId])
 }
 ```
 
-购物车不预留库存。库存只在创建订单时预留。
+购物车不预留库存。库存只在创建订单时预留。旧客户端的 `productId` 仅在商品恰有一个启用 SKU 时兼容。
 
 ### 5.3 订单
 
@@ -253,8 +267,11 @@ model ShopOrderItem {
   id              BigInt   @id @default(autoincrement())
   orderId         BigInt
   productId       BigInt
+  skuId           BigInt
   productName     String
   productImage    String?
+  skuCode         String
+  skuSpecifications Json
   unitPriceFen    Int
   quantity        Int
   subtotalFen     Int
@@ -262,6 +279,7 @@ model ShopOrderItem {
 
   order   ShopOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product ShopProduct @relation(fields: [productId], references: [id])
+  sku     ShopProductSku @relation(fields: [skuId], references: [id])
 
   @@index([orderId])
 }
@@ -332,10 +350,10 @@ PostgreSQL 是库存事实来源，Redis 只用于缓存、限流或短期任务
 
 在一个数据库事务中：
 
-1. 查询并锁定商品记录；
+1. 按 SKU ID 稳定排序并锁定 SKU 记录；
 2. 校验商品处于上架状态；
-3. 校验库存满足购买数量；
-4. 增加 `reservedStock`；
+3. 校验商品和 SKU 均可售且 SKU 库存满足购买数量；
+4. 增加对应 SKU 的 `reservedStock`；
 5. 创建订单和订单项快照；
 6. 创建有效期，例如 15 分钟；
 7. 返回订单。
@@ -401,7 +419,7 @@ POST /shop/orders/:id/payment
 
 第一阶段不实现自动分账。支付资金先进入平台账户，商城只记录订单和应收数据。待商家模式、退款规则和财务流程稳定后，再单独设计分账模块。
 
-**当前实现状态（2026-09-23）：** 支付适配器尚未实现真实微信 V3 请求；预下单和退款调用失败关闭，回调验签固定失败。完成商户证书、API v3 密钥、通知 URL、沙箱或受控小额交易联调并通过重复通知测试前，不视为支付闭环完成或具备生产条件。
+**当前实现状态（2026-09-24）：** 当前工作区已接入微信 V3 下单、查询、关单、退款及验签/解密代码，并有 mock 测试；但改动尚未提交，也没有微信商户端到端联调。完成商户证书、API v3 密钥、通知 URL、受控交易及重复通知测试前，不视为支付闭环完成或具备生产条件。当前支付开关保持关闭。
 
 ---
 
@@ -481,7 +499,7 @@ POST   /admin/shop/refunds/:id/approve
 POST   /admin/shop/refunds/:id/reject
 ```
 
-金额由服务端根据商品当前数据计算，客户端只提交商品 ID、数量和收货信息。
+金额由服务端根据所选 SKU 当前数据计算，客户端只提交 `skuId`、数量和收货信息。兼容期内旧 `productId` 只允许对应唯一启用 SKU。
 
 ---
 
@@ -613,13 +631,14 @@ views/shop/refund.vue
 |---|---|---|
 | 商品、分类、购物车、下单与库存预留 | 已实现，需持续回归 | PostgreSQL 为库存事实来源，金额以分存储 |
 | 小程序结算、订单查询与后台发货 | 已实现，需真实环境验收 | 受控试运营前需核对完整用户流程与部署配置 |
-| 退款申请、审批与状态处理 | 已实现基础流程，异常恢复待补 | 微信退款适配器未实现；外部调用失败/未知结果需要恢复与核对机制 |
-| 微信支付 V3 下单、通知验签解密、退款请求 | 未实现 | 当前适配器失败关闭；不具备真实收款/退款能力 |
+| 退款申请、审批与状态处理 | 已实现基础流程，异常恢复待联调 | 工作区已有退款查单和审计代码；未完成商户联调，结果未知时仍须人工核对 |
+| 微信支付 V3 下单、通知验签解密、退款请求 | 工作区代码已接入，mock 验证 | 尚未提交或完成商户联调；开关关闭，不具备真实收款/退款能力 |
 | 支付迟到通知与订单过期关单竞态 | 未完成 | 订单过期释放库存后若收到成功支付通知，须有补偿、告警和人工核查路径 |
 | Prisma 商城迁移与部署验证 | 待核实/验收 | 对照当前 schema、已提交迁移及目标数据库状态，禁止未经审查直接迁移共享或生产库 |
-| SKU、虚拟履约、第三方商家、分账 | 暂缓 | 需求确认并通过阶段门禁后单独设计 |
+| SKU 规格、价格与库存 | 代码与隔离迁移回填已验证，目标环境待发布核查 | `ShopProductSku` 为价格和库存事实来源；订单保存 SKU 快照 |
+| 虚拟履约、第三方商家、分账 | 暂缓 | 需求确认并通过阶段门禁后单独设计 |
 
-**真实交易开放条件：** 迟到支付与退款异常具备可恢复处理；数据库迁移经过审查并完成备份/恢复准备；真实支付适配器完成签名、回调、金额校验和幂等测试；测试商户或受控小额交易通过；上线检查清单全部满足。
+**真实交易开放条件：** 迟到支付与退款异常具备可恢复处理；数据库迁移经过审查并完成备份/恢复准备；真实支付适配器完成签名、回调、金额校验和幂等测试；测试商户或受控小额交易通过；上线检查清单全部满足。该门槛仅适用于开放真实交易，不代表支付是当前商城开发的默认优先级。
 
 **文档状态规则：** “已实现”只描述代码存在；“已验证”须有自动化测试或可复现验收记录；“已上线”须有部署环境证据。不得仅凭页面/API 存在就将支付或退款记为生产可用。
 

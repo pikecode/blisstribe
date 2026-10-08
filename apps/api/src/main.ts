@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Reflector } from '@nestjs/core'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import { isAbsolute, join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
@@ -9,7 +10,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  })
   const configService = app.get(ConfigService)
   const logger = new Logger('Bootstrap')
 
@@ -41,7 +44,7 @@ async function bootstrap(): Promise<void> {
 
   // 全局过滤器 + 拦截器：统一响应格式
   app.useGlobalFilters(new HttpExceptionFilter())
-  app.useGlobalInterceptors(new ResponseInterceptor())
+  app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)))
 
   const port = configService.get<number>('PORT', 3000)
   await app.listen(port)

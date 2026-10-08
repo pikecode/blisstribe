@@ -67,13 +67,18 @@
         <el-table-column label="分类" width="120">
           <template #default="{ row }">{{ getCategoryName(row.categoryId) }}</template>
         </el-table-column>
-        <el-table-column label="价格" width="100">
-          <template #default="{ row }">¥{{ (row.priceFen / 100).toFixed(2) }}</template>
+        <el-table-column label="价格区间" width="150">
+          <template #default="{ row }">
+            ¥{{ (row.priceFen / 100).toFixed(2) }}
+            <template v-if="row.priceMaxFen !== row.priceFen">
+              - ¥{{ (row.priceMaxFen / 100).toFixed(2) }}
+            </template>
+          </template>
         </el-table-column>
         <el-table-column label="库存" width="100">
           <template #default="{ row }">
             <div class="stock-info">
-              <span>总: {{ row.totalStock }}</span>
+            <span>可售: {{ row.available }}</span>
               <span class="stock-reserved">预留: {{ row.reservedStock }}</span>
               <span class="stock-sold">已售: {{ row.soldStock }}</span>
             </div>
@@ -178,23 +183,52 @@
           />
         </el-form-item>
 
-        <el-form-item label="价格（元）" prop="priceFen">
-          <el-input-number
-            v-model="productForm.priceYuan"
-            :min="0.01"
-            :step="0.01"
-            :precision="2"
-            placeholder="请输入价格"
-          />
-        </el-form-item>
-
-        <el-form-item label="库存数量" prop="totalStock">
-          <el-input-number
-            v-model="productForm.totalStock"
-            :min="0"
-            :step="1"
-            placeholder="请输入库存数量"
-          />
+        <el-form-item label="商品规格" required>
+          <div class="sku-editor">
+            <el-table :data="productForm.skus" border size="small" style="width: 100%">
+              <el-table-column label="SKU 编码" min-width="130">
+                <template #default="{ row }">
+                  <el-input v-model="row.skuCode" placeholder="自动生成" />
+                </template>
+              </el-table-column>
+              <el-table-column label="规格属性 JSON" min-width="190">
+                <template #default="{ row }">
+                  <el-input
+                    v-model="row.specificationsText"
+                    placeholder='例如 {"颜色":"红色","尺寸":"M"}'
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="价格（元）" width="135">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.priceYuan" :min="0.01" :step="0.01" :precision="2" />
+                </template>
+              </el-table-column>
+              <el-table-column label="总库存" width="115">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.totalStock" :min="0" :step="1" />
+                </template>
+              </el-table-column>
+              <el-table-column label="启用" width="70" align="center">
+                <template #default="{ row }">
+                  <el-checkbox v-model="row.enabled" />
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="65" align="center">
+                <template #default="{ $index }">
+                  <el-button
+                    type="danger"
+                    link
+                    :disabled="productForm.skus.length <= 1"
+                    @click="productForm.skus.splice($index, 1)"
+                  >
+                    删除
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-button class="sku-editor__add" plain @click="addSku">添加 SKU</el-button>
+          </div>
         </el-form-item>
 
         <el-form-item label="商品图片" prop="images">
@@ -258,7 +292,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { shopApi, type ShopProduct, type ShopCategory } from '@/api/shop'
+import { shopApi, type ShopProduct, type ShopCategory, type ProductSkuInput } from '@/api/shop'
 
 const authStore = useAuthStore()
 const productFormRef = ref<FormInstance>()
@@ -277,13 +311,26 @@ const products = ref<ShopProduct[]>([])
 const productDialogVisible = ref(false)
 const editingProductId = ref<number | null>(null)
 
+type SkuFormRow = {
+  id?: string
+  skuCode: string
+  specificationsText: string
+  priceYuan: number
+  totalStock: number
+  enabled: boolean
+}
+
 const defaultProductForm = () => ({
   categoryId: categories.value[0]?.id || 0,
   name: '',
   description: '',
-  priceYuan: 0,
-  priceFen: 0,
-  totalStock: 0,
+  skus: [{
+    skuCode: '',
+    specificationsText: '{}',
+    priceYuan: 0.01,
+    totalStock: 0,
+    enabled: true,
+  }] as SkuFormRow[],
   images: [] as string[],
   sortOrder: 0,
 })
@@ -293,33 +340,6 @@ const productForm = reactive(defaultProductForm())
 const productRules = {
   categoryId: [{ required: true, message: '请选择分类', trigger: 'change' }],
   name: [{ required: true, message: '请输入商品名', trigger: 'blur' }],
-  priceFen: [
-    { required: true, message: '请输入价格', trigger: 'blur' },
-    {
-      validator: (rule: any, value: number) => {
-        if (value < 0) {
-          return Promise.reject(new Error('价格不能为负数'))
-        }
-        return Promise.resolve()
-      },
-      trigger: 'blur',
-    },
-  ],
-  totalStock: [
-    { required: true, message: '请输入库存数量', trigger: 'blur' },
-    {
-      validator: (rule: any, value: number) => {
-        if (!Number.isInteger(value)) {
-          return Promise.reject(new Error('库存必须为整数'))
-        }
-        if (value < 0) {
-          return Promise.reject(new Error('库存不能为负数'))
-        }
-        return Promise.resolve()
-      },
-      trigger: 'blur',
-    },
-  ],
   images: [
     {
       validator: (rule: any, value: string[]) => {
@@ -337,7 +357,7 @@ const uploadAction = `${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/upload/c
 const uploadHeaders = computed(() => ({ Authorization: authStore.token }))
 
 function getCategoryName(categoryId: number): string {
-  return categories.value.find(cat => cat.id === categoryId)?.name || '-'
+  return categories.value.find(cat => String(cat.id) === String(categoryId))?.name || '-'
 }
 
 function getStatusText(status: number): string {
@@ -396,9 +416,14 @@ function openProductDialog(row?: ShopProduct) {
       categoryId: row.categoryId,
       name: row.name,
       description: row.description || '',
-      priceYuan: row.priceFen / 100,
-      priceFen: row.priceFen,
-      totalStock: row.totalStock,
+      skus: row.skus.map((sku) => ({
+        id: String(sku.id),
+        skuCode: sku.skuCode,
+        specificationsText: JSON.stringify(sku.specifications),
+        priceYuan: sku.priceFen / 100,
+        totalStock: sku.totalStock,
+        enabled: sku.enabled,
+      })),
       images: [...row.images],
       sortOrder: row.sortOrder,
     })
@@ -407,6 +432,16 @@ function openProductDialog(row?: ShopProduct) {
   }
   productDialogVisible.value = true
   productFormRef.value?.clearValidate()
+}
+
+function addSku() {
+  productForm.skus.push({
+    skuCode: '',
+    specificationsText: JSON.stringify({ 规格: `规格${productForm.skus.length + 1}` }),
+    priceYuan: 0.01,
+    totalStock: 0,
+    enabled: true,
+  })
 }
 
 function beforeImageUpload(file: any) {
@@ -454,13 +489,32 @@ async function submitProduct() {
 
   submitting.value = true
   try {
+    const skus: ProductSkuInput[] = productForm.skus.map((sku) => {
+      let specifications: Record<string, string>
+      try {
+        const parsed = JSON.parse(sku.specificationsText || '{}')
+        if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+          throw new Error('规格属性必须是 JSON 对象')
+        }
+        specifications = parsed
+      } catch {
+        throw new Error('规格属性格式错误，请输入 JSON 对象')
+      }
+      return {
+        id: sku.id,
+        skuCode: sku.skuCode.trim() || undefined,
+        specifications,
+        priceFen: Math.round(sku.priceYuan * 100),
+        totalStock: sku.totalStock,
+        enabled: sku.enabled,
+      }
+    })
     const data = {
       categoryId: productForm.categoryId,
       name: productForm.name,
       description: productForm.description,
       images: productForm.images,
-      priceFen: Math.round(productForm.priceYuan * 100),
-      totalStock: productForm.totalStock,
+      skus,
       sortOrder: productForm.sortOrder,
     }
 
@@ -533,6 +587,14 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: $space-16;
+}
+
+.sku-editor {
+  width: 100%;
+
+  &__add {
+    margin-top: 10px;
+  }
 }
 
 .toolbar {

@@ -30,67 +30,94 @@ export class OrderService {
       throw new BadRequestException('订单商品不能为空')
     }
 
-    const quantities = new Map<bigint, number>()
+    const parsedItems: Array<{ skuId?: bigint; productId?: bigint; quantity: number }> = []
     for (const item of dto.items) {
-      let productId: bigint
+      let skuId: bigint | undefined
+      let productId: bigint | undefined
       try {
-        productId = BigInt(item.productId)
+        if (item.skuId !== undefined) skuId = BigInt(item.skuId)
+        else if (item.productId !== undefined) productId = BigInt(item.productId)
+        else throw new Error('missing id')
       } catch {
-        throw new BadRequestException('商品 ID 无效')
+        throw new BadRequestException('商品或 SKU ID 无效')
       }
       if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0) {
         throw new BadRequestException('商品数量必须为正整数')
       }
-      const quantity = (quantities.get(productId) || 0) + item.quantity
-      if (!Number.isSafeInteger(quantity)) {
-        throw new BadRequestException('商品数量超出限制')
-      }
-      quantities.set(productId, quantity)
+      parsedItems.push({ skuId, productId, quantity: item.quantity })
     }
 
     return this.prisma.$transaction(async (tx: any) => {
+      const quantities = new Map<bigint, number>()
+      for (const item of parsedItems) {
+        let skuId = item.skuId
+        if (!skuId && item.productId) {
+          const product = await tx.shopProduct.findUnique({
+            where: { id: item.productId },
+            include: { skus: { where: { enabled: true } } },
+          })
+          if (!product || product.deletedAt) {
+            throw new NotFoundException(`商品不存在：${item.productId}`)
+          }
+          if (product.skus.length !== 1) {
+            throw new BadRequestException('该商品有多个规格，请先选择规格')
+          }
+          skuId = product.skus[0].id
+        }
+        if (!skuId) throw new BadRequestException('SKU ID 无效')
+        const quantity = (quantities.get(skuId) || 0) + item.quantity
+        if (!Number.isSafeInteger(quantity)) throw new BadRequestException('商品数量超出限制')
+        quantities.set(skuId, quantity)
+      }
+
       let totalAmountFen = 0
       const orderItems: Array<Record<string, unknown>> = []
 
-      for (const [productId, quantity] of [...quantities].sort(([a], [b]) => a < b ? -1 : 1)) {
+      for (const [skuId, quantity] of [...quantities].sort(([a], [b]) => a < b ? -1 : 1)) {
         const locked = await tx.$queryRaw`
-          SELECT "id" FROM "ShopProduct" WHERE "id" = ${productId} FOR UPDATE
+          SELECT "id" FROM "ShopProductSku" WHERE "id" = ${skuId} FOR UPDATE
         `
         if (!Array.isArray(locked) || locked.length === 0) {
-          throw new NotFoundException(`商品不存在：${productId}`)
+          throw new NotFoundException(`SKU 不存在：${skuId}`)
         }
 
-        const product = await tx.shopProduct.findUnique({ where: { id: productId } })
-        if (!product || product.deletedAt) {
-          throw new NotFoundException(`商品不存在：${productId}`)
+        const sku = await tx.shopProductSku.findUnique({
+          where: { id: skuId },
+          include: { product: true },
+        })
+        if (!sku || sku.product.deletedAt) {
+          throw new NotFoundException(`SKU 不存在：${skuId}`)
         }
-        if (product.status !== 1) {
-          throw new BadRequestException(`商品已下架：${product.name}`)
+        if (!sku.enabled || sku.product.status !== 1) {
+          throw new BadRequestException(`商品规格已下架：${sku.product.name}`)
         }
 
-        const available = product.totalStock - product.reservedStock - product.soldStock
+        const available = sku.totalStock - sku.reservedStock - sku.soldStock
         if (available < quantity) {
-          throw new BadRequestException(`商品库存不足：${product.name}`)
+          throw new BadRequestException(`商品规格库存不足：${sku.product.name}`)
         }
-        if (!Number.isSafeInteger(product.priceFen) || product.priceFen <= 0) {
-          throw new BadRequestException(`商品价格无效：${product.name}`)
+        if (!Number.isSafeInteger(sku.priceFen) || sku.priceFen <= 0) {
+          throw new BadRequestException(`商品规格价格无效：${sku.product.name}`)
         }
 
-        const subtotalFen = product.priceFen * quantity
+        const subtotalFen = sku.priceFen * quantity
         totalAmountFen += subtotalFen
         if (!Number.isSafeInteger(subtotalFen) || !Number.isSafeInteger(totalAmountFen)) {
           throw new BadRequestException('订单金额超出限制')
         }
 
-        await tx.shopProduct.update({
-          where: { id: productId },
+        await tx.shopProductSku.update({
+          where: { id: skuId },
           data: { reservedStock: { increment: quantity } },
         })
         orderItems.push({
-          productId,
-          productName: product.name,
-          productImage: product.images[0] || null,
-          unitPriceFen: product.priceFen,
+          productId: sku.productId,
+          skuId,
+          productName: sku.product.name,
+          productImage: sku.product.images[0] || null,
+          skuCode: sku.skuCode,
+          skuSpecifications: sku.specifications,
+          unitPriceFen: sku.priceFen,
           quantity,
           subtotalFen,
         })
@@ -122,7 +149,7 @@ export class OrderService {
       })
       if (cart) {
         await tx.shopCartItem.deleteMany({
-          where: { cartId: cart.id, productId: { in: [...quantities.keys()] } },
+          where: { cartId: cart.id, skuId: { in: [...quantities.keys()] } },
         })
       }
 
@@ -281,9 +308,9 @@ export class OrderService {
     }
   }
 
-  async getOrderDetailByOrderNo(orderNo: string) {
+  async getAdminOrderDetail(orderId: bigint) {
     const order = await this.prisma.shopOrder.findUnique({
-      where: { orderNo },
+      where: { id: orderId },
       include: {
         user: {
           select: {

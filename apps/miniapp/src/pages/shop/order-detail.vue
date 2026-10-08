@@ -18,17 +18,46 @@
 
       <!-- 订单状态卡片 -->
       <view class="order-status-card">
-        <text class="order-status-card__status" :class="statusClass(order.status)">{{ statusText(order.status) }}</text>
+        <text class="order-status-card__status" :class="statusClass(displayStatus(order))">{{ statusText(displayStatus(order)) }}</text>
         <text class="order-status-card__no">{{ order.orderNo }}</text>
-        <text class="order-status-card__date">{{ formatDate(order.createdAt) }}</text>
+        <view class="order-status-card__times">
+          <view class="order-status-card__time-row">
+            <text>创建时间</text>
+            <text>{{ formatDate(order.createdAt) }}</text>
+          </view>
+          <view class="order-status-card__time-row">
+            <text>支付时间</text>
+            <text>{{ order.paidAt ? formatDate(order.paidAt) : '未支付' }}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 收货信息 -->
+      <view v-if="order.receiverName && order.receiverPhone && order.shippingAddress" class="order-section address-card">
+        <text class="order-section__title">收货信息</text>
+        <view class="address-card__contact">
+          <text class="address-card__name">{{ order.receiverName }}</text>
+          <text class="address-card__phone">{{ order.receiverPhone }}</text>
+        </view>
+        <text class="address-card__address">{{ order.shippingAddress }}</text>
       </view>
 
       <!-- 订单商品 -->
       <view class="order-section">
         <text class="order-section__title">订单商品</text>
         <view v-for="item in order.items" :key="item.id" class="order-product">
+          <image
+            v-if="item.productImage"
+            class="order-product__image"
+            :src="item.productImage"
+            mode="aspectFill"
+          />
+          <view v-else class="order-product__image order-product__image--empty">暂无图片</view>
           <view class="order-product__info">
             <text class="order-product__title">{{ item.productName }}</text>
+            <text v-if="formatSkuSpecifications(item.skuSpecifications)" class="order-product__specifications">
+              {{ formatSkuSpecifications(item.skuSpecifications) }}
+            </text>
             <view class="order-product__meta">
               <text>数量：{{ item.quantity }}</text>
               <text>单价：¥{{ (item.unitPriceFen / 100).toFixed(2) }}</text>
@@ -39,7 +68,7 @@
       </view>
 
       <!-- 物流信息 -->
-      <view v-if="order.status === 'shipped' && order.trackingNo" class="order-section">
+      <view v-if="order.fulfillmentStatus === 'shipped' && order.trackingNo" class="order-section">
         <text class="order-section__title">物流信息</text>
         <view class="logistics-info">
           <view class="logistics-info__item">
@@ -54,17 +83,34 @@
         <text class="order-section__title">订单汇总</text>
         <view class="order-summary">
           <view class="order-summary__row">
-            <text class="order-summary__label">小计</text>
-            <text class="order-summary__value">¥{{ (itemTotal / 100).toFixed(2) }}</text>
+            <text class="order-summary__label">商品金额</text>
+            <text class="order-summary__value">¥{{ (order.totalAmountFen / 100).toFixed(2) }}</text>
           </view>
-          <view class="order-summary__row">
-            <text class="order-summary__label">运费</text>
-            <text class="order-summary__value">¥0.00</text>
+          <view v-if="order.discountAmountFen" class="order-summary__row">
+            <text class="order-summary__label">优惠</text>
+            <text class="order-summary__discount">-¥{{ (order.discountAmountFen / 100).toFixed(2) }}</text>
           </view>
           <view class="order-summary__row order-summary__row--total">
-            <text class="order-summary__label">总计</text>
+            <text class="order-summary__label">实付金额</text>
             <text class="order-summary__total">¥{{ (order.paymentAmountFen / 100).toFixed(2) }}</text>
           </view>
+        </view>
+      </view>
+
+      <!-- 订单信息 -->
+      <view class="order-section order-info">
+        <text class="order-section__title">订单信息</text>
+        <view class="order-info__row">
+          <text class="order-info__label">订单编号</text>
+          <text class="order-info__value">{{ order.orderNo }}</text>
+        </view>
+        <view v-if="order.remark" class="order-info__row order-info__row--remark">
+          <text class="order-info__label">订单备注</text>
+          <text class="order-info__value">{{ order.remark }}</text>
+        </view>
+        <view v-if="order.cancelReason" class="order-info__row order-info__row--remark">
+          <text class="order-info__label">取消原因</text>
+          <text class="order-info__value">{{ order.cancelReason }}</text>
         </view>
       </view>
 
@@ -97,11 +143,6 @@ const canRequestRefund = computed(() =>
   order.value?.paymentStatus === 'paid' && order.value.fulfillmentStatus === 'pending'
 )
 
-const itemTotal = computed(() => {
-  if (!order.value) return 0
-  return order.value.items.reduce((sum, item) => sum + item.subtotalFen, 0)
-})
-
 function statusText(status: OrderStatus): string {
   const map: Record<OrderStatus, string> = {
     pending_payment: '待支付',
@@ -109,6 +150,7 @@ function statusText(status: OrderStatus): string {
     paid: '已支付',
     shipped: '已发货',
     completed: '已完成',
+    cancelled: '已取消',
   }
   return map[status] || status
 }
@@ -120,14 +162,27 @@ function statusClass(status: OrderStatus): string {
     paid: 'order-status-card__status--info',
     shipped: 'order-status-card__status--primary',
     completed: 'order-status-card__status--success',
+    cancelled: 'order-status-card__status--muted',
   }
   return map[status] || status
+}
+
+function displayStatus(value: Order): OrderStatus {
+  if (value.fulfillmentStatus === 'shipped') return 'shipped'
+  if (value.fulfillmentStatus === 'completed') return 'completed'
+  return value.status
 }
 
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function formatSkuSpecifications(specifications: Record<string, string>): string {
+  return Object.entries(specifications || {})
+    .map(([key, value]) => `${key}：${value}`)
+    .join(' / ')
 }
 
 async function loadOrder(): Promise<void> {
@@ -165,7 +220,9 @@ async function processPayment(): Promise<void> {
   try {
     await shopApi.createPayment(order.value.id)
     await loadOrder()
-    if (order.value?.paymentStatus !== 'paid') {
+    if (order.value?.paymentStatus === 'paid') {
+      uni.showToast({ title: '支付成功', icon: 'success' })
+    } else {
       uni.showToast({ title: '支付渠道暂未配置，请稍后重试', icon: 'none' })
     }
   } catch {
@@ -255,9 +312,9 @@ onLoad((options) => {
 }
 
 .order-status-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 16rpx;
-  padding: 32rpx;
+  background: linear-gradient(145deg, #087a43 0%, #07b75a 100%);
+  border-radius: 22rpx;
+  padding: 38rpx 32rpx;
   margin-bottom: 24rpx;
   color: #fff;
   text-align: center;
@@ -269,31 +326,23 @@ onLoad((options) => {
     margin-bottom: 16rpx;
 
     &--warning {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: #fff7cf;
     }
 
     &--info {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: #e9fff3;
     }
 
     &--primary {
-      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: #e9fff3;
     }
 
     &--success {
-      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: #fff;
+    }
+
+    &--muted {
+      color: #e5e7eb;
     }
   }
 
@@ -304,18 +353,27 @@ onLoad((options) => {
     margin-bottom: 8rpx;
   }
 
-  &__date {
-    display: block;
+  &__times {
+    margin-top: 20rpx;
+    padding-top: 16rpx;
+    border-top: 1rpx solid rgba(255, 255, 255, 0.2);
+  }
+
+  &__time-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5rpx 0;
     font-size: 22rpx;
-    opacity: 0.9;
+    opacity: 0.92;
   }
 }
 
 .order-section {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: 20rpx;
   padding: 24rpx;
   margin-bottom: 16rpx;
+  box-shadow: var(--shadow-sm);
 
   &__title {
     display: block;
@@ -339,17 +397,41 @@ onLoad((options) => {
     border-bottom: none;
   }
 
+  &__image {
+    width: 120rpx;
+    height: 120rpx;
+    margin-right: 18rpx;
+    border-radius: 14rpx;
+    background: var(--color-bg-gray);
+    flex-shrink: 0;
+
+    &--empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-text-tertiary);
+      font-size: 20rpx;
+    }
+  }
+
   &__info {
     flex: 1;
     display: flex;
     flex-direction: column;
     gap: 8rpx;
+    min-width: 0;
   }
 
   &__title {
     font-size: 26rpx;
     color: var(--color-text);
     font-weight: 600;
+    line-height: 1.4;
+  }
+
+  &__specifications {
+    font-size: 22rpx;
+    color: var(--color-text-secondary);
     line-height: 1.4;
   }
 
@@ -366,6 +448,33 @@ onLoad((options) => {
     font-weight: 700;
     margin-left: 16rpx;
     flex-shrink: 0;
+  }
+}
+
+.address-card {
+  &__contact {
+    display: flex;
+    align-items: center;
+    gap: 20rpx;
+    margin-bottom: 12rpx;
+  }
+
+  &__name {
+    color: var(--color-text);
+    font-size: 28rpx;
+    font-weight: 700;
+  }
+
+  &__phone {
+    color: var(--color-text-secondary);
+    font-size: 24rpx;
+  }
+
+  &__address {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: 25rpx;
+    line-height: 1.6;
   }
 }
 
@@ -449,6 +558,39 @@ onLoad((options) => {
     font-size: 32rpx;
     color: var(--color-primary);
     font-weight: 800;
+  }
+
+  &__discount {
+    color: var(--color-danger);
+    font-size: 24rpx;
+    font-weight: 600;
+  }
+}
+
+.order-info {
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 24rpx;
+    padding: 10rpx 0;
+
+    &--remark {
+      align-items: flex-start;
+    }
+  }
+
+  &__label {
+    flex-shrink: 0;
+    color: var(--color-text-secondary);
+    font-size: 24rpx;
+  }
+
+  &__value {
+    color: var(--color-text);
+    font-size: 24rpx;
+    line-height: 1.5;
+    text-align: right;
+    word-break: break-all;
   }
 }
 

@@ -1,5 +1,11 @@
 import { IsInt, IsString, IsOptional, IsNotEmpty, Min } from 'class-validator'
 
+export class CreateShopPaymentDto {
+  @IsString()
+  @IsNotEmpty()
+  code!: string
+}
+
 export class CreatePaymentDto {
   @IsInt()
   @IsNotEmpty()

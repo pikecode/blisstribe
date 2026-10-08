@@ -2,7 +2,6 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { CartRepository } from './cart.repository'
 import { ProductRepository } from '../product/product.repository'
 import { AddCartItemDto, UpdateCartItemDto } from '../dto/cart.dto'
-import { AmountUtil } from '../common/utils/amount.util'
 
 @Injectable()
 export class CartService {
@@ -11,182 +10,130 @@ export class CartService {
     private productRepository: ProductRepository
   ) {}
 
-  async getCart(userId: bigint): Promise<{
-    id: bigint
-    userId: bigint
-    items: Array<{
-      id: bigint
-      productId: bigint
-      quantity: number
-      product: {
-        id: bigint
-        name: string
-        images: string[]
-        priceFen: number
-        totalStock: number
-        available: number
-      }
-    }>
-    totalQuantity: number
-    totalAmount: number
-  }> {
+  async getCart(userId: bigint): Promise<any> {
     const cart = await this.cartRepository.findOrCreateByUserId(userId)
-
-    const totalQuantity = cart.items.reduce((sum, item) => sum + item.quantity, 0)
-    const totalAmount = cart.items.reduce(
-      (sum, item) => sum + item.product.priceFen * item.quantity,
-      0
-    )
+    const items = cart.items.map((item: any) => {
+      const sku = item.sku
+      return {
+        id: item.id,
+        cartId: item.cartId,
+        skuId: sku.id,
+        quantity: item.quantity,
+        sku: {
+          id: sku.id,
+          skuCode: sku.skuCode,
+          specifications: sku.specifications,
+          priceFen: sku.priceFen,
+          totalStock: sku.totalStock,
+          reservedStock: sku.reservedStock,
+          soldStock: sku.soldStock,
+          available: Math.max(0, sku.totalStock - sku.reservedStock - sku.soldStock),
+          enabled: sku.enabled,
+          product: {
+            id: sku.product.id,
+            name: sku.product.name,
+            images: sku.product.images,
+            status: sku.product.status,
+          },
+        },
+      }
+    })
 
     return {
       id: cart.id,
       userId: cart.userId,
-      items: cart.items.map(item => ({
-        id: item.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        product: {
-          id: item.product.id,
-          name: item.product.name,
-          images: item.product.images,
-          priceFen: item.product.priceFen,
-          totalStock: item.product.totalStock,
-          available:
-            item.product.totalStock -
-            item.product.reservedStock -
-            item.product.soldStock,
-        },
-      })),
-      totalQuantity,
-      totalAmount,
+      items,
+      totalQuantity: items.reduce((sum: number, item: any) => sum + item.quantity, 0),
+      totalAmount: items.reduce(
+        (sum: number, item: any) => sum + item.sku.priceFen * item.quantity,
+        0
+      ),
     }
   }
 
   async addItem(userId: bigint, dto: AddCartItemDto): Promise<any> {
-    // Validate product exists and is published
-    const productId = typeof dto.productId === 'bigint' ? dto.productId : BigInt(dto.productId)
-    const product = await this.productRepository.findById(productId)
-
-    if (!product) {
-      throw new NotFoundException('商品不存在')
-    }
-
-    if (product.status !== 1) {
-      throw new NotFoundException('商品已下架')
-    }
-
-    // Validate quantity
-    if (!Number.isInteger(dto.quantity) || dto.quantity <= 0) {
+    if (!Number.isSafeInteger(dto.quantity) || dto.quantity <= 0) {
       throw new BadRequestException('商品数量必须大于0')
     }
 
-    // Check available stock
-    const available = product.totalStock - product.reservedStock - product.soldStock
-    if (dto.quantity > available) {
-      throw new BadRequestException('库存不足')
-    }
-
-    // Get or create cart
-    const cart = await this.cartRepository.findOrCreateByUserId(userId)
-
-    // Check if product already in cart
-    const existingItem = await this.cartRepository.findItemByCartIdAndProductId(
-      cart.id,
-      productId
-    )
-
-    let cartItem
-    if (existingItem) {
-      // Increment quantity
-      const newQuantity = existingItem.quantity + dto.quantity
-
-      // Re-check available stock with new quantity
-      if (newQuantity > available) {
-        throw new BadRequestException('库存不足')
+    let skuId: bigint
+    if (dto.skuId !== undefined) {
+      try {
+        skuId = BigInt(dto.skuId)
+      } catch {
+        throw new BadRequestException('SKU ID 无效')
       }
-
-      cartItem = await this.cartRepository.updateItem(cart.id, productId, newQuantity)
+    } else if (dto.productId !== undefined) {
+      let productId: bigint
+      try {
+        productId = BigInt(dto.productId)
+      } catch {
+        throw new BadRequestException('商品 ID 无效')
+      }
+      const product = await this.productRepository.findById(productId)
+      if (!product) throw new NotFoundException('商品不存在')
+      const enabledSkus = product.skus.filter((sku: any) => sku.enabled)
+      if (enabledSkus.length !== 1) {
+        throw new BadRequestException('该商品有多个规格，请先选择规格')
+      }
+      skuId = enabledSkus[0].id
     } else {
-      // Create new item
-      cartItem = await this.cartRepository.createItem(cart.id, productId, dto.quantity)
+      throw new BadRequestException('必须提供 SKU ID')
     }
 
+    const sku = await this.productRepository.findSkuById(skuId)
+    if (!sku || !sku.product || sku.product.deletedAt) {
+      throw new NotFoundException(`SKU 不存在：${skuId.toString()}`)
+    }
+    if (!sku.enabled || sku.product.status !== 1) {
+      throw new NotFoundException('商品规格已下架')
+    }
+
+    const available = sku.totalStock - sku.reservedStock - sku.soldStock
+    const cart = await this.cartRepository.findOrCreateByUserId(userId)
+    const existingItem = await this.cartRepository.findItemByCartIdAndSkuId(cart.id, skuId)
+    const nextQuantity = (existingItem?.quantity || 0) + dto.quantity
+    if (nextQuantity > available) throw new BadRequestException('库存不足')
+
+    if (existingItem) {
+      await this.cartRepository.updateItem(cart.id, skuId, nextQuantity)
+    } else {
+      await this.cartRepository.createItem(cart.id, skuId, dto.quantity)
+    }
     return this.getCart(userId)
   }
 
-  async updateItem(
-    userId: bigint,
-    itemId: bigint,
-    dto: UpdateCartItemDto
-  ): Promise<any> {
-    if (dto.quantity !== undefined) {
-      // Validate quantity
-      if (!Number.isInteger(dto.quantity) || dto.quantity <= 0) {
-        throw new BadRequestException('商品数量必须大于0')
-      }
+  async updateItem(userId: bigint, itemId: bigint, dto: UpdateCartItemDto): Promise<any> {
+    if (dto.quantity !== undefined && (!Number.isSafeInteger(dto.quantity) || dto.quantity <= 0)) {
+      throw new BadRequestException('商品数量必须大于0')
     }
-
     const cart = await this.cartRepository.findByUserId(userId)
-    if (!cart) {
-      throw new NotFoundException('购物车不存在')
-    }
+    if (!cart) throw new NotFoundException('购物车不存在')
+    const item = cart.items.find((candidate: any) => candidate.id === itemId)
+    if (!item) throw new BadRequestException('该商品不在购物车中')
 
-    // Find the item in the cart
-    const item = cart.items.find(i => i.id === itemId)
-    if (!item) {
-      throw new BadRequestException('该商品不在购物车中')
-    }
-
-    // Verify item belongs to user's cart
-    if (item.cartId !== cart.id) {
-      throw new BadRequestException('无权操作此商品')
-    }
-
-    // If updating quantity, validate stock
     if (dto.quantity !== undefined) {
-      const product = item.product
-      const available = product.totalStock - product.reservedStock - product.soldStock
-
-      if (dto.quantity > available) {
-        throw new BadRequestException('库存不足')
-      }
-
-      await this.cartRepository.updateItem(cart.id, item.productId, dto.quantity)
+      const sku = item.sku
+      const available = sku.totalStock - sku.reservedStock - sku.soldStock
+      if (!sku.enabled || dto.quantity > available) throw new BadRequestException('库存不足或规格已下架')
+      await this.cartRepository.updateItem(cart.id, item.skuId, dto.quantity)
     }
-
     return this.getCart(userId)
   }
 
   async removeItem(userId: bigint, itemId: bigint): Promise<any> {
     const cart = await this.cartRepository.findByUserId(userId)
-    if (!cart) {
-      throw new NotFoundException('购物车不存在')
-    }
-
-    // Find the item in the cart
-    const item = cart.items.find(i => i.id === itemId)
-    if (!item) {
-      throw new BadRequestException('该商品不在购物车中')
-    }
-
-    // Verify item belongs to user's cart
-    if (item.cartId !== cart.id) {
-      throw new BadRequestException('无权操作此商品')
-    }
-
-    await this.cartRepository.deleteItem(cart.id, item.productId)
-
+    if (!cart) throw new NotFoundException('购物车不存在')
+    const item = cart.items.find((candidate: any) => candidate.id === itemId)
+    if (!item) throw new BadRequestException('该商品不在购物车中')
+    await this.cartRepository.deleteItem(cart.id, item.skuId)
     return this.getCart(userId)
   }
 
   async clearCart(userId: bigint): Promise<any> {
     const cart = await this.cartRepository.findByUserId(userId)
-    if (!cart) {
-      throw new NotFoundException('购物车不存在')
-    }
-
+    if (!cart) throw new NotFoundException('购物车不存在')
     await this.cartRepository.clearItems(cart.id)
-
     return this.getCart(userId)
   }
 
@@ -198,29 +145,18 @@ export class CartService {
     return this.addItem(userId, dto)
   }
 
-  async updateCartItemQuantity(userId: bigint, productId: bigint, quantity: number): Promise<any> {
-    if (!Number.isInteger(quantity) || quantity <= 0) {
+  async updateCartItemQuantity(userId: bigint, skuId: bigint, quantity: number): Promise<any> {
+    if (!Number.isSafeInteger(quantity) || quantity <= 0) {
       throw new BadRequestException('商品数量必须大于0')
     }
-
     const cart = await this.cartRepository.findByUserId(userId)
-    if (!cart) {
-      throw new NotFoundException('购物车不存在')
-    }
-
-    const item = cart.items.find(i => i.productId === productId)
-    if (!item) {
-      throw new BadRequestException('该商品不在购物车中')
-    }
-
-    const product = item.product
-    const available = product.totalStock - product.reservedStock - product.soldStock
-
-    if (quantity > available) {
-      throw new BadRequestException('库存不足')
-    }
-
-    await this.cartRepository.updateItem(cart.id, productId, quantity)
+    if (!cart) throw new NotFoundException('购物车不存在')
+    const item = cart.items.find((candidate: any) => candidate.skuId === skuId)
+    if (!item) throw new BadRequestException('该 SKU 不在购物车中')
+    const available =
+      item.sku.totalStock - item.sku.reservedStock - item.sku.soldStock
+    if (!item.sku.enabled || quantity > available) throw new BadRequestException('库存不足')
+    await this.cartRepository.updateItem(cart.id, skuId, quantity)
     return this.getCart(userId)
   }
 }

@@ -102,6 +102,12 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="渠道状态" width="150">
+          <template #default="{ row }">
+            <div>{{ row.lastProviderStatus || '-' }}</div>
+            <el-text v-if="refundNeedsProviderQuery(row)" type="danger" size="small">核对渠道，勿重提</el-text>
+          </template>
+        </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="160">
           <template #default="{ row }">
             {{ formatDate(row.createdAt) }}
@@ -122,6 +128,17 @@
                 @click="openApprovalDialog(row)"
               >
                 审批
+              </el-button>
+              <el-divider v-if="refundNeedsProviderQuery(row)" direction="vertical" />
+              <el-button
+                v-if="refundNeedsProviderQuery(row)"
+                type="warning"
+                link
+                size="small"
+                :loading="providerQueryingId === row.id"
+                @click="queryProviderRefund(row)"
+              >
+                查渠道
               </el-button>
             </div>
           </template>
@@ -179,6 +196,16 @@
                 @click="openApprovalDialog(row)"
               >
                 审批
+              </el-button>
+              <el-button
+                v-if="refundNeedsProviderQuery(row)"
+                type="warning"
+                link
+                size="small"
+                :loading="providerQueryingId === row.id"
+                @click="queryProviderRefund(row)"
+              >
+                查渠道
               </el-button>
             </div>
           </div>
@@ -259,6 +286,49 @@
           <div class="detail-row" v-if="currentRefund.rejectionReason">
             <span class="detail-label">拒绝原因</span>
             <span class="detail-value">{{ currentRefund.rejectionReason }}</span>
+          </div>
+        </div>
+
+        <el-divider />
+
+        <div class="detail-group">
+          <div class="detail-label">渠道处理</div>
+          <div class="detail-row">
+            <span class="detail-label">最近渠道状态</span>
+            <span class="detail-value">{{ currentRefund.lastProviderStatus || '尚无渠道结果' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">最近提交时间</span>
+            <span class="detail-value">{{ currentRefund.lastAttemptAt ? formatDate(currentRefund.lastAttemptAt) : '-' }}</span>
+          </div>
+          <el-alert
+            v-if="refundNeedsProviderQuery(currentRefund)"
+            type="warning"
+            :closable="false"
+            title="退款尚未确认终态。请先在微信商户平台核对此退款单号，禁止再次提交退款。"
+          />
+          <el-button
+            v-if="refundNeedsProviderQuery(currentRefund)"
+            type="warning"
+            :loading="providerQueryingId === currentRefund.id"
+            @click="queryProviderRefund(currentRefund)"
+          >
+            查询微信渠道状态
+          </el-button>
+        </div>
+
+        <el-divider v-if="currentRefund.events?.length" />
+
+        <div v-if="currentRefund.events?.length" class="detail-group">
+          <div class="detail-label">操作与渠道事件</div>
+          <div v-for="event in currentRefund.events" :key="event.id" class="refund-event">
+            <div class="refund-event__heading">
+              <span>{{ eventLabel(event.eventType) }} · {{ eventActorLabel(event) }}</span>
+              <span>{{ formatDate(event.createdAt) }}</span>
+            </div>
+            <div>{{ event.fromStatus || '新建' }} -&gt; {{ event.toStatus }}</div>
+            <div v-if="event.providerStatus">渠道状态：{{ event.providerStatus }}</div>
+            <div v-if="event.detail">{{ event.detail }}</div>
           </div>
         </div>
 
@@ -369,6 +439,7 @@ import { refundApi, type Refund } from '@/api/refund'
 const refunds = ref<Refund[]>([])
 const loading = ref(false)
 const approvalLoading = ref(false)
+const providerQueryingId = ref<number | null>(null)
 const keyword = ref('')
 const statusFilter = ref('')
 const dateRange = ref<[Date, Date] | null>(null)
@@ -412,6 +483,26 @@ const getStatusText = (status: string): string => statusMap[status]?.text || sta
 const getStatusType = (status: string): string => statusMap[status]?.type || 'info'
 
 const formatDate = (iso: string): string => new Date(iso).toLocaleString('zh-CN')
+const eventLabel = (type: string): string => ({
+  request_submitted: '用户提交申请',
+  approved: '管理员批准',
+  rejected: '管理员拒绝',
+  provider_request_accepted: '渠道受理',
+  provider_result_unknown: '渠道结果未知',
+  provider_notification: '渠道通知',
+  provider_query: '管理员渠道查单',
+}[type] || type)
+const eventActorLabel = (event: NonNullable<Refund['events']>[number]): string => {
+  if (event.actorType === 'admin') return `管理员 #${event.actorId ?? '-'}`
+  if (event.actorType === 'user') return '用户'
+  return event.actorType === 'wechat' ? '微信支付' : '系统'
+}
+const refundNeedsProviderQuery = (refund: Refund): boolean =>
+  refund.status === 'processing' &&
+  (
+    refund.lastErrorCode === 'provider_result_unknown' ||
+    ['SUBMITTED', 'PROCESSING', 'UNKNOWN', 'CLOSED', 'ABNORMAL', 'SUCCESS'].includes(refund.lastProviderStatus || '')
+  )
 
 const loadList = async (): Promise<void> => {
   loading.value = true
@@ -453,6 +544,25 @@ const viewDetail = async (row: Refund): Promise<void> => {
   }
 }
 
+const queryProviderRefund = async (row: Refund): Promise<void> => {
+  providerQueryingId.value = row.id
+  try {
+    const result = await refundApi.queryProviderRefund(row.id)
+    if (currentRefund.value?.id === row.id) currentRefund.value = result
+    await loadList()
+    ElMessage.success(
+      result.status === 'success'
+        ? '渠道确认退款成功，账务已更新'
+        : `已记录渠道状态：${result.lastProviderStatus || '未知'}；请勿重复提交退款`
+    )
+  } catch {
+    ElMessage.error('渠道查单失败，结果可能未知；请勿重复提交退款')
+    await loadList()
+  } finally {
+    providerQueryingId.value = null
+  }
+}
+
 const openApprovalDialog = async (row: Refund): Promise<void> => {
   try {
     currentRefund.value = await refundApi.getRefund(row.id)
@@ -486,11 +596,15 @@ const submitApproval = async (): Promise<void> => {
   approvalLoading.value = true
   try {
     if (approvalForm.value.decision === 'approve') {
-      await refundApi.approveRefund(currentRefund.value.id, {
+      const result = await refundApi.approveRefund(currentRefund.value.id, {
         approved: true,
         adminNote: approvalForm.value.remark || undefined,
       })
-      ElMessage.success('退款申请已提交至支付渠道')
+      ElMessage.warning(
+        result.lastErrorCode === 'provider_result_unknown'
+          ? '渠道结果未知，请先核对退款单，不要重复提交'
+          : '退款申请已提交，等待渠道确认'
+      )
     } else {
       await refundApi.rejectRefund(currentRefund.value.id, {
         rejectReason: approvalForm.value.rejectionReason,
@@ -757,6 +871,23 @@ onMounted(loadList)
   border-radius: $radius-md;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.refund-event {
+  display: grid;
+  gap: $space-4;
+  padding: $space-12 0;
+  border-bottom: 1px solid $color-border;
+  color: $color-text-secondary;
+  font-size: $font-size-sm;
+  overflow-wrap: anywhere;
+}
+
+.refund-event__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: $space-12;
+  color: $color-text;
 }
 
 .approval-content {

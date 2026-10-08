@@ -161,6 +161,18 @@
       }
     },
     {
+      "path": "pages/shop/addresses",
+      "style": {
+        "navigationBarTitleText": "收货地址"
+      }
+    },
+    {
+      "path": "pages/shop/address-edit",
+      "style": {
+        "navigationBarTitleText": "编辑收货地址"
+      }
+    },
+    {
       "path": "pages/shop/orders",
       "style": {
         "navigationBarTitleText": "我的订单"
@@ -214,6 +226,12 @@
         "text": "商城",
         "iconPath": "static/tabbar/shop.png",
         "selectedIconPath": "static/tabbar/shop-active.png"
+      },
+      {
+        "pagePath": "pages/shop/cart",
+        "text": "购物车",
+        "iconPath": "static/tabbar/cart.png",
+        "selectedIconPath": "static/tabbar/cart-active.png"
       },
       {
         "pagePath": "pages/profile/index",

@@ -2,7 +2,10 @@ import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-val
 
 export class CartItemForCheckout {
   @IsNotEmpty()
-  productId!: number | bigint | string
+  skuId?: number | bigint | string
+
+  @IsOptional()
+  productId?: number | bigint | string
 
   @IsInt()
   @IsNotEmpty()
@@ -36,7 +39,10 @@ export class OrderItemResponseDto {
   id!: bigint
   orderId!: bigint
   productId!: bigint
+  skuId!: bigint
   productName!: string
+  skuCode!: string
+  skuSpecifications!: Record<string, string>
   quantity!: number
   unitPriceFen!: number
   subtotalFen!: number

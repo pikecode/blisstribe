@@ -1,9 +1,15 @@
-import { IsInt, IsOptional, IsNotEmpty, Min } from 'class-validator'
+import { IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator'
 
 export class AddCartItemDto {
-  @IsInt()
-  @IsNotEmpty()
-  productId!: bigint
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d+$/)
+  skuId?: string
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d+$/)
+  productId?: string
 
   @IsInt()
   @IsNotEmpty()
@@ -21,10 +27,21 @@ export class UpdateCartItemDto {
 export class CartItemResponseDto {
   id!: bigint
   cartId!: bigint
-  productId!: bigint
+  skuId!: bigint
   quantity!: number
-  priceInFen!: number
-  totalInFen!: number
+  sku!: {
+    id: bigint
+    skuCode: string
+    specifications: Record<string, string>
+    priceFen: number
+    available: number
+    enabled: boolean
+    product: {
+      id: bigint
+      name: string
+      images: string[]
+    }
+  }
   createdAt!: Date
   updatedAt!: Date
 }

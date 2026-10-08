@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
@@ -21,6 +21,23 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly invitationService: InvitationService,
   ) {}
+
+  async getWechatOpenIdForPayment(userId: bigint, code: string): Promise<string> {
+    if (!code?.trim()) throw new UnauthorizedException('微信登录凭证无效')
+    const session = await this.code2session(code.trim())
+    const account = await this.prisma.wechatAccount.findUnique({
+      where: { userId },
+      select: { wxOpenIdHash: true, status: true },
+    })
+    if (
+      !account ||
+      account.status !== 1 ||
+      account.wxOpenIdHash !== this.hmac(session.openid)
+    ) {
+      throw new UnauthorizedException('微信身份与当前登录用户不匹配')
+    }
+    return session.openid
+  }
 
   // 微信登录：code 换 openid，判断新老用户
   async wechatLogin(dto: WechatLoginDto): Promise<unknown> {

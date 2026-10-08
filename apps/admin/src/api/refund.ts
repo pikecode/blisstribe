@@ -15,6 +15,20 @@ export interface Refund {
   status: 'pending' | 'approved' | 'rejected' | 'processing' | 'success' | 'completed' | 'failed'
   rejectionReason?: string
   remark?: string
+  lastProviderStatus?: string
+  lastErrorCode?: string
+  lastAttemptAt?: string
+  events?: Array<{
+    id: number
+    eventType: string
+    actorType: string
+    actorId?: number
+    fromStatus?: string
+    toStatus: string
+    providerStatus?: string
+    detail?: string
+    createdAt: string
+  }>
   createdAt: string
   updatedAt: string
   user?: {
@@ -60,7 +74,7 @@ export const refundApi = {
 
   // Approve refund
   approveRefund(id: number, data: ApproveRefundDto) {
-    return request.post(`/admin/shop/refunds/${id}/approve`, data)
+    return request.post<Refund>(`/admin/shop/refunds/${id}/approve`, data)
   },
 
   // Reject refund
@@ -68,4 +82,7 @@ export const refundApi = {
     return request.post(`/admin/shop/refunds/${id}/reject`, data)
   },
 
+  queryProviderRefund(id: number) {
+    return request.post<Refund>(`/admin/shop/refunds/${id}/query-provider`)
+  },
 }

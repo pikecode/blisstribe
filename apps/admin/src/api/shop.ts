@@ -34,13 +34,36 @@ export interface ShopProduct {
   description?: string
   images: string[]
   priceFen: number
+  priceMaxFen: number
   totalStock: number
   reservedStock: number
   soldStock: number
+  skus: ShopProductSku[]
   status: number
   sortOrder: number
   createdAt: string
   updatedAt: string
+}
+
+export interface ShopProductSku {
+  id: number
+  skuCode: string
+  specifications: Record<string, string>
+  priceFen: number
+  totalStock: number
+  reservedStock: number
+  soldStock: number
+  available: number
+  enabled: boolean
+}
+
+export interface ProductSkuInput {
+  id?: string
+  skuCode?: string
+  specifications: Record<string, string>
+  priceFen: number
+  totalStock: number
+  enabled: boolean
 }
 
 export interface CreateProductDto {
@@ -48,17 +71,16 @@ export interface CreateProductDto {
   name: string
   description?: string
   images: string[]
-  priceFen: number
-  totalStock: number
+  skus: ProductSkuInput[]
   sortOrder?: number
 }
 
 export interface UpdateProductDto {
+  categoryId?: number
   name?: string
   description?: string
   images?: string[]
-  priceFen?: number
-  totalStock?: number
+  skus?: ProductSkuInput[]
   status?: number
   sortOrder?: number
 }

@@ -8,10 +8,13 @@ import {
   UseGuards,
   Request,
   RawBodyRequest,
+  HttpCode,
+  SetMetadata,
 } from '@nestjs/common'
 import { Request as ExpressRequest } from 'express'
 import { JwtAuthGuard } from '../../common/guards/jwt.guard'
 import { AdminJwtGuard } from '../../common/guards/admin-jwt.guard'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { RefundService } from './refund.service'
 import { WechatPayService } from '../payment/wechat-pay.service'
 import { CreateRefundDto, ApproveRefundDto } from '../dto/refund.dto'
@@ -23,24 +26,24 @@ export class RefundController {
   @Post('orders/:id/refund')
   @UseGuards(JwtAuthGuard)
   async requestRefund(
-    @Request() req: any,
+    @CurrentUser() user: { userId: string },
     @Param('id') orderId: string,
     @Body() dto: CreateRefundDto
   ) {
-    const userId = BigInt(req.user.id)
+    const userId = BigInt(user.userId)
     return this.refundService.requestRefund(userId, BigInt(orderId), dto)
   }
 
   @Get('refunds')
   @UseGuards(JwtAuthGuard)
   async getUserRefunds(
-    @Request() req: any,
+    @CurrentUser() user: { userId: string },
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('limit') limit?: string
   ) {
-    const userId = BigInt(req.user.id)
+    const userId = BigInt(user.userId)
     return this.refundService.getUserRefunds(userId, {
       status,
       page: page ? parseInt(page, 10) : 1,
@@ -54,8 +57,8 @@ export class RefundController {
 
   @Get('refunds/:id')
   @UseGuards(JwtAuthGuard)
-  async getRefundDetail(@Request() req: any, @Param('id') refundId: string) {
-    const userId = BigInt(req.user.id)
+  async getRefundDetail(@CurrentUser() user: { userId: string }, @Param('id') refundId: string) {
+    const userId = BigInt(user.userId)
     return this.refundService.getRefundDetail(BigInt(refundId), userId)
   }
 }
@@ -87,6 +90,18 @@ export class AdminRefundController {
   @UseGuards(AdminJwtGuard)
   async getRefundDetail(@Param('id') refundId: string) {
     return this.refundService.getRefundDetail(BigInt(refundId))
+  }
+
+  @Post(':id/query-provider')
+  @UseGuards(AdminJwtGuard)
+  async queryProviderRefund(
+    @Request() req: any,
+    @Param('id') refundId: string
+  ) {
+    return this.refundService.queryProviderRefund(
+      BigInt(refundId),
+      BigInt(req.user.adminId)
+    )
   }
 
   @Post(':id/approve')
@@ -127,6 +142,7 @@ export class AdminRefundController {
 }
 
 @Controller('shop/webhooks')
+@SetMetadata('skipResponseEnvelope', true)
 export class RefundWebhookController {
   constructor(
     private refundService: RefundService,
@@ -134,6 +150,7 @@ export class RefundWebhookController {
   ) {}
 
   @Post('wechat-refund')
+  @HttpCode(200)
   async handleWechatRefundNotify(
     @Body() body: any,
     @Request() req: RawBodyRequest<ExpressRequest>
@@ -144,10 +161,11 @@ export class RefundWebhookController {
         'wechat-pay-timestamp': req.get('wechat-pay-timestamp') || '',
         'wechat-pay-nonce': req.get('wechat-pay-nonce') || '',
         'wechat-pay-signature': req.get('wechat-pay-signature') || '',
+        'wechat-pay-serial': req.get('wechatpay-serial') || '',
       }
 
-      // Get raw body for signature verification
-      const rawBody = req.rawBody?.toString('utf-8') || JSON.stringify(body)
+      const rawBody = req.rawBody?.toString('utf-8')
+      if (!rawBody) throw new Error('缺少微信支付回调原始请求体')
 
       // Verify signature via wechatPay.verifyNotifySignature()
       const isValid = this.wechatPayService.verifyNotifySignature(rawBody, headers)
@@ -161,6 +179,7 @@ export class RefundWebhookController {
 
       // Decrypt data via wechatPay.decryptNotify()
       const decryptedData = await this.wechatPayService.decryptNotify(body.resource)
+      this.wechatPayService.validateRefundNotification(decryptedData)
 
       // Call refundService.handleRefundCallback(decryptedData)
       await this.refundService.handleRefundCallback(decryptedData)
@@ -169,7 +188,7 @@ export class RefundWebhookController {
       return { code: 'SUCCESS' }
     } catch (error) {
       return {
-        code: 'ERROR',
+          code: 'FAIL',
         message: error instanceof Error ? error.message : 'Unknown error',
       }
     }

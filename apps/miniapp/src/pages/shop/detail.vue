@@ -1,14 +1,5 @@
 <template>
   <view class="product-detail">
-    <!-- Header with back button -->
-    <view class="product-detail__header">
-      <view class="product-detail__back" @tap="goBack">
-        <text class="product-detail__back-icon">‹</text>
-      </view>
-      <text class="product-detail__title">商品详情</text>
-      <view class="product-detail__header-spacer"></view>
-    </view>
-
     <!-- Loading state -->
     <view v-if="loading" class="product-detail__state">
       <text>商品加载中...</text>
@@ -24,12 +15,13 @@
     <view v-else-if="product" class="product-detail__content">
       <!-- Image carousel -->
       <view class="product-gallery">
-        <swiper class="product-gallery__swiper" :current="currentImageIndex" @change="onImageChange">
+        <swiper v-if="product.images.length" class="product-gallery__swiper" :current="currentImageIndex" @change="onImageChange">
           <swiper-item v-for="(image, index) in product.images" :key="index" class="product-gallery__item">
-            <image :src="image" class="product-gallery__image" mode="aspectFit" />
+            <image :src="image" class="product-gallery__image" mode="aspectFill" />
           </swiper-item>
         </swiper>
-        <view class="product-gallery__indicator">
+        <view v-else class="product-gallery__empty">暂无商品图片</view>
+        <view v-if="product.images.length > 1" class="product-gallery__indicator">
           <text class="product-gallery__counter">{{ currentImageIndex + 1 }}/{{ product.images.length }}</text>
         </view>
       </view>
@@ -42,42 +34,56 @@
             <text class="product-info__price-symbol">¥</text>
             <text class="product-info__price-value">{{ priceYuan }}</text>
           </view>
-          <view :class="['product-info__stock', `product-info__stock--${product.stockStatus}`]">
-            {{ stockStatusText(product.stockStatus) }}
+          <view :class="['product-info__stock', `product-info__stock--${selectedStockStatus}`]">
+            {{ stockStatusText(selectedStockStatus) }}<text v-if="selectedSkuAvailable > 0"> · {{ selectedSkuAvailable }} 件</text>
           </view>
         </view>
 
         <!-- Product title -->
         <text class="product-info__name">{{ product.name }}</text>
 
-        <!-- Product description -->
-        <view v-if="product.description" class="product-info__description">
-          <text class="product-info__description-label">商品描述</text>
-          <text class="product-info__description-text">{{ product.description }}</text>
-        </view>
-
       </view>
 
-      <!-- Quantity selector -->
-      <view class="product-quantity">
-        <text class="product-quantity__label">购买数量</text>
-        <view class="product-quantity__control">
-          <view class="product-quantity__btn" :class="{ disabled: quantity <= 1 }" @tap="decreaseQuantity">
-            <text>−</text>
-          </view>
-          <view class="product-quantity__input">
-            <input type="number" v-model.number="quantity" class="product-quantity__field" min="1" />
-          </view>
-          <view class="product-quantity__btn" :class="{ disabled: quantity >= product.available }" @tap="increaseQuantity">
-            <text>+</text>
+      <!-- SKU and quantity -->
+      <view class="product-skus">
+        <view class="product-skus__section">
+          <text class="product-skus__title">选择规格</text>
+          <view class="product-skus__options">
+            <view
+              v-for="sku in product.skus"
+              :key="sku.id"
+              class="product-skus__option"
+              :class="{
+                'product-skus__option--selected': sku.id === selectedSkuId,
+                'product-skus__option--disabled': sku.available <= 0,
+              }"
+              @tap="selectSku(sku.id)"
+            >
+              <text>{{ skuLabel(sku) }}</text>
+              <text v-if="sku.available <= 0">缺货</text>
+            </view>
           </view>
         </view>
+        <view class="product-quantity">
+          <text class="product-quantity__label">购买数量</text>
+          <view class="product-quantity__control">
+            <view class="product-quantity__btn" :class="{ disabled: quantity <= 1 }" @tap="decreaseQuantity">−</view>
+            <text class="product-quantity__value">{{ quantity }}</text>
+            <view class="product-quantity__btn" :class="{ disabled: quantity >= selectedSkuAvailable }" @tap="increaseQuantity">+</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Product description -->
+      <view v-if="product.description" class="product-description">
+        <text class="product-description__title">商品详情</text>
+        <text class="product-description__text">{{ product.description }}</text>
       </view>
 
       <!-- Action buttons -->
       <view class="product-actions">
         <view
-          v-if="product.stockStatus !== 'sold_out'"
+          v-if="selectedSkuAvailable > 0"
           class="product-actions__button product-actions__button--primary"
           :class="{ loading: addingToCart }"
           @tap="handleAddToCart"
@@ -95,8 +101,8 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
-import { shopApi, type ShopProduct } from '@/api/modules/shop'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { shopApi, type ShopProduct, type ShopProductSku } from '@/api/modules/shop'
 import { cartApi } from '@/api/modules/cart'
 import { useCartStore } from '@/stores/modules/cart'
 
@@ -109,11 +115,34 @@ const addingToCart = ref(false)
 const currentImageIndex = ref(0)
 const quantity = ref(1)
 const productId = ref('')
+const selectedSkuId = ref('')
+
+const selectedSku = computed(() =>
+  product.value?.skus.find((sku) => sku.id === selectedSkuId.value) || product.value?.skus[0]
+)
+const selectedSkuAvailable = computed(() => selectedSku.value?.available || 0)
+const selectedStockStatus = computed(() => {
+  const available = selectedSkuAvailable.value
+  return available <= 0 ? 'sold_out' : available <= 5 ? 'limited' : 'available'
+})
 
 const priceYuan = computed(() => {
-  if (!product.value) return '0.00'
-  return (product.value.priceFen / 100).toFixed(2)
+  if (!selectedSku.value) return '0.00'
+  return (selectedSku.value.priceFen / 100).toFixed(2)
 })
+
+function skuLabel(sku: ShopProductSku): string {
+  const values = Object.entries(sku.specifications)
+    .map(([key, value]) => `${key} ${value}`)
+  return values.length ? values.join(' / ') : '默认规格'
+}
+
+function selectSku(id: string) {
+  const sku = product.value?.skus.find((item) => item.id === id)
+  if (!sku || sku.available <= 0) return
+  selectedSkuId.value = id
+  quantity.value = 1
+}
 
 function stockStatusText(status: string): string {
   switch (status) {
@@ -133,7 +162,7 @@ function onImageChange(event: any) {
 }
 
 function increaseQuantity() {
-  if (product.value && quantity.value < product.value.available) quantity.value++
+  if (quantity.value < selectedSkuAvailable.value) quantity.value++
 }
 
 function decreaseQuantity() {
@@ -151,6 +180,7 @@ async function loadProduct() {
   try {
     const data = await shopApi.productDetail(productId.value)
     product.value = data
+    selectedSkuId.value = data.skus[0]?.id || ''
     currentImageIndex.value = 0
     quantity.value = 1
   } catch (error) {
@@ -162,12 +192,12 @@ async function loadProduct() {
 }
 
 async function handleAddToCart() {
-  if (!product.value || addingToCart.value) return
+  if (!product.value || !selectedSku.value || addingToCart.value) return
 
   addingToCart.value = true
 
   try {
-    const updatedCart = await cartApi.addItem(product.value.id, quantity.value)
+    const updatedCart = await cartApi.addItem(selectedSku.value.id, quantity.value)
     cartStore.setCart(updatedCart)
 
     uni.showToast({
@@ -191,15 +221,14 @@ async function handleAddToCart() {
   }
 }
 
-function goBack() {
-  uni.navigateBack({
-    delta: 1,
-  })
-}
-
 onLoad((option: any) => {
   if (option && option.id) {
     productId.value = String(option.id)
+  }
+})
+
+onShow(() => {
+  if (productId.value) {
     loadProduct()
   }
 })
@@ -207,77 +236,36 @@ onLoad((option: any) => {
 
 <style lang="scss" scoped>
 .product-detail {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background-color: #f5f5f5;
-
-  &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background-color: #fff;
-    border-bottom: 1px solid #eee;
-  }
-
-  &__back {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #333;
-    font-size: 24px;
-  }
-
-  &__back-icon {
-    font-weight: bold;
-    font-size: 28px;
-  }
-
-  &__title {
-    flex: 1;
-    text-align: center;
-    font-size: 16px;
-    font-weight: 500;
-    color: #333;
-  }
-
-  &__header-spacer {
-    width: 36px;
-  }
+  min-height: 100vh;
+  background-color: var(--color-bg);
 
   &__content {
-    flex: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
+    padding-bottom: calc(130rpx + env(safe-area-inset-bottom));
   }
 
   &__state {
-    flex: 1;
+    min-height: 70vh;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
     background-color: #fff;
-    color: #666;
-    font-size: 14px;
-    gap: 12px;
+    color: var(--color-text-secondary);
+    font-size: 26rpx;
+    gap: 20rpx;
 
     &--error {
-      color: #f56c6c;
+      color: var(--color-danger);
     }
   }
 
   &__retry {
-    margin-top: 8px;
-    padding: 8px 16px;
-    background-color: #f56c6c;
+    margin-top: 12rpx;
+    padding: 14rpx 28rpx;
+    background-color: var(--color-primary);
     color: #fff;
-    border-radius: 4px;
-    font-size: 14px;
+    border-radius: var(--radius-round);
+    font-size: 24rpx;
   }
 }
 
@@ -289,16 +277,16 @@ onLoad((option: any) => {
 
   &__swiper {
     width: 100%;
-    height: 400px;
+    height: 620rpx;
   }
 
   &__item {
     width: 100%;
-    height: 400px;
+    height: 620rpx;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #f5f5f5;
+    background-color: var(--color-bg-gray);
   }
 
   &__image {
@@ -306,31 +294,43 @@ onLoad((option: any) => {
     height: 100%;
   }
 
+  &__empty {
+    height: 620rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-gray);
+    color: var(--color-text-tertiary);
+    font-size: 24rpx;
+  }
+
   &__indicator {
     position: absolute;
-    right: 12px;
-    bottom: 12px;
-    background-color: rgba(0, 0, 0, 0.6);
-    padding: 4px 8px;
-    border-radius: 4px;
+    right: 24rpx;
+    bottom: 24rpx;
+    background-color: rgba(31, 41, 55, 0.66);
+    padding: 8rpx 18rpx;
+    border-radius: var(--radius-round);
   }
 
   &__counter {
     color: #fff;
-    font-size: 12px;
+    font-size: 21rpx;
   }
 }
 
 .product-info {
   background-color: #fff;
-  padding: 16px;
-  border-bottom: 1px solid #eee;
+  margin: 18rpx 20rpx 0;
+  padding: 28rpx;
+  border-radius: 20rpx;
+  box-shadow: var(--shadow-sm);
 
   &__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
+    margin-bottom: 18rpx;
   }
 
   &__price {
@@ -340,26 +340,26 @@ onLoad((option: any) => {
   }
 
   &__price-symbol {
-    font-size: 14px;
-    color: #f56c6c;
+    font-size: 26rpx;
+    color: #d04a36;
     font-weight: 500;
   }
 
   &__price-value {
-    font-size: 28px;
-    color: #f56c6c;
-    font-weight: bold;
+    font-size: 48rpx;
+    color: #d04a36;
+    font-weight: 800;
   }
 
   &__stock {
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
+    padding: 8rpx 16rpx;
+    border-radius: var(--radius-round);
+    font-size: 22rpx;
     font-weight: 500;
 
     &--available {
-      background-color: #f0f9ff;
-      color: #0ea5e9;
+      background-color: var(--color-primary-light);
+      color: #078447;
     }
 
     &--limited {
@@ -375,93 +375,91 @@ onLoad((option: any) => {
 
   &__name {
     display: block;
-    font-size: 16px;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 8px;
-    line-height: 1.4;
+    font-size: 34rpx;
+    font-weight: 800;
+    color: var(--color-text);
+    line-height: 46rpx;
+  }
+}
+
+.product-skus {
+  margin: 18rpx 20rpx 0;
+  padding: 28rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  box-shadow: var(--shadow-sm);
+
+  &__section {
+    padding-bottom: 24rpx;
+    border-bottom: 1rpx solid var(--color-border);
   }
 
-  &__subtitle {
+  &__title {
     display: block;
-    font-size: 13px;
-    color: #999;
-    margin-bottom: 12px;
+    margin-bottom: 20rpx;
+    color: var(--color-text);
+    font-size: 27rpx;
+    font-weight: 700;
+  }
 
-    text {
-      display: block;
-      line-height: 1.4;
+  &__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14rpx;
+  }
+
+  &__option {
+    display: flex;
+    min-height: 64rpx;
+    align-items: center;
+    gap: 10rpx;
+    padding: 0 22rpx;
+    border: 1rpx solid var(--color-border-strong);
+    border-radius: 14rpx;
+    color: var(--color-text-secondary);
+    font-size: 23rpx;
+
+    &--selected {
+      border-color: var(--color-primary);
+      color: #078447;
+      background: var(--color-primary-light);
     }
-  }
 
-  &__description {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #eee;
-  }
-
-  &__description-label {
-    display: block;
-    font-size: 12px;
-    color: #999;
-    margin-bottom: 8px;
-    font-weight: 500;
-  }
-
-  &__description-text {
-    display: block;
-    font-size: 13px;
-    color: #666;
-    line-height: 1.6;
-  }
-
-  &__summary {
-    margin-top: 12px;
-  }
-
-  &__summary-text {
-    display: block;
-    font-size: 12px;
-    color: #666;
-    line-height: 1.5;
-    background-color: #f9f9f9;
-    padding: 8px;
-    border-radius: 4px;
+    &--disabled {
+      opacity: 0.45;
+    }
   }
 }
 
 .product-quantity {
-  background-color: #fff;
-  padding: 16px;
-  border-bottom: 1px solid #eee;
+  padding-top: 24rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
 
   &__label {
-    font-size: 14px;
-    color: #333;
-    font-weight: 500;
+    font-size: 26rpx;
+    color: var(--color-text);
+    font-weight: 700;
   }
 
   &__control {
     display: flex;
     align-items: center;
-    gap: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    border: 1rpx solid var(--color-border);
+    border-radius: 12rpx;
     overflow: hidden;
   }
 
   &__btn {
-    width: 32px;
-    height: 32px;
+    width: 58rpx;
+    height: 52rpx;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #f5f5f5;
-    font-size: 16px;
-    color: #333;
+    background-color: var(--color-bg-gray);
+    font-size: 28rpx;
+    color: var(--color-text);
     font-weight: bold;
 
     &.disabled {
@@ -470,43 +468,65 @@ onLoad((option: any) => {
     }
   }
 
-  &__input {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
+  &__value {
+    width: 64rpx;
+    text-align: center;
+    font-size: 24rpx;
+    color: var(--color-text);
+  }
+}
+
+.product-description {
+  margin: 18rpx 20rpx 0;
+  padding: 28rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  box-shadow: var(--shadow-sm);
+
+  &__title {
+    display: block;
+    margin-bottom: 16rpx;
+    color: var(--color-text);
+    font-size: 27rpx;
+    font-weight: 700;
   }
 
-  &__field {
-    width: 40px;
-    height: 32px;
-    text-align: center;
-    border: none;
-    font-size: 14px;
-    color: #333;
+  &__text {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: 25rpx;
+    line-height: 42rpx;
+    white-space: pre-wrap;
   }
 }
 
 .product-actions {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
   background-color: #fff;
-  padding: 12px 16px;
+  padding: 18rpx 24rpx calc(18rpx + env(safe-area-inset-bottom));
   display: flex;
-  gap: 12px;
+  gap: 18rpx;
+  border-top: 1rpx solid var(--color-border);
 
   &__button {
     flex: 1;
-    height: 44px;
+    height: 84rpx;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: var(--radius-round);
     border: none;
-    font-size: 15px;
-    font-weight: 500;
+    font-size: 28rpx;
+    font-weight: 700;
     transition: opacity 0.2s;
 
     &--primary {
-      background-color: #f56c6c;
+      background-color: var(--color-primary);
+      box-shadow: var(--shadow-action);
       color: #fff;
 
       &:active:not(.loading) {
@@ -526,7 +546,7 @@ onLoad((option: any) => {
   }
 
   &__text {
-    font-size: 15px;
+    font-size: 28rpx;
     color: inherit;
   }
 }

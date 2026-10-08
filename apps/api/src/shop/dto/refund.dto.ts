@@ -1,4 +1,4 @@
-import { IsInt, IsString, IsOptional, IsNotEmpty, Min, IsBoolean } from 'class-validator'
+import { IsInt, IsString, IsOptional, IsNotEmpty, Min, IsBoolean, MaxLength } from 'class-validator'
 
 export class CreateRefundDto {
   @IsInt()
@@ -8,6 +8,7 @@ export class CreateRefundDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(1000)
   reason?: string
 }
 
@@ -33,5 +34,6 @@ export class ApproveRefundDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   adminNote?: string
 }

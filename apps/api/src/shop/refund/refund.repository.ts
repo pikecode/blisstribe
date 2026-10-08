@@ -16,6 +16,7 @@ export class RefundRepository {
     return this.prisma.shopRefund.findUnique({
       where: { id },
       include: {
+        events: { orderBy: { createdAt: 'asc' } },
         order: {
           include: {
             user: { select: { id: true, nickname: true, phoneMasked: true } },
@@ -91,6 +92,7 @@ export class RefundRepository {
       this.prisma.shopRefund.findMany({
         where,
         include: {
+          events: { orderBy: { createdAt: 'desc' }, take: 1 },
           order: {
             include: {
               user: { select: { id: true, nickname: true, phoneMasked: true } },

@@ -6,6 +6,9 @@ export interface OrderItem {
   id: string
   orderId: string
   productId: string
+  skuId: string
+  skuCode: string
+  skuSpecifications: Record<string, string>
   productImage?: string | null
   productName: string
   quantity: number
@@ -21,15 +24,20 @@ export interface Order {
   paymentStatus: string
   fulfillmentStatus: string
   totalAmountFen: number
+  discountAmountFen: number
   paymentAmountFen: number
   refundedAmountFen: number
   receiverName?: string
   receiverPhone?: string
   shippingAddress?: string
+  remark?: string | null
+  cancelReason?: string | null
   trackingNo?: string
   createdAt: string
   updatedAt: string
   shippedAt?: string
+  paidAt?: string
+  cancelledAt?: string
   completedAt?: string
   items: OrderItem[]
 }
@@ -49,7 +57,10 @@ export interface OrderListParams {
 }
 
 export interface CreateOrderParams {
-  items: Array<{ productId: string; quantity: number }>
+  items: Array<
+    | { skuId: string; productId?: never; quantity: number }
+    | { productId: string; skuId?: never; quantity: number }
+  >
   receiverName: string
   receiverPhone: string
   shippingAddress: string

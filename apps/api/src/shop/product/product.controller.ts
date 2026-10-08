@@ -60,6 +60,12 @@ export class AdminProductController {
     })
   }
 
+  @Get(':id')
+  @UseGuards(AdminJwtGuard)
+  async getProduct(@Param('id') id: string) {
+    return this.productService.getProductById(BigInt(id))
+  }
+
   @Post()
   @UseGuards(AdminJwtGuard)
   async createProduct(@Body() dto: CreateProductDto) {

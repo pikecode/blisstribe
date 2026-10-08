@@ -6,10 +6,10 @@ import {
   Body,
   Query,
   UseGuards,
-  Request,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../../common/guards/jwt.guard'
 import { AdminJwtGuard } from '../../common/guards/admin-jwt.guard'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { OrderService } from './order.service'
 import { CreateOrderDto } from '../dto/order.dto'
 
@@ -19,21 +19,21 @@ export class OrderController {
 
   @Post('orders')
   @UseGuards(JwtAuthGuard)
-  async createOrder(@Request() req: any, @Body() dto: CreateOrderDto) {
-    const userId = BigInt(req.user.id)
+  async createOrder(@CurrentUser() user: { userId: string }, @Body() dto: CreateOrderDto) {
+    const userId = BigInt(user.userId)
     return this.orderService.createOrder(userId, dto)
   }
 
   @Get('orders')
   @UseGuards(JwtAuthGuard)
   async getUserOrders(
-    @Request() req: any,
+    @CurrentUser() user: { userId: string },
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('limit') legacyLimit?: string
   ) {
-    const userId = BigInt(req.user.id)
+    const userId = BigInt(user.userId)
     return this.orderService.getUserOrders(userId, {
       status,
       page: page ? parseInt(page, 10) : 1,
@@ -47,15 +47,15 @@ export class OrderController {
 
   @Get('orders/:id')
   @UseGuards(JwtAuthGuard)
-  async getOrderDetail(@Request() req: any, @Param('id') orderId: string) {
-    const userId = BigInt(req.user.id)
+  async getOrderDetail(@CurrentUser() user: { userId: string }, @Param('id') orderId: string) {
+    const userId = BigInt(user.userId)
     return this.orderService.getOrderDetail(BigInt(orderId), userId)
   }
 
   @Post('orders/:id/cancel')
   @UseGuards(JwtAuthGuard)
-  async cancelOrder(@Request() req: any, @Param('id') orderId: string) {
-    const userId = BigInt(req.user.id)
+  async cancelOrder(@CurrentUser() user: { userId: string }, @Param('id') orderId: string) {
+    const userId = BigInt(user.userId)
     return this.orderService.cancelOrder(BigInt(orderId), userId)
   }
 }
@@ -94,7 +94,7 @@ export class AdminOrderController {
   @Get('orders/:id')
   @UseGuards(AdminJwtGuard)
   async getOrderDetail(@Param('id') orderId: string) {
-    return this.orderService.getOrderDetailByOrderNo(orderId)
+    return this.orderService.getAdminOrderDetail(BigInt(orderId))
   }
 
   @Post('orders/:id/ship')

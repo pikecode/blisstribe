@@ -188,6 +188,7 @@ async function handlePayment(id: string): Promise<void> {
   try {
     await shopApi.createPayment(id)
     await loadOrders()
+    uni.showToast({ title: '支付成功', icon: 'success' })
   } catch {
     uni.showToast({ title: '微信支付暂不可用，请稍后重试', icon: 'none' })
   }
@@ -252,18 +253,18 @@ onShow(loadOrders)
     padding: 24rpx 32rpx;
     overflow-x: auto;
     background: #fff;
-    border-bottom: 1rpx solid var(--color-border);
+    box-shadow: var(--shadow-sm);
   }
 
   &__filter {
     flex-shrink: 0;
     padding: 10rpx 22rpx;
     border-radius: 30rpx;
-    background: var(--color-bg-white);
+    background: var(--color-bg-gray);
     color: var(--color-text-secondary);
     font-size: 26rpx;
     font-weight: 600;
-    border: 1rpx solid var(--color-border);
+    border: 1rpx solid transparent;
     transition: all var(--duration-fast) ease-in-out;
 
     &:active {
@@ -344,7 +345,7 @@ onShow(loadOrders)
 
 .order-card {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: 20rpx;
   padding: 24rpx;
   margin-bottom: 16rpx;
   box-shadow: var(--shadow-sm);

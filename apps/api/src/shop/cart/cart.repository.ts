@@ -1,35 +1,22 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../common/prisma.service'
-import { ShopCart, ShopCartItem } from '@prisma/client'
 
 @Injectable()
 export class CartRepository {
   constructor(private prisma: PrismaService) {}
 
-  async findByUserId(userId: bigint): Promise<
-    (ShopCart & {
-      items: (ShopCartItem & {
-        product: any
-      })[]
-    }) | null
-  > {
+  async findByUserId(userId: bigint): Promise<any | null> {
     return this.prisma.shopCart.findUnique({
       where: { userId },
       include: {
         items: {
-          include: { product: true },
+          include: { sku: { include: { product: true } } },
         },
       },
     })
   }
 
-  async findOrCreateByUserId(userId: bigint): Promise<
-    ShopCart & {
-      items: (ShopCartItem & {
-        product: any
-      })[]
-    }
-  > {
+  async findOrCreateByUserId(userId: bigint): Promise<any> {
     let cart = await this.findByUserId(userId)
 
     if (!cart) {
@@ -39,7 +26,7 @@ export class CartRepository {
         },
         include: {
           items: {
-            include: { product: true },
+            include: { sku: { include: { product: true } } },
           },
         },
       })
@@ -48,59 +35,59 @@ export class CartRepository {
     return cart
   }
 
-  async findItemByCartIdAndProductId(
+  async findItemByCartIdAndSkuId(
     cartId: bigint,
-    productId: bigint
-  ): Promise<(ShopCartItem & { product: any }) | null> {
+    skuId: bigint
+  ): Promise<any | null> {
     return this.prisma.shopCartItem.findUnique({
       where: {
-        cartId_productId: {
+        cartId_skuId: {
           cartId,
-          productId,
+          skuId,
         },
       },
-      include: { product: true },
+      include: { sku: { include: { product: true } } },
     })
   }
 
   async createItem(
     cartId: bigint,
-    productId: bigint,
+    skuId: bigint,
     quantity: number
-  ): Promise<ShopCartItem & { product: any }> {
+  ): Promise<any> {
     return this.prisma.shopCartItem.create({
       data: {
         cartId,
-        productId,
+        skuId,
         quantity,
       },
-      include: { product: true },
+      include: { sku: { include: { product: true } } },
     })
   }
 
   async updateItem(
     cartId: bigint,
-    productId: bigint,
+    skuId: bigint,
     quantity: number
-  ): Promise<ShopCartItem & { product: any }> {
+  ): Promise<any> {
     return this.prisma.shopCartItem.update({
       where: {
-        cartId_productId: {
+        cartId_skuId: {
           cartId,
-          productId,
+          skuId,
         },
       },
       data: { quantity },
-      include: { product: true },
+      include: { sku: { include: { product: true } } },
     })
   }
 
-  async deleteItem(cartId: bigint, productId: bigint): Promise<ShopCartItem> {
+  async deleteItem(cartId: bigint, skuId: bigint): Promise<any> {
     return this.prisma.shopCartItem.delete({
       where: {
-        cartId_productId: {
+        cartId_skuId: {
           cartId,
-          productId,
+          skuId,
         },
       },
     })

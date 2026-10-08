@@ -1,27 +1,24 @@
-import { beforeAll, describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it, jest } from '@jest/globals'
 
-let PaymentService: typeof import('../../apps/api/src/shop/payment/payment.service').PaymentService
+jest.mock('@nestjs/common', () => ({
+  Injectable: () => (target: unknown) => target,
+  BadRequestException: class BadRequestException extends Error {},
+  NotFoundException: class NotFoundException extends Error {},
+}))
+jest.mock('../../apps/api/src/common/prisma.service', () => ({
+  PrismaService: class PrismaService {},
+}))
+jest.mock('../../apps/api/src/shop/order/order.repository', () => ({
+  OrderRepository: class OrderRepository {},
+}))
+jest.mock('../../apps/api/src/shop/payment/payment.repository', () => ({
+  PaymentRepository: class PaymentRepository {},
+}))
+jest.mock('../../apps/api/src/shop/payment/wechat-pay.service', () => ({
+  WechatPayService: class WechatPayService {},
+}))
 
-beforeAll(async () => {
-  jest.unstable_mockModule('@nestjs/common', () => ({
-    Injectable: () => (target: unknown) => target,
-    BadRequestException: class BadRequestException extends Error {},
-    NotFoundException: class NotFoundException extends Error {},
-  }))
-  jest.unstable_mockModule('../../apps/api/src/common/prisma.service', () => ({
-    PrismaService: class PrismaService {},
-  }))
-  jest.unstable_mockModule('../../apps/api/src/shop/order/order.repository', () => ({
-    OrderRepository: class OrderRepository {},
-  }))
-  jest.unstable_mockModule('../../apps/api/src/shop/payment/payment.repository', () => ({
-    PaymentRepository: class PaymentRepository {},
-  }))
-  jest.unstable_mockModule('../../apps/api/src/shop/payment/wechat-pay.service', () => ({
-    WechatPayService: class WechatPayService {},
-  }))
-  ;({ PaymentService } = await import('../../apps/api/src/shop/payment/payment.service'))
-})
+import { PaymentService } from '../../apps/api/src/shop/payment/payment.service'
 
 describe('PaymentService closure recovery', () => {
   const order = {
@@ -30,7 +27,7 @@ describe('PaymentService closure recovery', () => {
     status: 'pending_payment',
     paymentStatus: 'unpaid',
     paymentAmountFen: 1200,
-    items: [{ productId: 20n, quantity: 2 }],
+    items: [{ skuId: 20n, quantity: 2 }],
   }
 
   function setup(overrides: {
@@ -38,13 +35,21 @@ describe('PaymentService closure recovery', () => {
     close?: { tradeState: string }
     queryError?: Error
     initialOrder?: typeof order
+    closingTransactionResult?: { count: number }
+    orderAfterClosingRace?: { status: string; paymentStatus: string }
   } = {}) {
     const tx: any = {
       shopOrder: {
-        updateMany: jest.fn(async () => ({ count: 1 })),
-        findUnique: jest.fn(async () => overrides.initialOrder || order),
+        updateMany: jest.fn(async () => (
+          overrides.closingTransactionResult || { count: 1 }
+        )),
+        findUnique: jest.fn(async () => (
+          overrides.orderAfterClosingRace ||
+          overrides.initialOrder ||
+          order
+        )),
       },
-      shopProduct: {
+      shopProductSku: {
         updateMany: jest.fn(async () => ({ count: 1 })),
       },
       shopPayment: {
@@ -95,7 +100,7 @@ describe('PaymentService closure recovery', () => {
       where: { id: 10n, status: 'closing', paymentStatus: 'unpaid' },
       data: expect.objectContaining({ status: 'cancelled', cancelReason: 'expired' }),
     }))
-    expect(tx.shopProduct.updateMany).toHaveBeenCalledWith({
+    expect(tx.shopProductSku.updateMany).toHaveBeenCalledWith({
       where: { id: 20n, reservedStock: { gte: 2 } },
       data: { reservedStock: { decrement: 2 } },
     })
@@ -114,7 +119,7 @@ describe('PaymentService closure recovery', () => {
     })
     expect(wechatPayService.closeTrade).not.toHaveBeenCalled()
     expect(prisma.$transaction).not.toHaveBeenCalled()
-    expect(tx.shopProduct.updateMany).not.toHaveBeenCalled()
+    expect(tx.shopProductSku.updateMany).not.toHaveBeenCalled()
   })
 
   it('settles a trade found successful while closure is in progress', async () => {
@@ -133,7 +138,7 @@ describe('PaymentService closure recovery', () => {
       },
       data: expect.objectContaining({ status: 'paid', paymentStatus: 'paid' }),
     }))
-    expect(tx.shopProduct.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+    expect(tx.shopProductSku.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: { reservedStock: { decrement: 2 }, soldStock: { increment: 2 } },
     }))
   })
@@ -165,7 +170,19 @@ describe('PaymentService closure recovery', () => {
       },
       update: {},
     })
-    expect(tx.shopProduct.updateMany).not.toHaveBeenCalled()
+    expect(tx.shopProductSku.updateMany).not.toHaveBeenCalled()
     expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports paid when the callback wins the final close transaction race', async () => {
+    const { service, tx } = setup({
+      closingTransactionResult: { count: 0 },
+      orderAfterClosingRace: { status: 'paid', paymentStatus: 'paid' },
+    })
+
+    await expect(service.closeUnpaidOrder(10n, 'expired')).resolves.toBe('paid')
+
+    expect(tx.shopOrder.findUnique).toHaveBeenCalledWith({ where: { id: 10n } })
+    expect(tx.shopProductSku.updateMany).not.toHaveBeenCalled()
   })
 })

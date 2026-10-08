@@ -4,7 +4,7 @@
 
 本文档描述 BlissTribe 商城第一阶段的数据库设计。
 
-商城模块包含 8 个核心表，构成"商品 → 购物车 → 订单 → 支付 → 退款"的完整交易闭环。
+商城数据关系为"商品 → SKU → 购物车/订单项 → 订单 → 支付/退款"。SKU 是价格和库存的事实来源。
 
 ## 表关系图
 
@@ -12,14 +12,14 @@
 User (用户)
 ├── ShopCart (1:1 购物车)
 │   └── ShopCartItem[] (1:多 购物车项)
-│       └── ShopProduct (多:1 商品)
+│       └── ShopProductSku (多:1 SKU)
 └── ShopOrder[] (1:多 订单)
     ├── ShopOrderItem[] (1:多 订单项)
-    │   └── ShopProduct (多:1 商品快照)
+    │   └── ShopProductSku (多:1 SKU，订单项另保存下单快照)
     ├── ShopPayment[] (1:多 支付记录)
     └── ShopRefund[] (1:多 退款记录)
 
-ShopCategory (分类) (1:多)→ ShopProduct
+ShopCategory (分类) (1:多)→ ShopProduct (商品) (1:多)→ ShopProductSku
 ```
 
 ## 数据模型详解
@@ -47,10 +47,6 @@ ShopCategory (分类) (1:多)→ ShopProduct
 | name | String | 商品名称 |
 | description | String\| | 商品描述（可选） |
 | images | String[] | 图片 URL 数组 |
-| priceFen | Int | 单价，单位：分 |
-| totalStock | Int | 总库存，默认 0 |
-| reservedStock | Int | 已预留库存，默认 0 |
-| soldStock | Int | 已销售库存，默认 0 |
 | status | Int | 0=草稿 1=上架 2=下架，默认 0 |
 | sortOrder | Int | 排序字段，默认 0 |
 | createdAt | DateTime | 创建时间 |
@@ -61,14 +57,33 @@ ShopCategory (分类) (1:多)→ ShopProduct
 - `(categoryId, status, sortOrder)`
 - `(status, createdAt)`
 
+商品只保存公共信息；每个商品至少有一个 SKU。无规格商品使用空规格默认 SKU，规格属性以 JSON 保存。
+
+### 3. ShopProductSku（商品 SKU）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BigInt | 主键 |
+| productId | BigInt | 所属商品 |
+| skuCode | String | SKU 编码，全局唯一 |
+| specifications | Json | 规格属性，例如颜色/尺寸 |
+| specificationKey | String | 规范化规格键，同商品内唯一 |
+| priceFen | Int | SKU 单价，单位：分 |
+| totalStock | Int | 总库存 |
+| reservedStock | Int | 已预留库存 |
+| soldStock | Int | 已销售库存 |
+| enabled | Boolean | 是否可销售 |
+
+**唯一约束：** `skuCode`、`(productId, specificationKey)`
+
 **库存计算：**
 ```
-availableStock = totalStock - reservedStock - soldStock
+availableStock = sku.totalStock - sku.reservedStock - sku.soldStock
 ```
 
-不单独保存 `available` 字段，避免冗余字段失真。
+不单独保存可用库存。商品列表展示启用 SKU 的价格区间和库存汇总。
 
-### 3. ShopCart（购物车）
+### 4. ShopCart（购物车）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -81,26 +96,26 @@ availableStock = totalStock - reservedStock - soldStock
 
 **说明：** 购物车和用户是 1:1 关系。每个用户最多有一个购物车。购物车不预留库存，库存只在订单创建时预留。
 
-### 4. ShopCartItem（购物车项）
+### 5. ShopCartItem（购物车项）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | BigInt | 主键 |
 | cartId | BigInt | 购物车 ID（外键） |
-| productId | BigInt | 商品 ID（外键） |
+| skuId | BigInt | SKU ID（外键） |
 | quantity | Int | 数量 |
 | createdAt | DateTime | 创建时间 |
 | updatedAt | DateTime | 更新时间 |
 
 **外键关系：**
 - `ShopCart(id)` - 级联删除
-- `ShopProduct(id)` - 级联更新
+- `ShopProductSku(id)` - 删除受引用保护
 
-**约束：** `UNIQUE(cartId, productId)` - 每个购物车中每个商品最多一条记录
+**约束：** `UNIQUE(cartId, skuId)` - 每个购物车中每个 SKU 最多一条记录
 
 **索引：** `cartId`
 
-### 5. ShopOrder（订单）
+### 6. ShopOrder（订单）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -146,15 +161,18 @@ pending_payment (待支付)
 └── cancelled (已取消)
 ```
 
-### 6. ShopOrderItem（订单项）
+### 7. ShopOrderItem（订单项）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | BigInt | 主键 |
 | orderId | BigInt | 订单 ID（外键） |
 | productId | BigInt | 商品 ID（外键，用于追溯）|
+| skuId | BigInt | SKU ID（库存操作与追溯） |
 | productName | String | 商品名称（快照） |
 | productImage | String\| | 商品图片（快照，可选） |
+| skuCode | String | SKU 编码快照 |
+| skuSpecifications | Json | SKU 规格快照 |
 | unitPriceFen | Int | 单价（分，快照） |
 | quantity | Int | 数量 |
 | subtotalFen | Int | 小计（分） |
@@ -163,12 +181,13 @@ pending_payment (待支付)
 **外键关系：**
 - `ShopOrder(id)` - 级联删除
 - `ShopProduct(id)` - 级联更新
+- `ShopProductSku(id)` - 删除受引用保护
 
 **说明：** 订单项必须保存商品快照，商品后续改名、改价不能影响历史订单。
 
 **索引：** `orderId`
 
-### 7. ShopPayment（支付记录）
+### 8. ShopPayment（支付记录）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -195,7 +214,7 @@ pending_payment (待支付)
 - 支付状态：pending / success / failed / closed / refunded
 - 支付创建时不能要求已经存在微信交易号
 
-### 8. ShopRefund（退款记录）
+### 9. ShopRefund（退款记录）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -247,10 +266,10 @@ pending_payment (待支付)
 ### 创建订单时
 
 在单个数据库事务中：
-1. 查询商品并锁定
+1. 按 SKU ID 稳定排序并锁定 SKU
 2. 校验商品处于上架状态
-3. 校验库存满足购买数量
-4. 增加 `reservedStock`（预留库存）
+3. 校验商品上架、SKU 启用且 SKU 库存满足购买数量
+4. 增加对应 SKU 的 `reservedStock`（预留库存）
 5. 创建订单和订单项快照
 6. 设置订单过期时间（15 分钟）
 
@@ -280,7 +299,7 @@ reservedStock -= quantity（释放预留库存）
 
 ## 关键约束
 
-1. **所有金额由服务端计算**，客户端只提交商品 ID 和数量
+1. **所有金额由服务端计算**，客户端提交 SKU ID 和数量；兼容期旧商品 ID 仅映射到唯一启用 SKU
 2. **订单详情必须校验 userId**，用户隔离
 3. **商品详情只返回已上架（status=1）且未删除（deletedAt=null）的商品**
 4. **支付回调必须验签、幂等和金额校验**
@@ -293,6 +312,7 @@ reservedStock -= quantity（释放预留库存）
 
 - `ShopProduct(categoryId, status, sortOrder)` - 商品列表查询
 - `ShopProduct(status, createdAt)` - 新品上架查询
+- `ShopProductSku(productId, enabled)` - 商品启用 SKU 查询
 - `ShopOrder(userId, createdAt)` - 用户订单历史查询
 - `ShopOrder(status, expiresAt)` - 过期订单扫描
 - `ShopPayment(orderId, status)` - 订单支付状态查询
@@ -312,11 +332,12 @@ reservedStock -= quantity（释放预留库存）
 
 ## 迁移和版本管理
 
-- 商城结构通过增量迁移 `20260924000100_add_shop_module_and_sync_schema` 创建；生产截至 2026-09-24 尚未应用该迁移。
+- 商城基础结构通过增量迁移 `20260924000100_add_shop_module_and_sync_schema` 创建；原记录为截至 2026-09-24 生产尚未应用，当前目标环境状态须在发布前重新核实。
 - 旧 `0_init_shop_tables/migration.sql` 是重复的全库快照，不属于有效迁移基线，已从活动迁移目录移除。生产 migration history 不包含它；本地/其他环境如有该迁移记录，须单独核对和协调，禁止直接重置或伪造迁移状态。
 - 所有迁移文件放在 `apps/api/prisma/migrations/` 目录
 - 迁移由 Prisma `migrate deploy` 按历史顺序执行，不应假设 SQL 可重复执行。
-- 新迁移已在空数据库全链路和生产 schema-only 副本验证；生产执行仍需备份恢复演练、SQL 审查、审批及维护窗口。
+- `20260928000100_add_shop_product_skus` 回填默认 SKU、购物车 SKU 关联及订单规格快照，然后移除商品级价格/库存字段。2026-09-28 已在一次性 PostgreSQL 16 临时容器中完整重放 28 条迁移，并用旧格式代表性商品、购物车和订单验证价格/库存回填及关联快照；迁移后 Prisma schema diff 为空。
+- 上述结果只证明干净迁移链和代表性回填数据通过，不代表目标环境已迁移。未对默认本地业务库、共享环境或生产库执行写入；发布前仍需核对目标 migration history、数据量及外键，并完成目标备份恢复演练、SQL 审查、审批和维护窗口确认。该迁移移除旧商品列，不应承诺自动向下回滚；恢复方案是从迁移前备份恢复并校验数据。
 
 ## 相关文档
 

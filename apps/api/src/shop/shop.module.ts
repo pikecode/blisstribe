@@ -18,12 +18,16 @@ import { OrderController, AdminOrderController } from './order/order.controller'
 import { PaymentRepository } from './payment/payment.repository'
 import { WechatPayService } from './payment/wechat-pay.service'
 import { PaymentService } from './payment/payment.service'
+import { AdminPaymentExceptionController } from './payment/payment-exception.controller'
+import { PaymentExceptionService } from './payment/payment-exception.service'
 import { PaymentController, PaymentWebhookController } from './payment/payment.controller'
 import { ExpiredOrderTask } from './common/tasks/expired-order.task'
 import { ReconciliationTask } from './common/tasks/reconciliation.task'
 import { RefundRepository } from './refund/refund.repository'
 import { RefundService } from './refund/refund.service'
 import { RefundController, AdminRefundController, RefundWebhookController } from './refund/refund.controller'
+import { AddressController } from './address/address.controller'
+import { AddressService } from './address/address.service'
 
 @Module({
   imports: [PrismaModule, ScheduleModule.forRoot(), AdminModule, AuthModule],
@@ -37,9 +41,11 @@ import { RefundController, AdminRefundController, RefundWebhookController } from
     AdminOrderController,
     PaymentController,
     PaymentWebhookController,
+    AdminPaymentExceptionController,
     RefundController,
     AdminRefundController,
     RefundWebhookController,
+    AddressController,
   ],
   providers: [
     CategoryRepository,
@@ -53,10 +59,12 @@ import { RefundController, AdminRefundController, RefundWebhookController } from
     PaymentRepository,
     WechatPayService,
     PaymentService,
+    PaymentExceptionService,
     RefundRepository,
     RefundService,
     ExpiredOrderTask,
     ReconciliationTask,
+    AddressService,
   ],
   exports: [CategoryService, ProductService, CartService, OrderService, PaymentService, RefundService],
 })

@@ -4,16 +4,27 @@ export interface CartProduct {
   id: string
   name: string
   images: string[]
+  status: number
+}
+
+export interface CartSku {
+  id: string
+  skuCode: string
+  specifications: Record<string, string>
   priceFen: number
   totalStock: number
+  reservedStock: number
+  soldStock: number
   available: number
+  enabled: boolean
+  product: CartProduct
 }
 
 export interface CartItem {
   id: string
-  productId: string
+  skuId: string
   quantity: number
-  product: CartProduct
+  sku: CartSku
 }
 
 export interface Cart {
@@ -38,12 +49,12 @@ export const cartApi = {
   /**
    * Add item to cart
    */
-  addItem(productId: string, quantity: number): Promise<Cart> {
+  addItem(skuId: string, quantity: number): Promise<Cart> {
     return request({
       url: '/shop/cart/items',
       method: 'POST',
       data: {
-        productId,
+        skuId,
         quantity,
       },
     })

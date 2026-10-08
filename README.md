@@ -20,15 +20,23 @@ blisstribe/
 
 - Node.js >= 20
 - pnpm >= 10
-- Docker（用于本地数据库）
+- 本机数据库可使用 Docker Compose，或 macOS 上的 Homebrew PostgreSQL 17 + Redis
 
 ## 快速开始
 
-### 1. 启动数据库
+### 1. 启动数据库（二选一）
 
 ```bash
 pnpm docker:up        # 启动 PostgreSQL + Redis
 ```
+
+macOS 也可以使用 Homebrew 本机服务（需预先安装 `postgresql@17` 和 `redis`）：
+
+```bash
+brew install postgresql@17 redis
+```
+
+服务会由下面的 `pnpm dev:local` 启动并检查就绪状态。
 
 ### 2. 安装依赖
 
@@ -55,10 +63,22 @@ pnpm --filter @blisstribe/api prisma:seed   # 创建初始管理员 + 协议
 
 ### 5. 启动开发服务
 
-**一键启动（推荐）**：自动检查 Docker → 启动数据库 → 启动 API + Admin
+**Docker 环境**：自动检查 Docker → 启动数据库 → 启动 API + Admin
 
 ```bash
 ./scripts/dev.sh
+```
+
+**macOS + Homebrew 环境（不需要 Docker）**：检查并启动本机 PostgreSQL/Redis、等待就绪、执行未应用迁移后启动 API + Admin。该脚本不会重置数据库。
+
+```bash
+pnpm dev:local
+```
+
+如果还要同时监听小程序编译：
+
+```bash
+pnpm dev:all
 ```
 
 或手动分别启动：

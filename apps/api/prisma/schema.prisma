@@ -58,11 +58,28 @@ model User {
   activityRegistrations ActivityRegistration[]
   shoppingCart          ShopCart?
   shopOrders            ShopOrder[]
+  shopAddresses         ShopAddress[]
 
   @@index([status])
   @@index([createdAt])
   @@index([inviteCode])
   @@index([invitedBy])
+}
+
+model ShopAddress {
+  id            BigInt   @id @default(autoincrement())
+  userId        BigInt
+  receiverName  String
+  receiverPhone String
+  fullAddress   String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isDefault])
+  @@index([userId, updatedAt])
 }
 
 // 用户需求评估记录
@@ -976,27 +993,45 @@ model ShopCategory {
 
 // 商品
 model ShopProduct {
-  id            BigInt    @id @default(autoincrement())
-  categoryId    BigInt
-  name          String
-  description   String?
-  images        String[]
-  priceFen      Int // 单位：分
-  totalStock    Int       @default(0)
-  reservedStock Int       @default(0)
-  soldStock     Int       @default(0)
-  status        Int       @default(0) // 0草稿 1上架 2下架
-  sortOrder     Int       @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  id          BigInt    @id @default(autoincrement())
+  categoryId  BigInt
+  name        String
+  description String?
+  images      String[]
+  status      Int       @default(0) // 0草稿 1上架 2下架
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
-  category   ShopCategory    @relation(fields: [categoryId], references: [id])
-  cartItems  ShopCartItem[]
+  category   ShopCategory     @relation(fields: [categoryId], references: [id])
+  skus       ShopProductSku[]
   orderItems ShopOrderItem[]
 
   @@index([categoryId, status, sortOrder])
   @@index([status, createdAt])
+}
+
+model ShopProductSku {
+  id               BigInt   @id @default(autoincrement())
+  productId        BigInt
+  skuCode          String   @unique
+  specifications   Json     @default("{}")
+  specificationKey String
+  priceFen         Int
+  totalStock       Int      @default(0)
+  reservedStock    Int      @default(0)
+  soldStock        Int      @default(0)
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product    ShopProduct     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  cartItems  ShopCartItem[]
+  orderItems ShopOrderItem[]
+
+  @@unique([productId, specificationKey])
+  @@index([productId, enabled])
 }
 
 // 购物车
@@ -1014,15 +1049,15 @@ model ShopCart {
 model ShopCartItem {
   id        BigInt   @id @default(autoincrement())
   cartId    BigInt
-  productId BigInt
+  skuId     BigInt
   quantity  Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  cart    ShopCart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product ShopProduct @relation(fields: [productId], references: [id])
+  cart ShopCart       @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  sku  ShopProductSku @relation(fields: [skuId], references: [id], onDelete: Restrict)
 
-  @@unique([cartId, productId])
+  @@unique([cartId, skuId])
   @@index([cartId])
 }
 
@@ -1055,10 +1090,10 @@ model ShopOrder {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  user     User            @relation(fields: [userId], references: [id])
-  items    ShopOrderItem[]
-  payments ShopPayment[]
-  refunds  ShopRefund[]
+  user              User                   @relation(fields: [userId], references: [id])
+  items             ShopOrderItem[]
+  payments          ShopPayment[]
+  refunds           ShopRefund[]
   paymentExceptions ShopPaymentException[]
 
   @@index([userId, createdAt])
@@ -1068,18 +1103,22 @@ model ShopOrder {
 
 // 订单项
 model ShopOrderItem {
-  id           BigInt   @id @default(autoincrement())
-  orderId      BigInt
-  productId    BigInt
-  productName  String
-  productImage String?
-  unitPriceFen Int
-  quantity     Int
-  subtotalFen  Int
-  createdAt    DateTime @default(now())
+  id                BigInt   @id @default(autoincrement())
+  orderId           BigInt
+  productId         BigInt
+  skuId             BigInt
+  productName       String
+  productImage      String?
+  skuCode           String
+  skuSpecifications Json
+  unitPriceFen      Int
+  quantity          Int
+  subtotalFen       Int
+  createdAt         DateTime @default(now())
 
-  order   ShopOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product ShopProduct @relation(fields: [productId], references: [id])
+  order   ShopOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product ShopProduct    @relation(fields: [productId], references: [id])
+  sku     ShopProductSku @relation(fields: [skuId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
 }
@@ -1116,10 +1155,25 @@ model ShopPaymentException {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  order ShopOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  order   ShopOrder                    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  reviews ShopPaymentExceptionReview[]
 
   @@index([status, createdAt])
   @@index([orderId, createdAt])
+}
+
+model ShopPaymentExceptionReview {
+  id                 BigInt   @id @default(autoincrement())
+  paymentExceptionId BigInt
+  channelCheckResult String
+  resolutionNote     String
+  reviewedByAdminId  BigInt
+  createdAt          DateTime @default(now())
+
+  paymentException ShopPaymentException @relation(fields: [paymentExceptionId], references: [id], onDelete: Restrict)
+
+  @@index([paymentExceptionId, createdAt])
+  @@index([reviewedByAdminId, createdAt])
 }
 
 // 退款记录
@@ -1137,10 +1191,33 @@ model ShopRefund {
   approvedAt         DateTime?
   adminNotes         String?
   completedAt        DateTime?
+  lastProviderStatus String?
+  lastErrorCode      String?
+  lastAttemptAt      DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  order ShopOrder @relation(fields: [orderId], references: [id])
+  order  ShopOrder         @relation(fields: [orderId], references: [id])
+  events ShopRefundEvent[]
 
   @@index([orderId, status])
+  @@index([status, lastAttemptAt])
+}
+
+model ShopRefundEvent {
+  id             BigInt   @id @default(autoincrement())
+  refundId       BigInt
+  eventType      String
+  actorType      String
+  actorId        BigInt?
+  fromStatus     String?
+  toStatus       String
+  providerStatus String?
+  detail         String?
+  createdAt      DateTime @default(now())
+
+  refund ShopRefund @relation(fields: [refundId], references: [id], onDelete: Restrict)
+
+  @@index([refundId, createdAt])
+  @@index([eventType, createdAt])
 }

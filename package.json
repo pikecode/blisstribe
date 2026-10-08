@@ -10,6 +10,8 @@
     "miniapp:strip-sourcemap": "node scripts/strip-miniapp-sourcemap.mjs",
     "miniapp:watch-strip-sourcemap": "node scripts/strip-miniapp-sourcemap.mjs --watch",
     "dev:api": "pnpm --filter @blisstribe/api dev",
+    "dev:local": "bash ./scripts/dev-local.sh",
+    "dev:all": "bash ./scripts/dev-all.sh",
     "build:api": "pnpm --filter @blisstribe/api build",
     "dev:admin": "pnpm --filter @blisstribe/admin dev",
     "build:admin": "pnpm --filter @blisstribe/admin build",

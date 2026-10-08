@@ -30,7 +30,7 @@ export const useCartStore = defineStore('cart', () => {
    * Selected amount in fen
    */
   const selectedAmount = computed(() =>
-    selectedItems.value.reduce((sum, item) => sum + item.product.priceFen * item.quantity, 0)
+    selectedItems.value.reduce((sum, item) => sum + item.sku.priceFen * item.quantity, 0)
   )
 
   /**

@@ -115,6 +115,13 @@
         </view>
         <text class="profile__chevron">›</text>
       </view>
+      <view class="profile__menu-item" @tap="goShopAddresses">
+        <view>
+          <text class="profile__menu-title">收货地址</text>
+          <text class="profile__menu-desc">管理常用收货信息</text>
+        </view>
+        <text class="profile__chevron">›</text>
+      </view>
       <view class="profile__menu-item" @tap="goInvite">
         <view>
           <text class="profile__menu-title">邀请好友</text>
@@ -420,11 +427,15 @@ function goShop(): void {
 }
 
 function goShopCart(): void {
-  requireLogin(() => uni.navigateTo({ url: '/pages/shop/cart' }))
+  requireLogin(() => uni.switchTab({ url: '/pages/shop/cart' }))
 }
 
 function goShopOrders(): void {
   requireLogin(() => uni.navigateTo({ url: '/pages/shop/orders' }))
+}
+
+function goShopAddresses(): void {
+  requireLogin(() => uni.navigateTo({ url: '/pages/shop/addresses' }))
 }
 
 function goPartner(): void {

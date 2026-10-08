@@ -20,8 +20,9 @@ export class PaymentService {
   async createPayment(
     orderId: bigint,
     userId: bigint,
-    clientIp: string
-  ): Promise<{ prepayId: string; outTradeNo: string }> {
+    clientIp: string,
+    openId: string
+  ) {
     // Find order via OrderRepository.findById()
     const order = await this.orderRepository.findById(orderId)
 
@@ -41,13 +42,37 @@ export class PaymentService {
       throw new BadRequestException('订单状态不支持支付')
     }
 
+    if (this.wechatPayService.isMockPaymentEnabled()) {
+      if (!order.payments.some((payment) => payment.status === 'pending')) {
+        await this.paymentRepository.create({
+          orderId,
+          outTradeNo: order.orderNo,
+          prepayId: `mock-${order.orderNo}`,
+          amountFen: order.paymentAmountFen,
+          status: 'pending',
+        })
+      }
+      await this.handleWechatNotify({
+        out_trade_no: order.orderNo,
+        transaction_id: `MOCK-${order.orderNo}`,
+        amount: { total: order.paymentAmountFen },
+      })
+      return {
+        mock: true,
+        status: 'paid',
+        prepayId: `mock-${order.orderNo}`,
+        outTradeNo: order.orderNo,
+      }
+    }
+
     // Call wechatPay.createPrepay()
     const prepayResult = await this.wechatPayService.createPrepay({
       outTradeNo: order.orderNo,
       amount: order.paymentAmountFen,
       description: `BlissTribe订单${order.orderNo}`,
-      notifyUrl: `${process.env.API_BASE_URL || 'http://localhost:3000/api/v1'}/shop/webhooks/wechat-pay`,
+      notifyUrl: this.wechatPayService.getNotifyUrl('wechat-pay'),
       clientIp,
+      openId,
     })
 
     // Create ShopPayment record
@@ -61,8 +86,12 @@ export class PaymentService {
 
     // Return { prepayId, outTradeNo }
     return {
+      mock: false,
       prepayId: payment.prepayId || '',
       outTradeNo: payment.outTradeNo,
+      paymentParams: this.wechatPayService.buildClientPaymentParams(
+        payment.prepayId || ''
+      ),
     }
   }
 
@@ -176,8 +205,8 @@ export class PaymentService {
       }
 
       for (const item of order.items) {
-        const updatedProduct = await tx.shopProduct.updateMany({
-          where: { id: item.productId, reservedStock: { gte: item.quantity } },
+        const updatedProduct = await tx.shopProductSku.updateMany({
+          where: { id: item.skuId, reservedStock: { gte: item.quantity } },
           data: {
             reservedStock: { decrement: item.quantity },
             soldStock: { increment: item.quantity },
@@ -231,7 +260,7 @@ export class PaymentService {
     }
     if (!['CLOSED', 'REVOKED', 'PAYERROR'].includes(finalTradeState)) return 'pending'
 
-    await this.prisma.$transaction(async (tx: any) => {
+    const closureResult = await this.prisma.$transaction(async (tx: any) => {
       const cancelled = await tx.shopOrder.updateMany({
         where: { id: orderId, status: 'closing', paymentStatus: 'unpaid' },
         data: {
@@ -240,19 +269,23 @@ export class PaymentService {
           cancelReason: reason,
         },
       })
-      if (cancelled.count !== 1) return
+      if (cancelled.count !== 1) {
+        const currentOrder = await tx.shopOrder.findUnique({ where: { id: orderId } })
+        return currentOrder?.paymentStatus === 'paid' ? 'paid' : 'pending'
+      }
 
       for (const item of order.items) {
-        const released = await tx.shopProduct.updateMany({
-          where: { id: item.productId, reservedStock: { gte: item.quantity } },
+        const released = await tx.shopProductSku.updateMany({
+          where: { id: item.skuId, reservedStock: { gte: item.quantity } },
           data: { reservedStock: { decrement: item.quantity } },
         })
         if (released.count !== 1) {
           throw new BadRequestException('预留库存状态异常')
         }
       }
+      return 'closed'
     })
-    return 'closed'
+    return closureResult
   }
 
   async processRefund(
@@ -288,5 +321,9 @@ export class PaymentService {
 
     // Return { refundId }
     return { refundId: refundResult.refundId }
+  }
+
+  async queryRefund(outRefundNo: string) {
+    return this.wechatPayService.queryRefund(outRefundNo)
   }
 }
