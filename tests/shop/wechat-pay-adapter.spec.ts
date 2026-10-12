@@ -265,6 +265,14 @@ describe('WechatPayService', () => {
     ).not.toThrow()
     expect(() => service.validateRefundNotification({
       mchid: 'merchant-1', refund_status: 'SUCCESS',
+      amount: { refund: 100, total: 100, payer_refund: 100, payer_total: 100 },
+    })).not.toThrow()
+    expect(() => service.validateRefundNotification({
+      mchid: 'merchant-1', refund_status: 'SUCCESS',
+      amount: { refund: 100, total: 100, currency: 'USD' },
+    })).toThrow()
+    expect(() => service.validateRefundNotification({
+      mchid: 'merchant-1', refund_status: 'SUCCESS',
     })).toThrow()
     expect(() =>
       service.validateRefundNotification({

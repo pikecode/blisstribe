@@ -15,6 +15,8 @@ export interface Refund {
   status: 'pending' | 'approved' | 'rejected' | 'processing' | 'success' | 'completed' | 'failed'
   rejectionReason?: string
   remark?: string
+  completedAt?: string
+  wechatRefundId?: string
   lastProviderStatus?: string
   lastErrorCode?: string
   lastAttemptAt?: string

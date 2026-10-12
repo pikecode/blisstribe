@@ -128,10 +128,11 @@
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right" align="center">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
             <AdminListActions :show-more="canShipOrder(row) || row.status === 'pending_payment'">
               <AdminListAction label="查看" icon="View" @click="viewDetail(row)" />
+              <AdminListAction v-if="latestOrderRefund(row)" :label="latestOrderRefund(row)?.status === 'pending' ? '处理退款' : '查看退款'" icon="DocumentChecked" @click="handleOrderRefund(row)" />
               <template #more>
                 <el-dropdown-item
                 v-if="canShipOrder(row)"
@@ -353,10 +354,12 @@ import AdminListTable from '@/components/AdminListTable.vue'
 import AdminListToolbar from '@/components/AdminListToolbar.vue'
 import AdminListPagination from '@/components/AdminListPagination.vue'
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus'
 import { latestOrderRefund, orderRefundText, canShipOrder } from '@/utils/shop-order'
 import { shopOrderApi, ShopOrder } from '@/api/shop-order'
 
+const router = useRouter()
 const listError = ref('')
 
 
@@ -450,6 +453,11 @@ const viewDetail = async (row: ShopOrder) => {
   } catch (error) {
     ElMessage.error('加载订单详情失败')
   }
+}
+
+function handleOrderRefund(row: ShopOrder) {
+  const refund = latestOrderRefund(row)
+  if (refund) router.push({ name: 'ShopRefunds', query: { refundId: refund.id } })
 }
 
 // 打开发货对话框

@@ -117,15 +117,10 @@
         </el-table-column>
         <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <AdminListActions :show-more="row.status === 'pending' || refundNeedsProviderQuery(row)">
+            <AdminListActions :show-more="refundNeedsProviderQuery(row)">
               <AdminListAction label="详情" icon="View" @click="viewDetail(row)" />
+              <AdminListAction v-if="row.status === 'pending'" label="审核退款" icon="DocumentChecked" @click="openApprovalDialog(row)" />
               <template #more>
-                <el-dropdown-item
-                v-if="row.status === 'pending'"
-                @click="openApprovalDialog(row)"
-              >
-                审批
-              </el-dropdown-item>
                 <el-dropdown-item
                 v-if="refundNeedsProviderQuery(row)"
                 :disabled="providerQueryingId === row.id"
@@ -220,126 +215,66 @@
     </div>
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailDialogVisible" title="退款详情" width="600px">
-      <div v-if="currentRefund" class="detail-content">
-        <div class="detail-group">
-          <div class="detail-row">
-            <span class="detail-label">退款号</span>
-            <span class="detail-value">{{ currentRefund.refundNo }}</span>
+    <el-dialog v-model="detailDialogVisible" title="退款详情" width="min(880px, calc(100vw - 32px))" class="refund-detail-dialog" :close-on-click-modal="false" :destroy-on-close="true">
+      <div v-if="currentRefund" class="refund-detail-panel">
+        <div class="refund-overview">
+          <div>
+            <el-tag :type="getStatusType(currentRefund.status)" effect="light">{{ getStatusText(currentRefund.status) }}</el-tag>
+            <p class="refund-overview__hint">{{ currentRefund.status === 'pending' ? '请核对申请原因和金额，再决定是否批准退款。' : currentRefund.status === 'success' ? '微信渠道已确认退款成功，用户可在原支付账单查看退款详情。' : currentRefund.status === 'processing' ? '微信正在处理退款，可查询渠道结果，请勿重复发起退款。' : currentRefund.status === 'rejected' ? '申请已拒绝，用户可查看拒绝原因。' : '请核对处理记录与微信渠道结果。' }}</p>
           </div>
-          <div class="detail-row">
-            <span class="detail-label">订单号</span>
-            <span class="detail-value">{{ currentRefund.orderNo }}</span>
-          </div>
+          <div class="refund-overview__amount"><span>申请退款金额</span><strong>¥{{ (currentRefund.requestAmountFen / 100).toFixed(2) }}</strong></div>
         </div>
 
-        <el-divider />
-
-        <div class="detail-group">
-          <div class="detail-label">用户信息</div>
-          <div class="detail-row">
-            <span class="detail-label">昵称</span>
-            <span class="detail-value">{{ currentRefund.user?.nickname || currentRefund.userName }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">手机号</span>
-            <span class="detail-value">{{ currentRefund.user?.phoneMasked || currentRefund.userPhone }}</span>
-          </div>
+        <div class="refund-detail-grid">
+          <section class="refund-detail-section">
+            <h3>申请信息</h3>
+            <dl>
+              <dt>退款单号</dt><dd class="refund-identifier">{{ currentRefund.refundNo }}</dd>
+              <dt>关联订单</dt><dd class="refund-identifier">{{ currentRefund.orderNo || '-' }}</dd>
+              <dt>申请时间</dt><dd>{{ formatDate(currentRefund.createdAt) }}</dd>
+              <dt>申请用户</dt><dd>{{ currentRefund.user?.nickname || currentRefund.userName || '-' }}<span class="refund-secondary">{{ currentRefund.user?.phoneMasked || currentRefund.userPhone || '-' }}</span></dd>
+            </dl>
+          </section>
+          <section class="refund-detail-section">
+            <h3>退款处理</h3>
+            <dl>
+              <dt>批准金额</dt><dd>{{ currentRefund.approvedAmountFen != null ? `¥${(currentRefund.approvedAmountFen / 100).toFixed(2)}` : '尚未批准' }}</dd>
+              <dt>渠道记录</dt><dd>{{ providerStatusText(currentRefund.lastProviderStatus) }}</dd>
+              <dt>提交时间</dt><dd>{{ currentRefund.lastAttemptAt ? formatDate(currentRefund.lastAttemptAt) : '尚未提交' }}</dd>
+              <dt>完成时间</dt><dd>{{ currentRefund.completedAt ? formatDate(currentRefund.completedAt) : '尚未完成' }}</dd>
+              <dt v-if="currentRefund.wechatRefundId">微信退款单号</dt><dd v-if="currentRefund.wechatRefundId" class="refund-identifier">{{ currentRefund.wechatRefundId }}</dd>
+            </dl>
+          </section>
+          <section class="refund-detail-section refund-detail-section--wide">
+            <h3>退款原因</h3>
+            <div class="refund-note">{{ currentRefund.reason || '-' }}</div>
+            <div v-if="currentRefund.rejectionReason" class="refund-note refund-note--danger"><strong>拒绝原因</strong>{{ currentRefund.rejectionReason }}</div>
+            <div v-if="currentRefund.remark" class="refund-note"><strong>审核备注</strong>{{ currentRefund.remark }}</div>
+          </section>
         </div>
-
-        <el-divider />
-
-        <div class="detail-group">
-          <div class="detail-label">金额信息</div>
-          <div class="detail-row">
-            <span class="detail-label">申请金额</span>
-            <span class="detail-value">¥{{ (currentRefund.requestAmountFen / 100).toFixed(2) }}</span>
-          </div>
-          <div class="detail-row" v-if="currentRefund.approvedAmountFen !== undefined && currentRefund.approvedAmountFen !== null">
-            <span class="detail-label">批准金额</span>
-            <span class="detail-value">¥{{ (currentRefund.approvedAmountFen / 100).toFixed(2) }}</span>
-          </div>
-        </div>
-
-        <el-divider />
-
-        <div class="detail-group">
-          <div class="detail-label">状态信息</div>
-          <div class="detail-row">
-            <span class="detail-label">退款状态</span>
-            <span class="detail-value">
-              <el-tag :type="getStatusType(currentRefund.status)" effect="light" round>
-                {{ getStatusText(currentRefund.status) }}
-              </el-tag>
-            </span>
-          </div>
-          <div class="detail-row" v-if="currentRefund.rejectionReason">
-            <span class="detail-label">拒绝原因</span>
-            <span class="detail-value">{{ currentRefund.rejectionReason }}</span>
-          </div>
-        </div>
-
-        <el-divider />
-
-        <div class="detail-group">
-          <div class="detail-label">渠道处理</div>
-          <div class="detail-row">
-            <span class="detail-label">最近渠道状态</span>
-            <span class="detail-value">{{ currentRefund.lastProviderStatus || '尚无渠道结果' }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">最近提交时间</span>
-            <span class="detail-value">{{ currentRefund.lastAttemptAt ? formatDate(currentRefund.lastAttemptAt) : '-' }}</span>
-          </div>
-          <el-alert
-            v-if="refundNeedsProviderQuery(currentRefund)"
-            type="warning"
-            :closable="false"
-            title="退款尚未确认终态。请先在微信商户平台核对此退款单号，禁止再次提交退款。"
-          />
-          <el-button
-            v-if="refundNeedsProviderQuery(currentRefund)"
-            type="warning"
-            :loading="providerQueryingId === currentRefund.id"
-            @click="queryProviderRefund(currentRefund)"
-          >
-            查询微信渠道状态
-          </el-button>
-        </div>
-
-        <el-divider v-if="currentRefund.events?.length" />
-
-        <div v-if="currentRefund.events?.length" class="detail-group">
-          <div class="detail-label">操作与渠道事件</div>
-          <div v-for="event in currentRefund.events" :key="event.id" class="refund-event">
-            <div class="refund-event__heading">
-              <span>{{ eventLabel(event.eventType) }} · {{ eventActorLabel(event) }}</span>
-              <span>{{ formatDate(event.createdAt) }}</span>
-            </div>
-            <div>{{ event.fromStatus || '新建' }} -&gt; {{ event.toStatus }}</div>
-            <div v-if="event.providerStatus">渠道状态：{{ event.providerStatus }}</div>
-            <div v-if="event.detail">{{ event.detail }}</div>
-          </div>
-        </div>
-
-        <el-divider />
-
-        <div class="detail-group">
-          <div class="detail-label">退款原因</div>
-          <div class="detail-reason">
-            {{ currentRefund.reason || '-' }}
-          </div>
-        </div>
-
-        <el-divider v-if="currentRefund.remark" />
-
-        <div v-if="currentRefund.remark" class="detail-group">
-          <div class="detail-label">备注</div>
-          <div class="detail-reason">
-            {{ currentRefund.remark }}
-          </div>
-        </div>
+        <el-alert v-if="refundNeedsProviderQuery(currentRefund)" type="warning" :closable="false" show-icon title="退款结果尚未同步完成，请查询微信渠道状态；不要重复发起退款。" />
+        <el-collapse v-if="currentRefund.events?.length" class="refund-history">
+          <el-collapse-item name="history" :title="`处理记录 · ${currentRefund.events.length} 条`">
+            <el-timeline>
+              <el-timeline-item v-for="event in currentRefund.events" :key="event.id" :timestamp="formatDate(event.createdAt)" placement="top">
+                <div class="refund-history__title">{{ eventLabel(event.eventType) }}<span>{{ eventActorLabel(event) }}</span></div>
+                <div class="refund-history__status">{{ event.fromStatus ? getStatusText(event.fromStatus) : '新建' }} → {{ getStatusText(event.toStatus) }}<span v-if="event.providerStatus"> · {{ providerStatusText(event.providerStatus) }}</span></div>
+                <div v-if="event.detail" class="refund-history__note">{{ event.detail }}</div>
+              </el-timeline-item>
+            </el-timeline>
+          </el-collapse-item>
+        </el-collapse>
       </div>
+      <template #footer>
+        <div class="refund-detail-footer">
+          <el-button :disabled="!currentRefund || providerQueryingId !== null" @click="currentRefund && viewDetail(currentRefund)">刷新状态</el-button>
+          <div>
+            <el-button @click="detailDialogVisible = false">关闭</el-button>
+            <el-button v-if="currentRefund && refundNeedsProviderQuery(currentRefund)" type="primary" :loading="providerQueryingId === currentRefund.id" @click="queryProviderRefund(currentRefund)">查询微信结果</el-button>
+            <el-button v-if="currentRefund?.status === 'pending'" type="primary" @click="detailDialogVisible = false; openApprovalDialog(currentRefund)">审核退款</el-button>
+          </div>
+        </div>
+      </template>
     </el-dialog>
 
     <!-- 审批对话框 -->
@@ -428,6 +363,7 @@ import AdminListTable from '@/components/AdminListTable.vue'
 import AdminListToolbar from '@/components/AdminListToolbar.vue'
 import AdminListPagination from '@/components/AdminListPagination.vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { refundApi, type Refund } from '@/api/refund'
 
@@ -488,8 +424,12 @@ const eventLabel = (type: string): string => ({
   provider_request_accepted: '渠道受理',
   provider_result_unknown: '渠道结果未知',
   provider_notification: '渠道通知',
-  provider_query: '管理员渠道查单',
+  provider_query: '渠道查单',
 }[type] || type)
+const providerStatusText = (status?: string): string => ({
+  SUBMITTED: '已提交，等待结果', PROCESSING: '微信处理中', SUCCESS: '微信退款成功',
+  CLOSED: '渠道已关闭', ABNORMAL: '渠道退款异常', UNKNOWN: '结果未知',
+}[status || ''] || status || '尚无渠道记录')
 const eventActorLabel = (event: NonNullable<Refund['events']>[number]): string => {
   if (event.actorType === 'admin') return `管理员 #${event.actorId ?? '-'}`
   if (event.actorType === 'user') return '用户'
@@ -622,11 +562,60 @@ const submitApproval = async (): Promise<void> => {
   }
 }
 
-onMounted(loadList)
+const route = useRoute()
+onMounted(async () => {
+  await loadList()
+  const id = Number(route.query.refundId)
+  if (!Number.isSafeInteger(id) || id <= 0) return
+  try {
+    currentRefund.value = await refundApi.getRefund(id)
+    if (currentRefund.value.status === 'pending') {
+      resetApprovalForm()
+      approvalDialogVisible.value = true
+    } else {
+      detailDialogVisible.value = true
+    }
+  } catch {
+    ElMessage.error('获取退款详情失败')
+  }
+})
 </script>
 
 <style lang="scss" scoped>
 @use '@/styles/variables.scss' as *;
+.refund-detail-panel { max-height: 65vh; overflow-y: auto; padding-right: 6px; }
+.refund-overview { display: flex; justify-content: space-between; align-items: flex-start; gap: 28px; padding: 24px; margin-bottom: 20px; border-radius: 12px; background: #f6f8fb; }
+.refund-overview__hint { margin: 12px 0 0; color: #667085; font-size: 13px; line-height: 1.7; max-width: 440px; }
+.refund-overview__amount { flex-shrink: 0; text-align: right; }
+.refund-overview__amount span { display: block; color: #667085; font-size: 12px; }
+.refund-overview__amount strong { display: block; margin-top: 8px; font-size: 32px; font-weight: 600; color: #101828; font-variant-numeric: tabular-nums; }
+.refund-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+.refund-detail-section { padding: 20px; border: 1px solid #e4e7ed; border-radius: 10px; }
+.refund-detail-section--wide { grid-column: 1 / -1; }
+.refund-detail-section h3 { margin: 0 0 18px; font-size: 14px; font-weight: 600; color: #101828; }
+.refund-detail-section dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 14px 12px; margin: 0; font-size: 13px; line-height: 1.6; }
+.refund-detail-section dt { color: #667085; }
+.refund-detail-section dd { margin: 0; color: #344054; overflow-wrap: anywhere; }
+.refund-secondary { display: block; color: #98a2b3; font-size: 12px; }
+.refund-identifier { font-variant-numeric: tabular-nums; }
+.refund-note { padding: 12px 14px; border-radius: 6px; background: #f8fafc; color: #344054; font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.refund-note + .refund-note { margin-top: 12px; }
+.refund-note strong { display: block; margin-bottom: 4px; }
+.refund-note--danger { background: #fef3f2; color: #b42318; }
+.refund-history { margin-top: 18px; }
+.refund-history :deep(.el-timeline) { padding: 12px 6px 0; }
+.refund-history__title { color: #344054; font-weight: 600; }
+.refund-history__title span { margin-left: 12px; font-size: 12px; color: #98a2b3; font-weight: 400; }
+.refund-history__status, .refund-history__note { margin-top: 6px; font-size: 12px; color: #667085; line-height: 1.6; overflow-wrap: anywhere; }
+.refund-detail-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+@media (max-width: 640px) {
+  .refund-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .refund-overview { padding: 16px; gap: 16px; flex-direction: column; }
+  .refund-overview__amount { text-align: left; }
+  .refund-detail-section { padding: 16px; }
+  .refund-detail-footer { flex-wrap: wrap; }
+}
+
 
 .refund-mgr {
   display: flex;
@@ -718,71 +707,6 @@ onMounted(loadList)
       font-size: $font-size-xs;
     }
   }
-}
-
-.detail-content {
-  padding: $space-12 0;
-}
-
-.detail-group {
-  display: flex;
-  flex-direction: column;
-  gap: $space-12;
-
-  .detail-label:first-child {
-    font-weight: 600;
-    color: $color-text;
-    margin-bottom: $space-8;
-  }
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: $space-16;
-}
-
-.detail-label {
-  flex: 0 0 auto;
-  width: 100px;
-  color: $color-text-secondary;
-  font-size: $font-size-sm;
-}
-
-.detail-value {
-  flex: 1;
-  color: $color-text;
-  font-size: $font-size-sm;
-  word-break: break-all;
-}
-
-.detail-reason {
-  color: $color-text;
-  font-size: $font-size-sm;
-  line-height: 1.6;
-  padding: $space-12;
-  background: $color-surface-soft;
-  border-radius: $radius-md;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.refund-event {
-  display: grid;
-  gap: $space-4;
-  padding: $space-12 0;
-  border-bottom: 1px solid $color-border;
-  color: $color-text-secondary;
-  font-size: $font-size-sm;
-  overflow-wrap: anywhere;
-}
-
-.refund-event__heading {
-  display: flex;
-  justify-content: space-between;
-  gap: $space-12;
-  color: $color-text;
 }
 
 .approval-content {

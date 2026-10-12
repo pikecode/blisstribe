@@ -127,7 +127,7 @@ export class WechatPayService {
       (data.refund_status === 'SUCCESS' &&
         (!Number.isSafeInteger(data.amount?.refund) || data.amount.refund <= 0 ||
           !Number.isSafeInteger(data.amount?.total) || data.amount.total < data.amount.refund ||
-          data.amount.currency !== 'CNY'))
+          (data.amount.currency !== undefined && data.amount.currency !== 'CNY')))
     ) {
       throw new UnauthorizedException('微信退款通知商户或状态不匹配')
     }
