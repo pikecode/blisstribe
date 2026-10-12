@@ -17,7 +17,7 @@
         </div>
       </template>
 
-      <el-table :data="list" v-loading="loading" stripe>
+      <AdminListTable :data="list" :loading="loading" :error="listError" @retry="loadList">
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="类型" width="120">
           <template #default="{ row }">
@@ -37,25 +37,25 @@
         <el-table-column label="生效时间" width="180">
           <template #default="{ row }">{{ formatDate(row.effectiveAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openView(row)">查看</el-button>
-              <el-button size="small" type="primary" @click="openEdit(row)">编辑</el-button>
-              <el-button size="small" type="success" :disabled="row.isCurrent" @click="setCurrent(row)">
+            <AdminListActions>
+              <AdminListAction label="查看" icon="View" @click="openView(row)" />
+              <template #more>
+                <el-dropdown-item @click="openEdit(row)">编辑</el-dropdown-item>
+                <el-dropdown-item :disabled="row.isCurrent" @click="setCurrent(row)">
                 设为当前
-              </el-button>
-            </div>
+              </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page" v-model:page-size="pageSize"
-        :total="total" layout="total, prev, pager, next"
-        class="page-pager"
-        @current-change="loadList" @size-change="loadList"
-      />
+        :total="total"
+      :disabled="loading" @change="loadList" />
     </el-card>
 
     <!-- 新建弹窗 -->
@@ -107,9 +107,16 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { agreementApi } from '@/api'
+
+const listError = ref('')
+
 
 interface AgreementItem {
   id: number; type: string; version: string; title: string
@@ -134,10 +141,13 @@ const editForm = reactive({ title: '', content: '' })
 
 const loadList = async () => {
   loading.value = true
+  listError.value = ''
   try {
     const res = await agreementApi.list({ page: page.value, pageSize: pageSize.value, type: filterType.value || undefined })
     list.value = res.list
     total.value = res.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally { loading.value = false }
 }
 

@@ -23,6 +23,7 @@ export class PaymentService {
     clientIp: string,
     openId: string
   ) {
+    this.wechatPayService.assertCheckoutEnabled(userId)
     // Find order via OrderRepository.findById()
     const order = await this.orderRepository.findById(orderId)
 
@@ -65,7 +66,16 @@ export class PaymentService {
       }
     }
 
-    // Call wechatPay.createPrepay()
+    const pendingPayment = order.payments.find((payment) => payment.status === 'pending' && payment.prepayId)
+    if (pendingPayment?.prepayId) {
+      return {
+        mock: false,
+        prepayId: pendingPayment.prepayId,
+        outTradeNo: pendingPayment.outTradeNo,
+        paymentParams: this.wechatPayService.buildClientPaymentParams(pendingPayment.prepayId),
+      }
+    }
+
     const prepayResult = await this.wechatPayService.createPrepay({
       outTradeNo: order.orderNo,
       amount: order.paymentAmountFen,
@@ -73,6 +83,8 @@ export class PaymentService {
       notifyUrl: this.wechatPayService.getNotifyUrl('wechat-pay'),
       clientIp,
       openId,
+      userId,
+      expiresAt: order.expiresAt,
     })
 
     // Create ShopPayment record
@@ -258,7 +270,7 @@ export class PaymentService {
     if (trade.tradeState === 'NOTPAY') {
       finalTradeState = (await this.wechatPayService.closeTrade(order.orderNo)).tradeState
     }
-    if (!['CLOSED', 'REVOKED', 'PAYERROR'].includes(finalTradeState)) return 'pending'
+    if (!['CLOSED', 'REVOKED', 'PAYERROR', 'NOT_CREATED'].includes(finalTradeState)) return 'pending'
 
     const closureResult = await this.prisma.$transaction(async (tx: any) => {
       const cancelled = await tx.shopOrder.updateMany({
@@ -325,5 +337,24 @@ export class PaymentService {
 
   async queryRefund(outRefundNo: string) {
     return this.wechatPayService.queryRefund(outRefundNo)
+  }
+
+  async confirmPayment(orderId: bigint, userId: bigint) {
+    const order = await this.orderRepository.findById(orderId)
+    if (!order || order.userId !== userId) throw new NotFoundException('订单不存在')
+    if (order.paymentStatus === 'unpaid' && order.payments.length &&
+      ['pending_payment', 'closing'].includes(order.status)) {
+      const trade = await this.wechatPayService.queryTrade(order.orderNo)
+      if (trade.tradeState === 'SUCCESS') {
+        await this.handleWechatNotify({
+          out_trade_no: order.orderNo,
+          transaction_id: trade.transactionId,
+          amount: { total: trade.amountFen },
+        })
+      }
+    }
+    const current = await this.orderRepository.findById(orderId)
+    if (!current) throw new NotFoundException('订单不存在')
+    return { paymentStatus: current.paymentStatus }
   }
 }

@@ -8,10 +8,14 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AdminCoverUpload: typeof import('./src/components/AdminCoverUpload.vue')['default']
+    AdminListAction: typeof import('./src/components/AdminListAction.vue')['default']
+    AdminListActions: typeof import('./src/components/AdminListActions.vue')['default']
+    AdminListPagination: typeof import('./src/components/AdminListPagination.vue')['default']
+    AdminListTable: typeof import('./src/components/AdminListTable.vue')['default']
+    AdminListToolbar: typeof import('./src/components/AdminListToolbar.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCard: typeof import('element-plus/es')['ElCard']
-    ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
     ElCol: typeof import('element-plus/es')['ElCol']
     ElDatePicker: typeof import('element-plus/es')['ElDatePicker']
     ElDescriptions: typeof import('element-plus/es')['ElDescriptions']
@@ -49,6 +53,7 @@ declare module 'vue' {
     ElTimeline: typeof import('element-plus/es')['ElTimeline']
     ElTimelineItem: typeof import('element-plus/es')['ElTimelineItem']
     ElTimePicker: typeof import('element-plus/es')['ElTimePicker']
+    ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ElUpload: typeof import('element-plus/es')['ElUpload']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

@@ -11,7 +11,7 @@
         </div>
       </template>
 
-      <el-table :data="tableData" stripe style="width: 100%">
+      <AdminListTable :data="tableData" style="width: 100%" :loading="loading" :error="listError" @retry="fetchData">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" width="150" />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -40,33 +40,28 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="240" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openDialog(row)">编辑</el-button>
-              <el-button
-                size="small"
-                :type="row.status === 1 ? 'warning' : 'success'"
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="openDialog(row)" />
+              <template #more>
+                <el-dropdown-item
                 @click="toggleStatus(row)"
               >
                 {{ row.status === 1 ? '下线' : '上线' }}
-              </el-button>
-              <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-            </div>
+              </el-dropdown-item>
+                <el-dropdown-item @click="handleDelete(row)" class="admin-list-danger">删除</el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        class="page-pager"
-        @current-change="fetchData"
-        @size-change="fetchData"
-      />
+      :disabled="loading" @change="fetchData" />
     </el-card>
 
     <!-- 新增/编辑弹窗 -->
@@ -125,11 +120,18 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type UploadRawFile } from 'element-plus'
 import { bannerApi, type Banner } from '@/api/banner'
 import { useAuthStore } from '@/stores/auth'
 import request from '@/utils/request'
+
+const listError = ref('')
+
 
 const authStore = useAuthStore()
 
@@ -147,6 +149,7 @@ const gradientPresets = [
   { label: '暮光', value: 'linear-gradient(135deg, #c471ed 0%, #12c2e9 100%)' },
 ]
 
+const loading = ref(false)
 const tableData = ref<Banner[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -209,9 +212,17 @@ function handleUploadError() {
 }
 
 async function fetchData() {
-  const res = await bannerApi.list(page.value, pageSize.value)
-  tableData.value = res.list
-  total.value = res.total
+  loading.value = true
+  listError.value = ''
+  try {
+    const res = await bannerApi.list(page.value, pageSize.value)
+    tableData.value = res.list
+    total.value = res.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
+  } finally {
+    loading.value = false
+  }
 }
 
 function openDialog(row?: Banner) {

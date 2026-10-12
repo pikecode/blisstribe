@@ -1,7 +1,7 @@
 <template>
   <div class="admin-mgr">
     <el-card>
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-input
           v-model="keyword"
           placeholder="搜索用户名"
@@ -14,9 +14,9 @@
           <el-button text @click="loadRoles">刷新角色</el-button>
           <el-button type="primary" @click="openCreate">新增管理员</el-button>
         </div>
-      </div>
+      </AdminListToolbar>
 
-      <el-table :data="list" v-loading="loading" stripe>
+      <AdminListTable :data="list" :loading="loading" :error="listError" @retry="loadList">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="用户名" width="140" />
         <el-table-column prop="nickname" label="昵称" />
@@ -38,33 +38,29 @@
         <el-table-column label="最后登录" width="180">
           <template #default="{ row }">{{ row.lastLoginAt ? formatDate(row.lastLoginAt) : '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" text @click="openEdit(row)">编辑</el-button>
-              <el-button size="small" text @click="openRoles(row)">分配角色</el-button>
-              <el-button size="small" text type="warning" @click="openReset(row)">重置密码</el-button>
-              <el-button
-                size="small"
-                plain
-                :type="row.status === 1 ? 'danger' : 'success'"
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="openEdit(row)" />
+              <template #more>
+                <el-dropdown-item @click="openRoles(row)">分配角色</el-dropdown-item>
+                <el-dropdown-item @click="openReset(row)">重置密码</el-dropdown-item>
+                <el-dropdown-item
                 @click="toggleStatus(row)"
               >
                 {{ row.status === 1 ? '禁用' : '启用' }}
-              </el-button>
-            </div>
+              </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        layout="total, prev, pager, next"
-        @current-change="loadList"
-        class="page-pager"
-      />
+      :disabled="loading" @change="loadList" />
     </el-card>
 
     <!-- 新增/编辑管理员 -->
@@ -121,10 +117,18 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { adminApi, type AdminItem, type RoleItem } from '@/api/admin'
+
+const listError = ref('')
+
 
 const list = ref<AdminItem[]>([])
 const roles = ref<RoleItem[]>([])
@@ -160,6 +164,7 @@ const resetForm = reactive({ password: '' })
 
 const loadList = async (): Promise<void> => {
   loading.value = true
+  listError.value = ''
   try {
     const data = await adminApi.list({
       page: page.value,
@@ -168,6 +173,8 @@ const loadList = async (): Promise<void> => {
     })
     list.value = data.list
     total.value = data.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }

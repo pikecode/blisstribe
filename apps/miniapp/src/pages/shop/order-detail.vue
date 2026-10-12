@@ -18,7 +18,7 @@
 
       <!-- 订单状态卡片 -->
       <view class="order-status-card">
-        <text class="order-status-card__status" :class="statusClass(displayStatus(order))">{{ statusText(displayStatus(order)) }}</text>
+        <text class="order-status-card__status" :class="statusClass(displayStatus(order))">{{ refundStatusText(order) || statusText(displayStatus(order)) }}</text>
         <text class="order-status-card__no">{{ order.orderNo }}</text>
         <view class="order-status-card__times">
           <view class="order-status-card__time-row">
@@ -120,6 +120,10 @@
           <view class="order-actions__button order-actions__button--secondary" @tap="handleCancel">取消订单</view>
           <view class="order-actions__button order-actions__button--primary" @tap="handlePay">立即支付</view>
         </view>
+        <view v-else-if="currentRefund(order)" class="order-actions__group">
+          <view class="order-actions__button order-actions__button--secondary" @tap="viewRefund">查看退款</view>
+          <view v-if="canRequestRefund" class="order-actions__button order-actions__button--secondary" @tap="handleRefund">重新申请退款</view>
+        </view>
         <view v-else-if="canRequestRefund" class="order-actions__group">
           <view class="order-actions__button order-actions__button--secondary" @tap="handleRefund">申请退款</view>
         </view>
@@ -130,9 +134,10 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { orderApi, type Order, type OrderStatus } from '@/api/modules/order'
 import { shopApi } from '@/api/modules/shop'
+import { currentRefund, refundStatusText, canApplyRefund } from '@/utils/order-refund'
 
 const order = ref<Order | null>(null)
 const loading = ref(false)
@@ -140,7 +145,7 @@ const loadError = ref(false)
 const orderId = ref('')
 const paymentLoading = ref(false)
 const canRequestRefund = computed(() =>
-  order.value?.paymentStatus === 'paid' && order.value.fulfillmentStatus === 'pending'
+  !!order.value && canApplyRefund(order.value)
 )
 
 function statusText(status: OrderStatus): string {
@@ -218,12 +223,12 @@ async function processPayment(): Promise<void> {
 
   paymentLoading.value = true
   try {
-    await shopApi.createPayment(order.value.id)
+    const result = await shopApi.createPayment(order.value.id)
     await loadOrder()
-    if (order.value?.paymentStatus === 'paid') {
+    if (result.paymentStatus === 'paid') {
       uni.showToast({ title: '支付成功', icon: 'success' })
     } else {
-      uni.showToast({ title: '支付渠道暂未配置，请稍后重试', icon: 'none' })
+      uni.showToast({ title: '支付结果确认中，请稍后刷新订单', icon: 'none' })
     }
   } catch {
     uni.showToast({ title: '微信支付暂不可用，请稍后重试', icon: 'none' })
@@ -263,12 +268,18 @@ function handleRefund(): void {
   uni.navigateTo({ url: `/pages/shop/refund-request?id=${order.value.id}` })
 }
 
+function viewRefund(): void {
+  if (!order.value) return
+  const refund = currentRefund(order.value)
+  if (refund) uni.navigateTo({ url: `/pages/shop/refund-detail?id=${refund.id}` })
+}
+
 onLoad((options) => {
   if (options?.id) {
     orderId.value = String(options.id)
-    loadOrder()
   }
 })
+onShow(() => { if (orderId.value) loadOrder() })
 </script>
 
 <style lang="scss" scoped>

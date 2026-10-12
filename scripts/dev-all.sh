@@ -5,6 +5,5 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-exec pnpm exec concurrently --kill-others -n 'API+Admin,MiniApp' \
-  "pnpm dev:local" \
-  "pnpm dev:miniapp"
+# 先完成数据库迁移和共享包构建，再同时启动应用。
+exec bash "$PROJECT_ROOT/scripts/dev-local.sh" --all

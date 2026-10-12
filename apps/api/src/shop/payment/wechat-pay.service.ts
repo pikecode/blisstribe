@@ -32,6 +32,13 @@ export class WechatPayService {
     )
   }
 
+  assertCheckoutEnabled(userId?: bigint): void {
+    if (this.configService.get<string>('SHOP_PAYMENT_CHECKOUT_ENABLED') === 'false' &&
+      (!userId || this.configService.get<string>('SHOP_PAYMENT_TEST_USER_ID') !== userId.toString())) {
+      throw new ServiceUnavailableException('支付正在维护，请稍后重试')
+    }
+  }
+
   getNotifyUrl(event: 'wechat-pay' | 'wechat-refund'): string {
     let base: URL
     try {
@@ -59,7 +66,10 @@ export class WechatPayService {
     notifyUrl: string
     clientIp: string
     openId: string
+    userId?: bigint
+    expiresAt?: Date
   }): Promise<{ prepayId: string }> {
+    this.assertCheckoutEnabled(params.userId)
     const response = await this.request('POST', '/v3/pay/transactions/jsapi', {
       appid: this.required('WECHAT_APP_ID'),
       mchid: this.required('WECHAT_MCH_ID'),
@@ -68,6 +78,7 @@ export class WechatPayService {
       notify_url: this.validateNotifyUrl(params.notifyUrl),
       amount: { total: this.validateAmount(params.amount), currency: 'CNY' },
       payer: { openid: params.openId },
+      time_expire: params.expiresAt?.toISOString(),
       scene_info: { payer_client_ip: params.clientIp },
     })
     const prepayId = this.parseBody(response).prepay_id
@@ -112,7 +123,11 @@ export class WechatPayService {
   validateRefundNotification(data: any): void {
     if (
       data?.mchid !== this.required('WECHAT_MCH_ID') ||
-      typeof data?.refund_status !== 'string'
+      typeof data?.refund_status !== 'string' ||
+      (data.refund_status === 'SUCCESS' &&
+        (!Number.isSafeInteger(data.amount?.refund) || data.amount.refund <= 0 ||
+          !Number.isSafeInteger(data.amount?.total) || data.amount.total < data.amount.refund ||
+          data.amount.currency !== 'CNY'))
     ) {
       throw new UnauthorizedException('微信退款通知商户或状态不匹配')
     }
@@ -202,9 +217,15 @@ export class WechatPayService {
     const mchid = encodeURIComponent(this.required('WECHAT_MCH_ID'))
     const response = await this.request(
       'GET',
-      `/v3/pay/transactions/out-trade-no/${encodeURIComponent(outTradeNo)}?mchid=${mchid}`
+      `/v3/pay/transactions/out-trade-no/${encodeURIComponent(outTradeNo)}?mchid=${mchid}`,
+      undefined,
+      true
     )
     const body = this.parseBody(response)
+    if (response.status === 404 && body.code === 'ORDER_NOT_EXIST') {
+      return { tradeState: 'NOT_CREATED' }
+    }
+    if (body.trade_state === 'SUCCESS') this.validatePaymentNotification(body)
     return {
       tradeState: String(body.trade_state || ''),
       transactionId:
@@ -252,7 +273,8 @@ export class WechatPayService {
   private async request(
     method: string,
     path: string,
-    payload?: Record<string, unknown>
+    payload?: Record<string, unknown>,
+    allowMissingTrade = false
   ): Promise<WechatPayResponse> {
     if (this.configService.get<string>('WECHAT_PAY_ENABLED') !== 'true') {
       throw new ServiceUnavailableException('微信支付功能开关未启用')
@@ -275,6 +297,7 @@ export class WechatPayService {
         headers: {
           Accept: 'application/json',
           Authorization: authorization,
+          'Wechatpay-Serial': this.required('WECHAT_PLATFORM_SERIAL_NO'),
           ...(payload ? { 'Content-Type': 'application/json' } : {}),
         },
         body: payload ? body : undefined,
@@ -283,6 +306,10 @@ export class WechatPayService {
       const responseBody = await response.text()
       this.verifyResponse(response, responseBody)
       if (!response.ok) {
+        if (allowMissingTrade && response.status === 404 &&
+          JSON.parse(responseBody).code === 'ORDER_NOT_EXIST') {
+          return { status: response.status, headers: response.headers, body: responseBody }
+        }
         throw new ServiceUnavailableException(
           `微信支付接口返回错误（HTTP ${response.status}）`
         )

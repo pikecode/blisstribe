@@ -272,6 +272,17 @@ a {
   justify-content: flex-end;
 }
 
+// 列表公共外壳；业务内容和移动卡片继续由页面定义。
+.table-wrapper { min-width: 0; background: white; border-radius: $radius-md; }
+.pagination-wrapper { padding: 0 16px; background: white; border: 1px solid $color-border; border-radius: $radius-md; }
+.admin-list-danger:not(.is-disabled) { color: $color-danger; }
+.shop-product-mgr > .admin-list-toolbar,
+.user-mgr > .admin-list-toolbar,
+.order-mgr > .admin-list-toolbar,
+.refund-mgr > .admin-list-toolbar,
+.exceptions > .admin-list-toolbar { margin-bottom: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
 .table-muted {
   color: $color-text-tertiary;
 }

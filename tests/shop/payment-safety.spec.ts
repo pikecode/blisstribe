@@ -122,6 +122,16 @@ describe('PaymentService closure recovery', () => {
     expect(tx.shopProductSku.updateMany).not.toHaveBeenCalled()
   })
 
+  it('渠道确认从未创建预支付订单时释放库存，不调用关单', async () => {
+    const { service, tx, wechatPayService } = setup({ trade: { tradeState: 'NOT_CREATED' } })
+    await expect(service.closeUnpaidOrder(10n, '用户取消')).resolves.toBe('closed')
+    expect(wechatPayService.closeTrade).not.toHaveBeenCalled()
+    expect(tx.shopProductSku.updateMany).toHaveBeenCalledWith({
+      where: { id: 20n, reservedStock: { gte: 2 } },
+      data: { reservedStock: { decrement: 2 } },
+    })
+  })
+
   it('settles a trade found successful while closure is in progress', async () => {
     const { service, tx, wechatPayService } = setup({
       trade: { tradeState: 'SUCCESS', transactionId: 'WX-1', amountFen: 1200 },
@@ -184,5 +194,73 @@ describe('PaymentService closure recovery', () => {
 
     expect(tx.shopOrder.findUnique).toHaveBeenCalledWith({ where: { id: 10n } })
     expect(tx.shopProductSku.updateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('支付下单与主动确认', () => {
+  const order = {
+    id: 10n, userId: 1n, orderNo: 'ORDER-10', status: 'pending_payment',
+    paymentStatus: 'unpaid', expiresAt: new Date(Date.now() + 900000),
+    paymentAmountFen: 1200, payments: [{ status: 'pending', prepayId: 'PREPAY-1', outTradeNo: 'ORDER-10' }],
+  }
+
+  function setup() {
+    const repository: any = { findById: jest.fn(async () => order) }
+    const payments: any = { create: jest.fn() }
+    const wechat: any = {
+      assertCheckoutEnabled: jest.fn(), isMockPaymentEnabled: () => false,
+      createPrepay: jest.fn(), buildClientPaymentParams: jest.fn(() => ({ package: 'prepay_id=PREPAY-1' })),
+      queryTrade: jest.fn(async () => ({ tradeState: 'NOTPAY' })),
+    }
+    const service = new PaymentService({} as never, repository, payments, wechat)
+    return { service, repository, payments, wechat }
+  }
+
+  it('再次支付复用预支付记录，不重复下单', async () => {
+    const { service, payments, wechat } = setup()
+    await expect(service.createPayment(10n, 1n, '127.0.0.1', 'OPENID')).resolves.toMatchObject({ prepayId: 'PREPAY-1' })
+    expect(wechat.createPrepay).not.toHaveBeenCalled()
+    expect(payments.create).not.toHaveBeenCalled()
+  })
+
+  it('暂停支付也阻止复用已有预支付记录', async () => {
+    const { service, wechat, repository } = setup()
+    wechat.assertCheckoutEnabled.mockImplementation(() => { throw new Error('支付正在维护') })
+    await expect(service.createPayment(10n, 1n, '127.0.0.1', 'OPENID')).rejects.toThrow('支付正在维护')
+    expect(repository.findById).not.toHaveBeenCalled()
+    expect(wechat.buildClientPaymentParams).not.toHaveBeenCalled()
+  })
+
+  it('主动查单不允许访问其他用户订单', async () => {
+    const { service, wechat } = setup()
+    await expect(service.confirmPayment(10n, 2n)).rejects.toThrow('订单不存在')
+    expect(wechat.queryTrade).not.toHaveBeenCalled()
+  })
+
+  it('渠道未支付时保持未支付，不伪造成功', async () => {
+    const { service } = setup()
+    const settle = jest.spyOn(service, 'handleWechatNotify')
+    await expect(service.confirmPayment(10n, 1n)).resolves.toEqual({ paymentStatus: 'unpaid' })
+    expect(settle).not.toHaveBeenCalled()
+  })
+
+  it('回调延迟时使用渠道成功结果补记账，并读取最终状态', async () => {
+    const { service, repository, wechat } = setup()
+    wechat.queryTrade.mockResolvedValue({ tradeState: 'SUCCESS', transactionId: 'WX-1', amountFen: 1200 })
+    const settle = jest.spyOn(service, 'handleWechatNotify').mockResolvedValue({ message: 'success' })
+    repository.findById.mockResolvedValueOnce(order).mockResolvedValueOnce({ ...order, paymentStatus: 'paid' })
+    await expect(service.confirmPayment(10n, 1n)).resolves.toEqual({ paymentStatus: 'paid' })
+    expect(settle).toHaveBeenCalledWith({ out_trade_no: 'ORDER-10', transaction_id: 'WX-1', amount: { total: 1200 } })
+  })
+
+  it('并发创建支付记录使用商户单号幂等写入，不覆盖支付状态', async () => {
+    const { PaymentRepository } = jest.requireActual<any>('../../apps/api/src/shop/payment/payment.repository')
+    const prisma = { shopPayment: { upsert: jest.fn(async (_args: unknown) => ({ status: 'success' })) } }
+    const repository = new PaymentRepository(prisma)
+    const data = { orderId: 10n, outTradeNo: 'ORDER-10', prepayId: 'PREPAY-1', amountFen: 1200, status: 'pending' }
+    await repository.create(data)
+    expect(prisma.shopPayment.upsert).toHaveBeenCalledWith({
+      where: { outTradeNo: 'ORDER-10' }, update: { prepayId: 'PREPAY-1' }, create: data,
+    })
   })
 })

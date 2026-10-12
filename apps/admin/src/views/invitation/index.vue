@@ -33,7 +33,7 @@
       <template #header>
         <span>邀请排行榜 TOP10</span>
       </template>
-      <el-table :data="stats.topInviters" stripe size="small">
+      <AdminListTable :data="stats.topInviters" size="small">
         <el-table-column type="index" label="排名" width="60" />
         <el-table-column prop="nickname" label="邀请人" />
         <el-table-column prop="inviteCount" label="邀请人数" width="100">
@@ -41,7 +41,7 @@
             <el-tag type="success">{{ row.inviteCount }}人</el-tag>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
     </el-card>
 
     <!-- 邀请记录 -->
@@ -49,7 +49,7 @@
       <template #header>
         <span>邀请记录</span>
       </template>
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-input
           v-model="keyword"
           placeholder="搜索邀请人/被邀请人"
@@ -58,9 +58,9 @@
           @keyup.enter="handleSearch"
         />
         <el-button type="primary" @click="handleSearch">搜索</el-button>
-      </div>
+      </AdminListToolbar>
 
-      <el-table :data="list" v-loading="loading" stripe>
+      <AdminListTable :data="list" :loading="loading" :error="listError" @retry="loadList">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="inviterNickname" label="邀请人" />
         <el-table-column prop="inviteeNickname" label="被邀请人" />
@@ -75,24 +75,27 @@
         <el-table-column prop="createdAt" label="时间">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        layout="total, prev, pager, next"
-        @current-change="loadList"
-        class="invitation-mgr__pager"
-      />
+      :disabled="loading" @change="loadList" />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { invitationApi } from '@/api/invitation'
+
+const listError = ref('')
+
 
 const list = ref<Array<{
   id: number
@@ -125,6 +128,7 @@ const conversionRate = computed(() => {
 
 const loadList = async (): Promise<void> => {
   loading.value = true
+  listError.value = ''
   try {
     const data = await invitationApi.getRecords({
       page: page.value,
@@ -133,6 +137,8 @@ const loadList = async (): Promise<void> => {
     })
     list.value = data.list
     total.value = data.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }

@@ -15,6 +15,7 @@ export class ProductService {
     pageSize?: number
     categoryId?: string | bigint
     keyword?: string
+    status?: number
   }): Promise<any> {
     if (!params) {
       return this.productRepository.findAll()
@@ -31,6 +32,7 @@ export class ProductService {
       pageSize: params.pageSize,
       categoryId: categoryIdBig,
       keyword: params.keyword,
+      status: params.status,
     })
 
     return {

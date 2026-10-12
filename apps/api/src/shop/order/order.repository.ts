@@ -41,6 +41,7 @@ export class OrderRepository {
         where,
         include: {
           items: true,
+          refunds: { select: { id: true, status: true, createdAt: true }, orderBy: { createdAt: 'desc' } },
         },
         orderBy: { createdAt: 'desc' },
         take: limit,

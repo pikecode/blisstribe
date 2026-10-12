@@ -37,7 +37,9 @@ export class ProductSkuDto {
 }
 
 export class CreateProductDto {
+  @Type(() => Number)
   @IsInt()
+  @Min(1)
   @IsNotEmpty()
   categoryId!: number
 
@@ -66,7 +68,9 @@ export class CreateProductDto {
 }
 
 export class UpdateProductDto {
+  @Type(() => Number)
   @IsInt()
+  @Min(1)
   @IsOptional()
   categoryId?: number
 

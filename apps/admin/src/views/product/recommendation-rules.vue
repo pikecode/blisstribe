@@ -19,7 +19,7 @@
         title="规则用于增强标签匹配：当用户评估结果包含全部命中标签时，指定产品获得额外加分，并优先展示规则推荐理由。"
       />
 
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-select v-model="filterModuleId" placeholder="全部模块" clearable style="width: 180px" @change="loadRules">
           <el-option v-for="item in modules" :key="item.id" :label="item.name" :value="item.id" />
         </el-select>
@@ -28,9 +28,9 @@
           <el-option label="停用" :value="0" />
         </el-select>
         <el-button @click="resetFilter">重置</el-button>
-      </div>
+      </AdminListToolbar>
 
-      <el-table :data="rules" v-loading="loading" stripe>
+      <AdminListTable :data="rules" :loading="loading" :error="listError" @retry="loadRules">
         <el-table-column label="规则" min-width="200">
           <template #default="{ row }">
             <div class="rule-title">{{ row.name }}</div>
@@ -55,17 +55,19 @@
             <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openDialog(row)">编辑</el-button>
-              <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="openDialog(row)" />
+              <template #more>
+                <el-dropdown-item @click="toggleStatus(row)">
                 {{ row.status === 1 ? '停用' : '启用' }}
-              </el-button>
-            </div>
+              </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑推荐规则' : '新增推荐规则'" width="680px">
@@ -119,6 +121,10 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -130,6 +136,9 @@ import {
   type TagDictionary,
 } from '@/api/product'
 import { buildTagOptionGroups, mapTagNamesToIds, tagOptionLabel } from '@/utils/tags'
+
+const listError = ref('')
+
 
 const modules = ref<ProductModule[]>([])
 const products = ref<Product[]>([])
@@ -178,11 +187,14 @@ async function loadBaseData() {
 
 async function loadRules() {
   loading.value = true
+  listError.value = ''
   try {
     rules.value = await productApi.listRecommendationRules({
       moduleId: filterModuleId.value,
       status: filterStatus.value,
     })
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }

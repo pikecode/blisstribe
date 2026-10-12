@@ -1,4 +1,4 @@
-// 业务错误码（对齐 docs/API.md）
+// 业务错误码（对齐 docs/engineering/API.md）
 
 export const ErrorCode = {
   // 认证错误 4xx

@@ -8,6 +8,7 @@ import {
   Body,
   UseGuards,
   Query,
+  ParseIntPipe,
 } from '@nestjs/common'
 import { AdminJwtGuard } from '../../common/guards/admin-jwt.guard'
 import { ProductService } from './product.service'
@@ -50,6 +51,7 @@ export class AdminProductController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('keyword') keyword?: string,
+    @Query('status', new ParseIntPipe({ optional: true })) status?: number,
   ) {
     const categoryIdBig = categoryId ? BigInt(categoryId) : undefined
     return this.productService.getAllProducts({
@@ -57,6 +59,7 @@ export class AdminProductController {
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
       keyword,
+      status,
     })
   }
 

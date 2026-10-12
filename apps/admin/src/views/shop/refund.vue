@@ -1,7 +1,7 @@
 <template>
   <div class="refund-mgr">
     <!-- 工具栏 -->
-    <div class="toolbar">
+    <AdminListToolbar>
       <div class="toolbar__filters">
         <!-- 搜索 -->
         <div class="toolbar__search">
@@ -45,19 +45,21 @@
         <!-- 重置按钮 -->
         <el-button plain icon="Refresh" @click="resetSearch">重置</el-button>
       </div>
-    </div>
+    </AdminListToolbar>
 
     <!-- 表格容器 -->
     <div class="table-wrapper">
       <!-- 桌面端表格 -->
-      <el-table
+      <el-alert v-if="isMobile && listError" :title="listError" type="error" :closable="false" show-icon>
+        <el-button link type="primary" :disabled="loading" @click="loadList">重新加载</el-button>
+      </el-alert>
+      <AdminListTable
         v-if="!isMobile"
         :data="refunds"
-        v-loading="loading"
-        stripe
+        :loading="loading"
         style="width: 100%"
         row-key="id"
-      >
+       :error="listError" @retry="loadList">
         <el-table-column type="index" label="序号" width="60" />
         <el-table-column prop="refundNo" label="退款号" width="140" show-overflow-tooltip>
           <template #default="{ row }">
@@ -113,37 +115,29 @@
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button type="primary" link size="small" @click="viewDetail(row)">
-                详情
-              </el-button>
-              <el-divider v-if="row.status === 'pending'" direction="vertical" />
-              <el-button
+            <AdminListActions :show-more="row.status === 'pending' || refundNeedsProviderQuery(row)">
+              <AdminListAction label="详情" icon="View" @click="viewDetail(row)" />
+              <template #more>
+                <el-dropdown-item
                 v-if="row.status === 'pending'"
-                type="success"
-                link
-                size="small"
                 @click="openApprovalDialog(row)"
               >
                 审批
-              </el-button>
-              <el-divider v-if="refundNeedsProviderQuery(row)" direction="vertical" />
-              <el-button
+              </el-dropdown-item>
+                <el-dropdown-item
                 v-if="refundNeedsProviderQuery(row)"
-                type="warning"
-                link
-                size="small"
-                :loading="providerQueryingId === row.id"
+                :disabled="providerQueryingId === row.id"
                 @click="queryProviderRefund(row)"
               >
                 查渠道
-              </el-button>
-            </div>
+              </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
       <!-- 移动端卡片列表 -->
       <div v-else v-loading="loading" class="refund-cards">
@@ -213,20 +207,16 @@
       </div>
 
       <!-- 空状态 -->
-      <el-empty v-if="!loading && refunds.length === 0" description="暂无退款数据" />
+      <el-empty v-if="isMobile && !loading && !listError && refunds.length === 0" description="暂无退款数据" />
     </div>
 
     <!-- 分页 -->
     <div class="pagination-wrapper">
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @current-change="loadList"
-        @size-change="loadList"
-      />
+      :disabled="loading" @change="loadList" />
     </div>
 
     <!-- 详情对话框 -->
@@ -432,9 +422,17 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { refundApi, type Refund } from '@/api/refund'
+
+const listError = ref('')
+
 
 const refunds = ref<Refund[]>([])
 const loading = ref(false)
@@ -506,6 +504,7 @@ const refundNeedsProviderQuery = (refund: Refund): boolean =>
 
 const loadList = async (): Promise<void> => {
   loading.value = true
+  listError.value = ''
   try {
     const data = await refundApi.listRefunds({
       page: page.value,
@@ -517,6 +516,8 @@ const loadList = async (): Promise<void> => {
     })
     refunds.value = data.list
     total.value = data.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }
@@ -633,96 +634,6 @@ onMounted(loadList)
   gap: $space-16;
 }
 
-.toolbar {
-  background: $color-bg-white;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  padding: $space-20;
-
-  &__filters {
-    display: flex;
-    align-items: center;
-    gap: $space-12;
-    flex-wrap: wrap;
-  }
-
-  &__search {
-    display: flex;
-    align-items: center;
-    gap: $space-12;
-    flex: 1;
-    min-width: 300px;
-
-    :deep(.el-input) {
-      .el-input__wrapper {
-        background: $color-surface-soft;
-        border-color: $color-border;
-
-        &:hover {
-          border-color: $color-primary;
-        }
-      }
-    }
-  }
-}
-
-.table-wrapper {
-  background: $color-bg-white;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  overflow: hidden;
-  box-shadow: $shadow-sm;
-
-  :deep(.el-table) {
-    --el-table-border-color: #{$color-border};
-    --el-table-header-bg-color: #{$color-surface-soft};
-    --el-table-header-text-color: #{$color-text};
-    --el-table-row-hover-bg-color: #{$color-bg-hover};
-
-    thead {
-      background: $color-surface-soft;
-
-      th {
-        background: $color-surface-soft;
-        font-weight: 600;
-        color: $color-text;
-        border-bottom: 1px solid $color-border;
-      }
-    }
-
-    tbody tr {
-      &:hover > td {
-        background: $color-bg-hover !important;
-      }
-    }
-  }
-}
-
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: $space-8;
-
-  :deep(.el-button) {
-    padding: 0;
-    height: auto;
-    font-size: $font-size-sm;
-
-    &.is-link {
-      text-decoration: none;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-
-  :deep(.el-divider--vertical) {
-    margin: 0 $space-6;
-    background-color: $color-border;
-  }
-}
-
 .refund-cards {
   display: flex;
   flex-direction: column;
@@ -806,22 +717,6 @@ onMounted(loadList)
     :deep(.el-button) {
       font-size: $font-size-xs;
     }
-  }
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  padding: $space-16;
-  background: $color-bg-white;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-
-  :deep(.el-pagination) {
-    --el-pagination-font-size: #{$font-size-sm};
-    --el-pagination-bg-color: transparent;
-    --el-pagination-button-bg-color: #{$color-surface-soft};
-    --el-pagination-button-disabled-bg-color: #{$color-bg};
   }
 }
 

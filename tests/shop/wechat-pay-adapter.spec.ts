@@ -63,6 +63,40 @@ describe('WechatPayService', () => {
 
   afterEach(() => fetchMock.mockRestore())
 
+  it('暂停新支付时不下单，但仍允许查单', async () => {
+    values.SHOP_PAYMENT_CHECKOUT_ENABLED = 'false'
+    try {
+      await expect(service.createPrepay({
+        outTradeNo: 'ORDER-1', amount: 100, description: '商城订单',
+        notifyUrl: 'https://api.example.com/api/v1/shop/webhooks/wechat-pay',
+        clientIp: '127.0.0.1', openId: 'openid-1',
+      })).rejects.toThrow('支付正在维护')
+      expect(fetchMock).not.toHaveBeenCalled()
+      fetchMock.mockResolvedValue(signedResponse(JSON.stringify({ trade_state: 'NOTPAY' })))
+      await expect(service.queryTrade('ORDER-1')).resolves.toMatchObject({ tradeState: 'NOTPAY' })
+    } finally {
+      delete values.SHOP_PAYMENT_CHECKOUT_ENABLED
+    }
+  })
+
+  it('暂停期间只允许指定验收用户下单', async () => {
+    values.SHOP_PAYMENT_CHECKOUT_ENABLED = 'false'
+    values.SHOP_PAYMENT_TEST_USER_ID = '7'
+    const params = {
+      outTradeNo: 'ORDER-TEST', amount: 1, description: '验收',
+      notifyUrl: 'https://api.example.com/api/v1/shop/webhooks/wechat-pay',
+      clientIp: '127.0.0.1', openId: 'OPENID',
+    }
+    try {
+      await expect(service.createPrepay({ ...params, userId: 8n })).rejects.toThrow('支付正在维护')
+      expect(fetchMock).not.toHaveBeenCalled()
+      await expect(service.createPrepay({ ...params, userId: 7n })).resolves.toEqual({ prepayId: 'prepay-123' })
+    } finally {
+      delete values.SHOP_PAYMENT_CHECKOUT_ENABLED
+      delete values.SHOP_PAYMENT_TEST_USER_ID
+    }
+  })
+
   it('以商户私钥签名 JSAPI 请求并只发送分为单位的金额', async () => {
     const result = await service.createPrepay({
       outTradeNo: 'ORDER-1',
@@ -84,6 +118,7 @@ describe('WechatPayService', () => {
       payer: { openid: 'openid-1' },
     })
     expect(init.headers.Authorization).toContain('WECHATPAY2-SHA256-RSA2048')
+    expect(init.headers['Wechatpay-Serial']).toBe(values.WECHAT_PLATFORM_SERIAL_NO)
   })
 
   it('拒绝非 HTTPS 通知地址且不发出网络请求', async () => {
@@ -98,6 +133,15 @@ describe('WechatPayService', () => {
       })
     ).rejects.toThrow('必须使用 HTTPS')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('仅将验签通过的渠道订单不存在识别为未创建', async () => {
+    fetchMock.mockResolvedValue(signedResponse(JSON.stringify({ code: 'ORDER_NOT_EXIST' }), 404))
+    await expect(service.queryTrade('ORDER-NEW')).resolves.toEqual({ tradeState: 'NOT_CREATED' })
+    fetchMock.mockResolvedValue(signedResponse(JSON.stringify({ code: 'SYSTEM_ERROR' }), 500))
+    await expect(service.queryTrade('ORDER-NEW')).rejects.toThrow('HTTP 500')
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ code: 'ORDER_NOT_EXIST' }), { status: 404 }))
+    await expect(service.queryTrade('ORDER-NEW')).rejects.toThrow('验签')
   })
 
   it('未显式启用支付开关时不访问微信 API', async () => {
@@ -216,8 +260,12 @@ describe('WechatPayService', () => {
       service.validateRefundNotification({
         mchid: 'merchant-1',
         refund_status: 'SUCCESS',
+        amount: { refund: 100, total: 100, currency: 'CNY' },
       })
     ).not.toThrow()
+    expect(() => service.validateRefundNotification({
+      mchid: 'merchant-1', refund_status: 'SUCCESS',
+    })).toThrow()
     expect(() =>
       service.validateRefundNotification({
         mchid: 'another-merchant',

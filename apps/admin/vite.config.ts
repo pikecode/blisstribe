@@ -18,9 +18,11 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    // 固定开发地址，端口占用时明确报错，避免就绪检查指向其他服务。
+    strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        target: 'http://127.0.0.1:4000',
         changeOrigin: true,
       },
     },

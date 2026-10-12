@@ -77,25 +77,26 @@
     </view>
 
     <!-- Reason Picker -->
-    <picker-view v-if="showReasonPicker" class="refund-request__picker-overlay" @tap="handlePickerOverlayTap">
+    <view v-if="showReasonPicker" class="refund-request__picker-overlay" @tap="handlePickerOverlayTap" @touchmove.stop.prevent>
       <view class="refund-request__picker-content" @tap.stop>
         <view class="refund-request__picker-header">
           <text class="refund-request__picker-title">选择退款原因</text>
-          <text class="refund-request__picker-close" @tap="showReasonPicker = false">✕</text>
+          <button class="refund-request__picker-close" aria-label="关闭退款原因选择" @tap="showReasonPicker = false">×</button>
         </view>
         <scroll-view class="refund-request__picker-list" scroll-y>
-          <view
-            v-for="(reason, index) in refundReasons"
-            :key="index"
+          <button
+            v-for="reason in refundReasons"
+            :key="reason"
             class="refund-request__picker-item"
             :class="{ active: selectedReason === reason }"
             @tap="selectReason(reason)"
           >
-            {{ reason }}
-          </view>
+            <text>{{ reason }}</text>
+            <text class="refund-request__picker-check" :class="{ selected: selectedReason === reason }">{{ selectedReason === reason ? '✓' : '' }}</text>
+          </button>
         </scroll-view>
       </view>
-    </picker-view>
+    </view>
 
     <!-- Success Modal -->
     <view v-if="successVisible" class="refund-request__success-mask">
@@ -115,6 +116,7 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { shopApi, type ShopOrder } from '@/api/modules/shop'
+import { canApplyRefund, currentRefund } from '@/utils/order-refund'
 import { useAuthStore } from '@/stores/modules/auth'
 
 type UniValueEvent = { detail?: { value?: string | number } }
@@ -135,7 +137,7 @@ const refundAmount = computed(() => {
   return order.value?.paymentAmountFen || 0
 })
 const canRequestRefund = computed(() =>
-  order.value?.paymentStatus === 'paid' && order.value.fulfillmentStatus === 'pending'
+  !!order.value && canApplyRefund(order.value)
 )
 
 const canSubmit = computed(() => {
@@ -176,7 +178,7 @@ function validateForm(): boolean {
 }
 
 async function submitRefund() {
-  if (!validateForm() || !orderId.value || !canRequestRefund.value) return
+  if (submitting.value || !validateForm() || !orderId.value || !canRequestRefund.value) return
 
   submitting.value = true
   try {
@@ -206,6 +208,9 @@ async function loadOrder() {
   try {
     const orderData = await shopApi.getOrderDetail(orderId.value)
     order.value = orderData
+    if (!canApplyRefund(orderData) && currentRefund(orderData)) {
+      uni.redirectTo({ url: `/pages/shop/refund-detail?id=${currentRefund(orderData)!.id}` })
+    }
   } catch (error) {
     console.error('Failed to load order:', error)
     uni.showToast({
@@ -470,19 +475,24 @@ onLoad((options) => {
 
   &__picker-overlay {
     position: fixed;
-    inset: 0;
-    z-index: 10;
-    background: rgba(0, 0, 0, 0.5);
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    background: rgba(17, 24, 39, 0.44);
     display: flex;
     align-items: flex-end;
-    animation: slideUp 300ms ease-out;
+    animation: fadeIn 180ms ease-out;
   }
 
   &__picker-content {
     width: 100%;
-    max-height: 60vh;
+    box-sizing: border-box;
+    padding-bottom: env(safe-area-inset-bottom);
+    max-height: 80vh;
     background: #fff;
-    border-radius: 20rpx 20rpx 0 0;
+    border-radius: 32rpx 32rpx 0 0;
     overflow: hidden;
     animation: slideUp 300ms ease-out;
   }
@@ -491,32 +501,56 @@ onLoad((options) => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20rpx 24rpx;
+    padding: 24rpx 32rpx;
     border-bottom: 1rpx solid var(--color-border);
   }
 
   &__picker-title {
     color: var(--color-text);
-    font-size: 28rpx;
+    font-size: 32rpx;
     font-weight: 700;
   }
 
   &__picker-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80rpx;
+    height: 80rpx;
+    padding: 0;
+    margin: 0 -16rpx 0 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--color-bg-subtle);
     color: var(--color-text-secondary);
-    font-size: 32rpx;
-    cursor: pointer;
+    font-size: 44rpx;
+    line-height: 1;
+    &::after { border: 0; }
   }
 
   &__picker-list {
-    max-height: calc(60vh - 80rpx);
+    height: 660rpx;
+    max-height: 60vh;
   }
 
   &__picker-item {
-    padding: 20rpx 24rpx;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 110rpx;
+    padding: 24rpx 32rpx;
+    margin: 0;
+    border-radius: 0;
+    background: #fff;
+    text-align: left;
+    line-height: 1.5;
     color: var(--color-text);
-    font-size: 26rpx;
+    font-size: 30rpx;
     border-bottom: 1rpx solid var(--color-border);
     transition: all 200ms ease;
+    &::after { border: 0; }
 
     &.active {
       background: var(--color-primary-light);
@@ -527,6 +561,18 @@ onLoad((options) => {
     &:active {
       background: var(--color-bg-subtle);
     }
+  }
+
+  &__picker-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40rpx;
+    height: 40rpx;
+    border: 2rpx solid var(--color-border);
+    border-radius: 50%;
+    font-size: 26rpx;
+    &.selected { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
   }
 
   &__success-mask {

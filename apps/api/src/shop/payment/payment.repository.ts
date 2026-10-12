@@ -13,8 +13,10 @@ export class PaymentRepository {
     amountFen: number
     status: string
   }): Promise<ShopPayment> {
-    return this.prisma.shopPayment.create({
-      data: {
+    return this.prisma.shopPayment.upsert({
+      where: { outTradeNo: data.outTradeNo },
+      update: { prepayId: data.prepayId },
+      create: {
         orderId: data.orderId,
         outTradeNo: data.outTradeNo,
         prepayId: data.prepayId,

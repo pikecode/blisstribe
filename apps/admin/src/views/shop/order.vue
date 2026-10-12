@@ -1,13 +1,13 @@
 <template>
   <div class="order-mgr">
     <!-- 工具栏 -->
-    <div class="toolbar">
+    <AdminListToolbar>
       <div class="toolbar__filters">
         <!-- 搜索 -->
         <div class="toolbar__search">
           <el-input
             v-model="keyword"
-            placeholder="搜索订单号、用户昵称、手机号..."
+            placeholder="订单号 / 用户昵称 / 手机号"
             clearable
             prefix-icon="Search"
             @keyup.enter="handleSearch"
@@ -72,99 +72,94 @@
         <!-- 重置按钮 -->
         <el-button plain icon="Refresh" @click="resetSearch">重置</el-button>
       </div>
-    </div>
+    </AdminListToolbar>
 
     <!-- 表格容器 -->
     <div class="table-wrapper">
-      <el-table
+      <AdminListTable
         :data="orders"
-        v-loading="loading"
-        stripe
+        :loading="loading"
         style="width: 100%"
         row-key="id"
-      >
-        <el-table-column type="index" label="序号" width="60" />
-        <el-table-column prop="orderNo" label="订单号" width="160" show-overflow-tooltip>
+       :error="listError" @retry="loadOrders">
+        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column prop="orderNo" label="订单号" min-width="280" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-button type="primary" link @click="viewDetail(row)">
+            <el-button class="order-number" type="primary" link @click="viewDetail(row)">
               {{ row.orderNo }}
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column label="用户" width="140">
+        <el-table-column label="用户" min-width="150">
           <template #default="{ row }">
             <div>
-              <div>{{ row.user?.nickname || '-' }}</div>
-              <div style="color: #909399; font-size: 12px">{{ row.user?.phoneMasked || '-' }}</div>
+              <div class="order-user__name">{{ row.user?.nickname || '-' }}</div>
+              <div class="order-user__phone">{{ row.user?.phoneMasked || '-' }}</div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="订单金额" width="100" align="right">
+        <el-table-column label="订单金额" min-width="110" align="right">
           <template #default="{ row }">
-            ¥{{ (row.totalAmountFen / 100).toFixed(2) }}
+            <span class="order-amount">¥{{ (row.totalAmountFen / 100).toFixed(2) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="支付状态" width="100">
+        <el-table-column label="支付状态" min-width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="getPaymentStatusType(row.paymentStatus)" effect="light" round>
+            <el-tag :type="getPaymentStatusType(row.paymentStatus)" effect="light">
               {{ getPaymentStatusText(row.paymentStatus) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="履约状态" width="100">
+        <el-table-column label="履约状态" min-width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="getFulfillmentStatusType(row.fulfillmentStatus)" effect="light" round>
+            <el-tag :type="getFulfillmentStatusType(row.fulfillmentStatus)" effect="light">
               {{ getFulfillmentStatusText(row.fulfillmentStatus) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="160">
+        <el-table-column label="退款状态" min-width="130" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="latestOrderRefund(row) || row.fulfillmentStatus === 'refunded'" :type="row.fulfillmentStatus === 'refunded' ? 'success' : 'warning'" effect="light">{{ orderRefundText(row) }}</el-tag>
+            <span v-else style="color: #909399">无退款</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="创建时间" min-width="165">
           <template #default="{ row }">
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="80" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button type="primary" link size="small" @click="viewDetail(row)">查看</el-button>
-              <el-divider direction="vertical" />
-              <el-button
-                v-if="row.paymentStatus === 'paid' && row.fulfillmentStatus === 'pending'"
-                type="success"
-                link
-                size="small"
+            <AdminListActions :show-more="canShipOrder(row) || row.status === 'pending_payment'">
+              <AdminListAction label="查看" icon="View" @click="viewDetail(row)" />
+              <template #more>
+                <el-dropdown-item
+                v-if="canShipOrder(row)"
                 @click="openShipDialog(row)"
               >
                 发货
-              </el-button>
-              <el-button
+              </el-dropdown-item>
+                <el-dropdown-item
                 v-if="row.status === 'pending_payment'"
-                type="danger"
-                link
-                size="small"
                 @click="cancelOrderConfirm(row)"
               >
                 取消
-              </el-button>
-            </div>
+              </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-empty v-if="!loading && orders.length === 0" description="暂无订单数据" />
     </div>
 
     <!-- 分页 -->
     <div class="pagination-wrapper">
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @current-change="loadOrders"
-        @size-change="loadOrders"
-      />
+      :disabled="loading" @change="loadOrders" />
     </div>
 
     <!-- 订单详情对话框 -->
@@ -186,7 +181,7 @@
             <div class="detail-label">订单状态</div>
             <div class="detail-value">
               <el-tag :type="getOrderStatusType(selectedOrder.status)" effect="light">
-                {{ getOrderStatusText(selectedOrder.status) }}
+                {{ orderRefundText(selectedOrder) === '无退款' ? getOrderStatusText(selectedOrder.status) : orderRefundText(selectedOrder) }}
               </el-tag>
             </div>
           </div>
@@ -219,6 +214,13 @@
           <div class="detail-col">
             <div class="detail-label">支付时间</div>
             <div class="detail-value">{{ selectedOrder.paidAt ? formatDate(selectedOrder.paidAt) : '-' }}</div>
+          </div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-col">
+            <div class="detail-label">退款状态</div>
+            <div class="detail-value">{{ orderRefundText(selectedOrder) }}</div>
           </div>
         </div>
 
@@ -260,7 +262,7 @@
 
         <!-- 订单商品 -->
         <el-divider>订单商品</el-divider>
-        <el-table :data="selectedOrder.items" stripe size="small">
+        <AdminListTable :data="selectedOrder.items" size="small">
           <el-table-column prop="productName" label="商品名称" min-width="150" />
           <el-table-column label="单价" width="100" align="right">
             <template #default="{ row }">
@@ -273,7 +275,7 @@
               ¥{{ (row.subtotalFen / 100).toFixed(2) }}
             </template>
           </el-table-column>
-        </el-table>
+        </AdminListTable>
 
         <!-- 金额信息 -->
         <el-divider>金额信息</el-divider>
@@ -345,9 +347,18 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus'
+import { latestOrderRefund, orderRefundText, canShipOrder } from '@/utils/shop-order'
 import { shopOrderApi, ShopOrder } from '@/api/shop-order'
+
+const listError = ref('')
+
 
 interface ShipForm {
   trackingNo: string
@@ -391,6 +402,7 @@ const shipRules = {
 // 加载订单列表
 const loadOrders = async () => {
   loading.value = true
+  listError.value = ''
   try {
     const [startDate, endDate] = dateRange.value || [null, null]
     const result = await shopOrderApi.listOrders({
@@ -406,6 +418,7 @@ const loadOrders = async () => {
     orders.value = result.orders
     total.value = result.total
   } catch (error) {
+    listError.value = '列表加载失败，请重试'
     ElMessage.error('加载订单列表失败')
   } finally {
     loading.value = false
@@ -441,6 +454,7 @@ const viewDetail = async (row: ShopOrder) => {
 
 // 打开发货对话框
 const openShipDialog = (row: ShopOrder) => {
+  if (!canShipOrder(row)) return
   selectedOrder.value = row
   shipForm.trackingNo = ''
   shipForm.logisticsCompany = ''
@@ -547,6 +561,8 @@ const getPaymentStatusType = (status: string) => {
 const getFulfillmentStatusText = (status: string) => {
   const statusMap: Record<string, string> = {
     pending: '待处理',
+    refunded: '已退款',
+    cancelled: '已取消',
     shipped: '已发货',
     completed: '已完成',
   }
@@ -556,6 +572,8 @@ const getFulfillmentStatusText = (status: string) => {
 const getFulfillmentStatusType = (status: string) => {
   const typeMap: Record<string, string> = {
     pending: 'warning',
+    refunded: 'success',
+    cancelled: 'info',
     shipped: 'info',
     completed: 'success',
   }
@@ -582,47 +600,24 @@ onMounted(() => {
 <style scoped lang="scss">
 .order-mgr {
   padding: 16px;
-}
 
-.toolbar {
-  margin-bottom: 16px;
-
-  &__filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
+  .toolbar__filters { width: 100%; gap: 10px; }
+  .toolbar__search { flex-wrap: nowrap; }
+  .toolbar__search :deep(.el-input) { width: 290px; }
+  .table-wrapper { overflow: hidden; border-radius: 12px 12px 0 0; }
+  .pagination-wrapper { margin-top: -1px; padding: 0 16px; border: 1px solid #e4e7ed; border-top: 0; border-radius: 0 0 12px 12px; background: #fff; }
+  .order-number { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .order-user__name { font-weight: 500; color: #303133; }
+  .order-user__phone { margin-top: 3px; color: #909399; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .order-amount { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .table-wrapper :deep(.el-table th.el-table__cell) { height: 48px; background: #f8fafc; color: #667085; font-size: 12px; font-weight: 500; }
+  .table-wrapper :deep(.el-table td.el-table__cell) { padding: 16px 0; }
+  .table-wrapper :deep(.el-tag) { border-color: transparent; font-weight: 500; border-radius: 5px; }
+  @media (max-width: 767px) {
+    padding: 8px;
+    .toolbar__search { width: 100%; }
+    .toolbar__search :deep(.el-input) { width: auto; flex: 1; }
   }
-
-  &__search {
-    display: flex;
-    gap: 8px;
-    flex: 1;
-    min-width: 300px;
-
-    :deep(.el-input) {
-      flex: 1;
-    }
-  }
-}
-
-.table-wrapper {
-  background: white;
-  border-radius: 4px;
-  margin-bottom: 16px;
-  overflow: auto;
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .order-detail {

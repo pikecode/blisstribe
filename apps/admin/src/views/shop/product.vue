@@ -1,7 +1,7 @@
 <template>
   <div class="shop-product-mgr">
     <!-- 工具栏 -->
-    <div class="toolbar" role="region" aria-label="搜索和操作工具栏">
+    <AdminListToolbar role="region" aria-label="搜索和操作工具栏">
       <div class="toolbar__left">
         <div class="toolbar__search">
           <label for="product-search-input" class="sr-only">搜索商品名</label>
@@ -29,23 +29,39 @@
           <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
         </el-select>
 
+        <el-select v-model="selectedStatus" placeholder="全部状态" clearable style="width: 130px" aria-label="商品状态筛选" @change="handleSearch">
+          <el-option label="草稿" :value="0" /><el-option label="上架" :value="1" /><el-option label="下架" :value="2" />
+        </el-select>
         <el-button plain icon="Refresh" @click="resetSearch">重置</el-button>
-        <el-button type="primary" @click="openProductDialog()">添加商品</el-button>
+        <el-button type="primary" @click="openProductDialog()" icon="Plus">新增商品</el-button>
       </div>
-    </div>
+    </AdminListToolbar>
 
     <!-- 商品表格 -->
     <div class="table-wrapper">
-      <el-table
+      <AdminListTable
         :data="products"
-        v-loading="loading"
-        stripe
+        :loading="loading"
+        row-key="id"
+        :max-height="620"
         style="width: 100%"
         role="table"
         aria-label="商品列表表格"
-      >
-        <el-table-column type="index" label="序号" width="60" />
-        <el-table-column label="商品" min-width="220">
+        empty-text="暂无符合条件的商品"
+       :error="listError" @retry="loadProducts">
+        <el-table-column type="expand" width="48">
+          <template #default="{ row }">
+            <div class="sku-preview">
+              <AdminListTable :data="row.skus" size="small">
+                <el-table-column label="规格组合" min-width="200"><template #default="{ row: sku }">{{ Object.entries(sku.specifications).map(([name, value]) => `${name}：${value}`).join(' / ') || '默认规格' }}</template></el-table-column>
+                <el-table-column label="售价" width="120"><template #default="{ row: sku }">¥{{ (sku.priceFen / 100).toFixed(2) }}</template></el-table-column>
+                <el-table-column prop="available" label="可售" width="90" />
+                <el-table-column label="状态" width="90"><template #default="{ row: sku }"><el-tag :type="sku.enabled ? 'success' : 'info'" size="small">{{ sku.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
+              </AdminListTable>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="商品" min-width="280">
           <template #default="{ row }">
             <div class="product-item">
               <el-image
@@ -59,15 +75,13 @@
               </div>
               <div class="product-info">
                 <div class="product-name">{{ row.name }}</div>
-                <div class="product-desc">{{ row.description || '-' }}</div>
+                <div class="product-desc">{{ getCategoryName(row.categoryId) }} · {{ row.description || '暂无描述' }}</div>
               </div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="分类" width="120">
-          <template #default="{ row }">{{ getCategoryName(row.categoryId) }}</template>
-        </el-table-column>
-        <el-table-column label="价格区间" width="150">
+        <el-table-column label="规格" width="110"><template #default="{ row }"><el-tag type="info" effect="plain">{{ row.skus.length }} 个规格</el-tag></template></el-table-column>
+        <el-table-column label="售价 / 区间" min-width="180">
           <template #default="{ row }">
             ¥{{ (row.priceFen / 100).toFixed(2) }}
             <template v-if="row.priceMaxFen !== row.priceFen">
@@ -75,12 +89,11 @@
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="库存" width="100">
+        <el-table-column label="库存" width="160">
           <template #default="{ row }">
             <div class="stock-info">
-            <span>可售: {{ row.available }}</span>
-              <span class="stock-reserved">预留: {{ row.reservedStock }}</span>
-              <span class="stock-sold">已售: {{ row.soldStock }}</span>
+            <span class="stock-available">可售 <strong>{{ row.available }}</strong></span>
+              <span class="stock-secondary">预留 {{ row.reservedStock }} · 已售 {{ row.soldStock }}</span>
             </div>
           </template>
         </el-table-column>
@@ -95,65 +108,64 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button type="primary" link size="small" @click="editProduct(row)">编辑</el-button>
-              <el-divider direction="vertical" />
-              <el-button
-                v-if="row.status !== 1"
-                type="success"
-                link
-                size="small"
-                @click="publishProduct(row)"
-              >
-                上架
-              </el-button>
-              <el-button
-                v-else
-                type="warning"
-                link
-                size="small"
-                @click="unpublishProduct(row)"
-              >
-                下架
-              </el-button>
-              <el-divider direction="vertical" />
-              <el-button type="danger" link size="small" @click="deleteProduct(row)">删除</el-button>
-            </div>
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="editProduct(row)" />
+              <template #more>
+                <el-dropdown-item v-if="row.status !== 1" @click="publishProduct(row)">上架商品</el-dropdown-item>
+                <el-dropdown-item v-else @click="unpublishProduct(row)">下架商品</el-dropdown-item>
+                <el-dropdown-item divided class="danger-menu-item" @click="deleteProduct(row)">删除商品</el-dropdown-item>
+                  </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-empty v-if="!loading && products.length === 0" description="暂无商品数据" />
     </div>
 
     <!-- 分页 -->
     <div class="pagination-wrapper">
-      <el-pagination
+
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @current-change="loadProducts"
-        @size-change="loadProducts"
-      />
+      :disabled="loading" @change="loadProducts" />
     </div>
 
     <!-- 新增/编辑商品对话框 -->
     <el-dialog
       v-model="productDialogVisible"
       :title="editingProductId ? '编辑商品' : '添加商品'"
-      width="700px"
+      width="min(1100px, 94vw)"
+      class="product-dialog"
+      :before-close="closeProductDialog"
+      top="5vh"
       :close-on-click-modal="false"
     >
+      <template #header>
+        <div class="editor-header"><div><h2>{{ editingProductId ? '编辑商品' : '新增商品' }}</h2><p>{{ editingProductId ? productForm.name : '完善商品信息，再配置售价与库存' }}</p></div><el-tag v-if="editingProductId" type="info" effect="plain">商品 #{{ editingProductId }}</el-tag></div>
+      </template>
       <el-form
         ref="productFormRef"
         :model="productForm"
         :rules="productRules"
-        label-width="100px"
+        label-position="top"
+        :disabled="submitting"
       >
+        <el-tabs v-model="editorTab" class="editor-tabs"><el-tab-pane label="商品信息" name="info" /><el-tab-pane :label="`规格与库存（${productForm.skus.length}）`" name="skus" /></el-tabs>
+        <div v-show="editorTab === 'info'" class="editor-info">
+          <section class="editor-info__main"><h3 class="editor-section-title">基本信息</h3>
+          <div class="form-grid">
+        <el-form-item label="商品名" prop="name">
+          <el-input
+            v-model="productForm.name"
+            placeholder="请输入商品名"
+            maxlength="100"
+          />
+        </el-form-item>
+
         <el-form-item label="分类" prop="categoryId">
           <el-select v-model="productForm.categoryId" placeholder="请选择分类" style="width: 100%">
             <el-option
@@ -165,14 +177,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="商品名" prop="name">
-          <el-input
-            v-model="productForm.name"
-            placeholder="请输入商品名"
-            maxlength="100"
-          />
-        </el-form-item>
-
+          </div>
         <el-form-item label="描述" prop="description">
           <el-input
             v-model="productForm.description"
@@ -183,55 +188,10 @@
           />
         </el-form-item>
 
-        <el-form-item label="商品规格" required>
-          <div class="sku-editor">
-            <el-table :data="productForm.skus" border size="small" style="width: 100%">
-              <el-table-column label="SKU 编码" min-width="130">
-                <template #default="{ row }">
-                  <el-input v-model="row.skuCode" placeholder="自动生成" />
-                </template>
-              </el-table-column>
-              <el-table-column label="规格属性 JSON" min-width="190">
-                <template #default="{ row }">
-                  <el-input
-                    v-model="row.specificationsText"
-                    placeholder='例如 {"颜色":"红色","尺寸":"M"}'
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="价格（元）" width="135">
-                <template #default="{ row }">
-                  <el-input-number v-model="row.priceYuan" :min="0.01" :step="0.01" :precision="2" />
-                </template>
-              </el-table-column>
-              <el-table-column label="总库存" width="115">
-                <template #default="{ row }">
-                  <el-input-number v-model="row.totalStock" :min="0" :step="1" />
-                </template>
-              </el-table-column>
-              <el-table-column label="启用" width="70" align="center">
-                <template #default="{ row }">
-                  <el-checkbox v-model="row.enabled" />
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="65" align="center">
-                <template #default="{ $index }">
-                  <el-button
-                    type="danger"
-                    link
-                    :disabled="productForm.skus.length <= 1"
-                    @click="productForm.skus.splice($index, 1)"
-                  >
-                    删除
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-            <el-button class="sku-editor__add" plain @click="addSku">添加 SKU</el-button>
-          </div>
-        </el-form-item>
-
-        <el-form-item label="商品图片" prop="images">
+          <el-form-item label="展示排序"><el-input-number v-model="productForm.sortOrder" :min="0" :precision="0" controls-position="right" /><span class="field-hint">数值越小，展示越靠前</span></el-form-item>
+          </section>
+          <aside class="editor-info__media">
+        <el-form-item label="图片与封面" prop="images">
           <div class="images-upload">
             <div class="images-list">
               <div
@@ -240,7 +200,9 @@
                 class="image-item"
               >
                 <el-image :src="img" class="image-preview" fit="cover" />
+                <span v-if="idx === 0" class="image-cover">封面</span>
                 <div class="image-actions">
+                  <el-button v-if="idx > 0" size="small" @click="setCover(idx)">设为封面</el-button>
                   <el-button
                     type="danger"
                     size="small"
@@ -254,6 +216,7 @@
 
             <div class="upload-area">
               <el-upload
+                :disabled="submitting || productForm.images.length >= 5"
                 :action="uploadAction"
                 :headers="uploadHeaders"
                 :show-file-list="false"
@@ -265,23 +228,63 @@
                 <el-button icon="Plus">上传图片</el-button>
               </el-upload>
               <div class="upload-tip">
-                支持 jpg/png/webp，最多 5 张，每张不超过 5MB
+                首张为封面 · 支持 jpg/png/webp · 最多 5 张 · 单张不超过 5MB
               </div>
             </div>
           </div>
         </el-form-item>
 
-        <el-form-item label="排序">
-          <el-input-number
-            v-model="productForm.sortOrder"
-            :min="0"
-            placeholder="排序值，数值越小越靠前"
-          />
-        </el-form-item>
+          </aside>
+        </div>
+        <section v-show="editorTab === 'skus'" class="editor-skus">
+          <div class="editor-skus__toolbar"><div><h3>规格与库存</h3><p>共 {{ productForm.skus.length }} 个规格，{{ productForm.skus.filter(sku => sku.enabled).length }} 个启用 · 点击行首箭头编辑属性</p></div><el-button type="primary" plain icon="Plus" @click="addSku">新增规格</el-button></div>
+          <el-table ref="skuTableRef" :data="productForm.skus" row-key="key" class="sku-edit-table" :row-class-name="skuRowClass">
+            <el-table-column type="expand" width="40">
+              <template #default="{ row: sku, $index: index }">
+                <div class="sku-property-editor">
+                  <div class="sku-property-editor__title">规格属性<span>例如：颜色 / 米白，尺寸 / 大号；无规格商品可留空</span></div>
+                  <div v-for="(attribute, attributeIndex) in sku.attributes" :key="attributeIndex" class="sku-attribute">
+                    <el-input v-model="attribute.name" placeholder="属性名，如颜色" maxlength="50" :aria-label="`规格 ${index + 1} 属性 ${attributeIndex + 1} 名称`" />
+                    <el-input v-model="attribute.value" placeholder="属性值，如米白" maxlength="100" :aria-label="`规格 ${index + 1} 属性 ${attributeIndex + 1} 值`" />
+                    <el-button link type="danger" @click="sku.attributes.splice(attributeIndex, 1)" :aria-label="`删除属性 ${attributeIndex + 1}`">移除</el-button>
+                  </div>
+                  <el-button link type="primary" icon="Plus" @click="sku.attributes.push({ name: '', value: '' })">添加属性</el-button>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="规格" min-width="230">
+              <template #default="{ row: sku }">
+                <button type="button" class="sku-name-button" :disabled="submitting" @click="skuTableRef?.toggleRowExpansion(sku)">{{ skuLabel(sku) }} <span>编辑属性</span></button>
+                <p v-if="skuErrors[sku.key]" class="sku-inline-error" role="alert">{{ skuErrors[sku.key] }}</p>
+              </template>
+            </el-table-column>
+            <el-table-column label="售价（元）" width="160"><template #default="{ row: sku, $index: index }"><el-input-number v-model="sku.priceYuan" :min="0.01" :step="1" :precision="2" controls-position="right" :aria-label="`规格 ${index + 1} 售价（元）`" /></template></el-table-column>
+            <el-table-column label="总库存" width="150"><template #default="{ row: sku, $index: index }"><el-input-number v-model="sku.totalStock" :min="sku.reservedStock + sku.soldStock" :step="1" :precision="0" controls-position="right" :aria-label="`规格 ${index + 1} 总库存`" /><p class="sku-stock-hint">预留 {{ sku.reservedStock }} · 已售 {{ sku.soldStock }}</p></template></el-table-column>
+            <el-table-column label="可售" width="75"><template #default="{ row: sku }"><strong class="sku-available">{{ sku.enabled ? Math.max(0, (sku.totalStock || 0) - sku.reservedStock - sku.soldStock) : 0 }}</strong></template></el-table-column>
+            <el-table-column label="启用" width="70"><template #default="{ row: sku, $index: index }"><el-switch v-model="sku.enabled" :aria-label="`规格 ${index + 1} 启用状态`" /></template></el-table-column>
+            <el-table-column label="操作" width="76" fixed="right" align="center">
+              <template #default="{ row: sku, $index: index }">
+                <el-dropdown trigger="click" :disabled="submitting">
+                  <el-button link :disabled="submitting" :aria-label="`规格 ${index + 1} 更多操作`">更多</el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item :disabled="submitting" @click="copySku(sku)">复制规格</el-dropdown-item>
+                      <el-dropdown-item divided class="danger-menu-item" :disabled="submitting || productForm.skus.length <= 1 || sku.reservedStock + sku.soldStock > 0" @click="removeSku(index)">删除规格</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </template>
+            </el-table-column>
+          </el-table>
+          <p class="editor-note">总库存包含可售、预留与已售数量；有订单的规格建议停用。修改规格不会改变历史订单快照。</p>
+        </section>
       </el-form>
 
       <template #footer>
-        <el-button @click="productDialogVisible = false">取消</el-button>
+        <span class="dialog-footer-hint">{{ formDirty ? '有未保存的修改' : '修改保存后生效' }}</span>
+        <el-button v-if="editorTab === 'info'" :disabled="submitting" @click="editorTab = 'skus'">配置规格</el-button>
+        <el-button v-else :disabled="submitting" @click="editorTab = 'info'">商品信息</el-button>
+        <el-button :disabled="submitting" @click="closeProductDialog()">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="submitProduct">保存</el-button>
       </template>
     </el-dialog>
@@ -289,10 +292,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox, type FormInstance, type TableInstance } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { shopApi, type ShopProduct, type ShopCategory, type ProductSkuInput } from '@/api/shop'
+
+const listError = ref('')
+
 
 const authStore = useAuthStore()
 const productFormRef = ref<FormInstance>()
@@ -304,38 +315,65 @@ const pageSize = ref(20)
 const total = ref(0)
 const keyword = ref('')
 const selectedCategoryId = ref<number | ''>('')
+const selectedStatus = ref<number | ''>('')
 
 const categories = ref<ShopCategory[]>([])
 const products = ref<ShopProduct[]>([])
 
 const productDialogVisible = ref(false)
 const editingProductId = ref<number | null>(null)
+const formBaseline = ref('')
+const skuErrors = ref<Record<number, string>>({})
+const editorTab = ref('info')
+const skuTableRef = ref<TableInstance>()
+
+async function closeProductDialog(done?: () => void) {
+  if (submitting.value) return
+  if (formDirty.value) {
+    try {
+      await ElMessageBox.confirm('修改尚未保存，关闭后将丢失本次修改。', '放弃修改？', { type: 'warning', confirmButtonText: '放弃修改', cancelButtonText: '继续编辑' })
+    } catch { return }
+  }
+  if (done) done()
+  else productDialogVisible.value = false
+}
 
 type SkuFormRow = {
   id?: string
   skuCode: string
-  specificationsText: string
+  key: number
+  attributes: { name: string; value: string }[]
+  reservedStock: number
+  soldStock: number
   priceYuan: number
   totalStock: number
   enabled: boolean
+}
+
+function skuRowClass({ row }: { row: SkuFormRow }) {
+  return skuErrors.value[row.key] ? 'sku-error-row' : ''
+}
+
+function skuLabel(sku: SkuFormRow) {
+  return sku.attributes.map(item => item.value.trim()).filter(Boolean).join(' / ') || '默认规格'
+}
+
+let skuKey = 0
+function newSku(): SkuFormRow {
+  return { key: ++skuKey, skuCode: '', attributes: [], priceYuan: 0.01, totalStock: 0, reservedStock: 0, soldStock: 0, enabled: true }
 }
 
 const defaultProductForm = () => ({
   categoryId: categories.value[0]?.id || 0,
   name: '',
   description: '',
-  skus: [{
-    skuCode: '',
-    specificationsText: '{}',
-    priceYuan: 0.01,
-    totalStock: 0,
-    enabled: true,
-  }] as SkuFormRow[],
+  skus: [newSku()],
   images: [] as string[],
   sortOrder: 0,
 })
 
 const productForm = reactive(defaultProductForm())
+const formDirty = computed(() => JSON.stringify(productForm) !== formBaseline.value)
 
 const productRules = {
   categoryId: [{ required: true, message: '请选择分类', trigger: 'change' }],
@@ -382,16 +420,19 @@ async function loadCategories() {
 
 async function loadProducts() {
   loading.value = true
+  listError.value = ''
   try {
     const result = await shopApi.listProducts({
       page: page.value,
       pageSize: pageSize.value,
       categoryId: selectedCategoryId.value || undefined,
       keyword: keyword.value || undefined,
+      status: selectedStatus.value === '' ? undefined : selectedStatus.value,
     })
     products.value = result.list
     total.value = result.total
   } catch (error) {
+    listError.value = '列表加载失败，请重试'
     ElMessage.error('加载商品列表失败')
   } finally {
     loading.value = false
@@ -406,6 +447,7 @@ function handleSearch() {
 function resetSearch() {
   keyword.value = ''
   selectedCategoryId.value = ''
+  selectedStatus.value = ''
   handleSearch()
 }
 
@@ -419,7 +461,10 @@ function openProductDialog(row?: ShopProduct) {
       skus: row.skus.map((sku) => ({
         id: String(sku.id),
         skuCode: sku.skuCode,
-        specificationsText: JSON.stringify(sku.specifications),
+        key: ++skuKey,
+        attributes: Object.entries(sku.specifications).map(([name, value]) => ({ name, value })),
+        reservedStock: sku.reservedStock,
+        soldStock: sku.soldStock,
         priceYuan: sku.priceFen / 100,
         totalStock: sku.totalStock,
         enabled: sku.enabled,
@@ -430,18 +475,41 @@ function openProductDialog(row?: ShopProduct) {
   } else {
     Object.assign(productForm, defaultProductForm())
   }
+  editorTab.value = 'info'
+  skuErrors.value = {}
+  formBaseline.value = JSON.stringify(productForm)
   productDialogVisible.value = true
   productFormRef.value?.clearValidate()
 }
 
 function addSku() {
+  const sku = newSku()
+  sku.attributes = [{ name: '规格', value: '' }]
+  productForm.skus.push(sku)
+  nextTick(() => skuTableRef.value?.toggleRowExpansion(sku, true))
+}
+
+function copySku(sku: SkuFormRow) {
   productForm.skus.push({
-    skuCode: '',
-    specificationsText: JSON.stringify({ 规格: `规格${productForm.skus.length + 1}` }),
-    priceYuan: 0.01,
-    totalStock: 0,
-    enabled: true,
+    ...newSku(),
+    attributes: sku.attributes.map(attribute => ({ ...attribute })),
+    priceYuan: sku.priceYuan,
+    totalStock: sku.totalStock,
+    enabled: sku.enabled,
   })
+  ElMessage.info('已复制，请修改属性值以区分新规格')
+}
+
+async function removeSku(index: number) {
+  const sku = productForm.skus[index]
+  if (!sku || productForm.skus.length <= 1 || sku.reservedStock + sku.soldStock > 0) return
+  try {
+    await ElMessageBox.confirm('删除后将在保存时移除此规格；有历史订单的规格可能无法删除，建议停用。', '删除规格', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '保留' })
+    const currentIndex = productForm.skus.indexOf(sku)
+    if (currentIndex >= 0 && productForm.skus.length > 1) productForm.skus.splice(currentIndex, 1)
+  } catch {
+    // 取消删除时保留规格。
+  }
 }
 
 function beforeImageUpload(file: any) {
@@ -474,14 +542,25 @@ function handleImageUploadError() {
   ElMessage.error('图片上传失败')
 }
 
+function setCover(index: number) {
+  const [image] = productForm.images.splice(index, 1)
+  productForm.images.unshift(image)
+}
+
 function removeImage(index: number) {
   productForm.images.splice(index, 1)
 }
 
 async function submitProduct() {
-  await productFormRef.value?.validate()
+  if (submitting.value) return
+  if (!await productFormRef.value?.validate().catch(async () => {
+    editorTab.value = 'info'
+    await nextTick()
+    document.querySelector('.product-dialog .is-error input')?.scrollIntoView({ block: 'center' })
+    return false
+  })) return
 
-  // Validate images
+  // 保存前校验必填图片。
   if (!productForm.images || productForm.images.length === 0) {
     ElMessage.error('请至少上传一张商品图片')
     return
@@ -489,17 +568,33 @@ async function submitProduct() {
 
   submitting.value = true
   try {
-    const skus: ProductSkuInput[] = productForm.skus.map((sku) => {
-      let specifications: Record<string, string>
-      try {
-        const parsed = JSON.parse(sku.specificationsText || '{}')
-        if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
-          throw new Error('规格属性必须是 JSON 对象')
-        }
-        specifications = parsed
-      } catch {
-        throw new Error('规格属性格式错误，请输入 JSON 对象')
+    skuErrors.value = {}
+    const combinations = new Set<string>()
+    const codes = new Set<string>()
+    const skus: ProductSkuInput[] = productForm.skus.map((sku, index) => {
+      const prefix = `规格 ${index + 1}：`
+      const invalid = (message: string): never => {
+        skuErrors.value[sku.key] = message
+        editorTab.value = 'skus'
+        nextTick(() => {
+          skuTableRef.value?.toggleRowExpansion(sku, true)
+          document.querySelector('.product-dialog .sku-error-row')?.scrollIntoView({ block: 'center' })
+        })
+        throw new Error(prefix + message)
       }
+      const entries = sku.attributes.map(attribute => [attribute.name.trim(), attribute.value.trim()] as const)
+      if (entries.some(([name, value]) => !name || !value)) invalid('请填写完整的属性名和属性值，或移除空属性')
+      if (new Set(entries.map(([name]) => name)).size !== entries.length) invalid('属性名不能重复')
+      entries.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+      const specifications = Object.fromEntries(entries)
+      const combination = JSON.stringify(specifications)
+      if (combinations.has(combination)) invalid('规格组合重复，请修改属性值')
+      combinations.add(combination)
+      const code = sku.skuCode.trim()
+      if (code && codes.has(code)) invalid('规格编码重复')
+      if (code) codes.add(code)
+      if (!Number.isFinite(sku.priceYuan) || sku.priceYuan < 0.01) invalid('售价至少为 0.01 元')
+      if (!Number.isSafeInteger(sku.totalStock) || sku.totalStock < sku.reservedStock + sku.soldStock) invalid('总库存不能低于预留与已售之和')
       return {
         id: sku.id,
         skuCode: sku.skuCode.trim() || undefined,
@@ -569,8 +664,8 @@ async function deleteProduct(row: ShopProduct) {
     await shopApi.deleteProduct(row.id)
     ElMessage.success('商品已删除')
     await loadProducts()
-  } catch (error) {
-    // User cancel
+  } catch (error: any) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error?.message || '删除失败')
   }
 }
 
@@ -583,106 +678,52 @@ onMounted(async () => {
 <style lang="scss" scoped>
 @use '@/styles/variables.scss' as *;
 
-.shop-product-mgr {
-  display: flex;
-  flex-direction: column;
-  gap: $space-16;
-}
+:global(.danger-menu-item:not(.is-disabled)) { color: #d92d20; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.list-count { margin-right: auto; color: $color-text-secondary; font-size: 13px; }
+.sku-preview { padding: 16px 28px; background: $color-surface-soft; }
+.stock-available { color: $color-text; font-size: 14px; }
+.stock-available strong { color: $color-primary; font-size: 18px; font-variant-numeric: tabular-nums; }
+.stock-secondary { color: $color-text-secondary; }
+.editor-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-right: 30px; }
+.editor-header h2 { margin: 0; font-size: 20px; font-weight: 600; }
+.editor-header p { margin: 5px 0 0; font-size: 12px; color: $color-text-secondary; }
+.editor-tabs { position: sticky; top: 0; z-index: 3; background: white; }
+.editor-tabs :deep(.el-tabs__header) { margin-bottom: 24px; }
+.editor-info { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; }
+.editor-info__media { border-left: 1px solid $color-border; padding-left: 24px; }
+.editor-section-title, .editor-skus__toolbar h3 { margin: 0 0 18px; font-size: 14px; font-weight: 600; }
+.form-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; }
+.field-hint, .editor-note { font-size: 12px; color: $color-text-secondary; }
+.field-hint { margin-left: 12px; }
+.editor-skus__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.editor-skus__toolbar h3 { margin-bottom: 5px; }
+.editor-skus__toolbar p, .sku-stock-hint { margin: 0; font-size: 12px; color: $color-text-secondary; }
+.sku-edit-table { border: 1px solid $color-border; border-radius: 8px; }
+.sku-edit-table :deep(.el-table__cell) { padding: 14px 0; vertical-align: top; }
+.sku-edit-table :deep(.el-input-number) { width: 100%; }
+.sku-edit-table :deep(.el-table__header th) { background: $color-surface-soft; }
+.sku-edit-table :deep(.sku-error-row) { --el-table-tr-bg-color: #fff5f4; }
+.sku-name-button { display: flex; justify-content: space-between; width: 100%; padding: 0; margin: 0 0 8px; border: 0; background: transparent; font: inherit; color: $color-text; font-weight: 600; text-align: left; cursor: pointer; }
+.sku-name-button span { color: $color-primary; font-weight: 400; font-size: 11px; }
+.sku-stock-hint { margin-top: 8px; }
+.sku-available { color: $color-primary; font-variant-numeric: tabular-nums; }
+.sku-inline-error { margin: 6px 0 0; color: $color-danger; font-size: 12px; line-height: 1.5; }
+.sku-property-editor { padding: 18px 36px; background: $color-surface-soft; }
+.sku-property-editor__title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.sku-property-editor__title span { margin-left: 12px; font-size: 12px; font-weight: 400; color: $color-text-secondary; }
+.sku-attribute { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; max-width: 600px; }
+.sku-attribute :deep(.el-input) { flex: 1; min-width: 0; }
+.editor-note { line-height: 1.7; margin: 14px 0 0; }
+.dialog-footer-hint { margin-right: auto; font-size: 12px; color: $color-text-secondary; }
+.image-cover { position: absolute; top: 6px; left: 6px; color: white; background: $color-primary; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+:global(.product-dialog) { display: flex; flex-direction: column; height: min(740px, 90vh); padding: 0; overflow: hidden; border-radius: 12px; }
+:global(.product-dialog .el-dialog__header) { margin: 0; padding: 20px 24px; border-bottom: 1px solid #e5e7eb; }
+:global(.product-dialog .el-dialog__body) { flex: 1; overflow-y: auto; min-height: 0; padding: 0 24px 24px; background: white; }
+:global(.product-dialog .el-dialog__footer) { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid #e5e7eb; background: #f8fafc; }
+@media (max-width: 767px) { .editor-info, .form-grid { grid-template-columns: 1fr; } .editor-info { gap: 16px; } .editor-info__media { border-left: 0; padding-left: 0; } .dialog-footer-hint { display: none; } .sku-property-editor { padding: 12px; } }
 
-.sku-editor {
-  width: 100%;
-
-  &__add {
-    margin-top: 10px;
-  }
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $space-16;
-  background: $color-bg-white;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  padding: $space-16;
-  flex-wrap: wrap;
-
-  &__left {
-    display: flex;
-    align-items: center;
-    gap: $space-12;
-    flex: 1;
-    min-width: 300px;
-  }
-
-  &__search {
-    display: flex;
-    align-items: center;
-    gap: $space-12;
-    flex: 1;
-    min-width: 300px;
-
-    :deep(.el-input) {
-      .el-input__wrapper {
-        background: $color-surface-soft;
-
-        &:hover {
-          border-color: $color-primary;
-        }
-      }
-    }
-  }
-
-  &__right {
-    display: flex;
-    align-items: center;
-    gap: $space-12;
-    flex-wrap: wrap;
-
-    :deep(.el-select) {
-      .el-input__wrapper {
-        background: $color-surface-soft;
-
-        &:hover {
-          border-color: $color-primary;
-        }
-      }
-    }
-  }
-}
-
-.table-wrapper {
-  background: $color-bg-white;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  overflow: hidden;
-  box-shadow: $shadow-sm;
-
-  :deep(.el-table) {
-    --el-table-border-color: #{$color-border};
-    --el-table-header-bg-color: #{$color-surface-soft};
-    --el-table-header-text-color: #{$color-text};
-    --el-table-row-hover-bg-color: #{$color-bg-hover};
-
-    thead {
-      background: $color-surface-soft;
-
-      th {
-        background: $color-surface-soft;
-        font-weight: 600;
-        color: $color-text;
-        border-bottom: 1px solid $color-border;
-      }
-    }
-
-    tbody tr {
-      &:hover > td {
-        background: $color-bg-hover !important;
-      }
-    }
-  }
-}
+.shop-product-mgr { display: flex; flex-direction: column; gap: $space-16; }
 
 .product-item {
   display: flex;
@@ -750,48 +791,6 @@ onMounted(async () => {
   }
 }
 
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: $space-8;
-  justify-content: center;
-
-  :deep(.el-button) {
-    padding: 0;
-    height: auto;
-    font-size: $font-size-sm;
-
-    &.is-link {
-      text-decoration: none;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-
-  :deep(.el-divider--vertical) {
-    margin: 0 $space-6;
-    background-color: $color-border;
-  }
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  padding: $space-16;
-  background: $color-bg-white;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-
-  :deep(.el-pagination) {
-    --el-pagination-font-size: #{$font-size-sm};
-    --el-pagination-bg-color: transparent;
-    --el-pagination-button-bg-color: #{$color-surface-soft};
-    --el-pagination-button-disabled-bg-color: #{$color-bg};
-  }
-}
-
 :deep(.el-dialog) {
   .el-dialog__header {
     background: $color-surface-soft;
@@ -814,7 +813,7 @@ onMounted(async () => {
 
   .images-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: $space-12;
   }
 
@@ -840,8 +839,12 @@ onMounted(async () => {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(0, 0, 0, 0.6);
-      opacity: 0;
+      background: rgba(0, 0, 0, 0.55);
+      top: auto;
+      padding: 4px;
+      gap: 4px;
+      flex-wrap: wrap;
+      opacity: 1;
       transition: opacity 0.3s;
 
       :deep(.el-button) {

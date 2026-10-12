@@ -29,6 +29,9 @@ packages/*/node_modules
 apps/miniapp/unpackage
 apps/api/.env
 .env.production
+# 前端生产配置仅包含公开 API 地址，需要随代码发布。
+!apps/admin/.env.production
+!apps/miniapp/.env.production
 apps/api/uploads
 apps/admin/.env
 *.tsbuildinfo

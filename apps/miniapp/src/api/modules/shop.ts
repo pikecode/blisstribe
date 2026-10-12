@@ -51,6 +51,7 @@ export interface ShopProductListResult {
 }
 
 export interface ShopOrder {
+  refunds?: Array<{ id: string; status: string; createdAt: string }>
   id: string
   orderNo: string
   userId: string
@@ -206,13 +207,20 @@ export const shopApi = {
       method: 'POST',
       data: { code },
     })
-    if (result.mock) return result
+    if (result.mock) return { ...result, paymentStatus: result.status === 'paid' ? 'paid' : 'unpaid' }
 
     if (!result.paymentParams) throw new Error('支付参数缺失')
-    await uni.requestPayment({
-      provider: 'wxpay',
-      ...result.paymentParams,
+    let paymentError: unknown
+    try {
+      await uni.requestPayment({ provider: 'wxpay', ...result.paymentParams })
+    } catch (error) {
+      paymentError = error
+    }
+    const confirmed = await request<{ paymentStatus: string }>({
+      url: `/shop/orders/${orderId}/payment/query`,
+      method: 'POST',
     })
-    return result
+    if (confirmed.paymentStatus !== 'paid' && paymentError) throw paymentError
+    return { ...result, paymentStatus: confirmed.paymentStatus }
   },
 }

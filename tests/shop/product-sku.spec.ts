@@ -17,6 +17,7 @@ import { ProductService } from '../../apps/api/src/shop/product/product.service'
 describe('ProductService SKU validation', () => {
   const productRepository: any = {
     create: jest.fn(),
+    findWithPagination: jest.fn(),
   }
   const categoryRepository: any = {
     findById: jest.fn(),
@@ -33,6 +34,14 @@ describe('ProductService SKU validation', () => {
       images: [],
       skus: [],
     })
+  })
+
+  it('状态筛选保留草稿状态 0 并传递到分页查询', async () => {
+    productRepository.findWithPagination.mockResolvedValue({ list: [], total: 0 })
+    await service.getAllProducts({ page: 1, pageSize: 20, status: 0 })
+    expect(productRepository.findWithPagination).toHaveBeenCalledWith(expect.objectContaining({ status: 0 }))
+    await service.getAllProducts({ page: 1, pageSize: 20 })
+    expect(productRepository.findWithPagination).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined }))
   })
 
   it('规范化属性并创建 SKU', async () => {

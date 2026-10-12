@@ -13,7 +13,7 @@
         </div>
       </div>
 
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-input
           v-model="keyword"
           placeholder="搜索主体名称、编号"
@@ -30,9 +30,12 @@
         </el-select>
         <el-button type="primary" @click="handleSearch">搜索</el-button>
         <el-button @click="resetSearch">重置</el-button>
-      </div>
+      </AdminListToolbar>
 
-      <el-table v-if="!isMobile" :data="list" v-loading="loading" stripe>
+      <el-alert v-if="isMobile && listError" :title="listError" type="error" :closable="false" show-icon>
+        <el-button link type="primary" :disabled="loading" @click="loadList">重新加载</el-button>
+      </el-alert>
+      <AdminListTable v-if="!isMobile" :data="list" :loading="loading" :error="listError" @retry="loadList">
         <el-table-column prop="partnerNo" label="主体编号" width="150" />
         <el-table-column prop="displayName" label="主体名称" min-width="160" />
         <el-table-column label="类型" width="120">
@@ -52,46 +55,40 @@
         <el-table-column prop="createdAt" label="申请时间" width="180">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" type="primary" plain @click="openDetail(row)">详情</el-button>
-              <el-button
+            <AdminListActions :show-more="[PartnerStatus.PENDING, PartnerStatus.ACTIVE, PartnerStatus.FROZEN].includes(row.status)">
+              <AdminListAction label="详情" icon="View" @click="openDetail(row)" />
+              <template #more>
+                <el-dropdown-item
                 v-if="row.status === PartnerStatus.PENDING"
-                size="small"
-                type="success"
                 @click="approvePartner(row)"
               >
                 审核通过
-              </el-button>
-              <el-button
+              </el-dropdown-item>
+                <el-dropdown-item
                 v-if="row.status === PartnerStatus.PENDING"
-                size="small"
-                type="danger"
                 @click="rejectPartner(row)"
-              >
+               class="admin-list-danger">
                 审核驳回
-              </el-button>
-              <el-button
+              </el-dropdown-item>
+                <el-dropdown-item
                 v-if="row.status === PartnerStatus.ACTIVE"
-                size="small"
-                type="warning"
                 @click="freezePartner(row)"
-              >
+               class="admin-list-danger">
                 冻结
-              </el-button>
-              <el-button
+              </el-dropdown-item>
+                <el-dropdown-item
                 v-if="row.status === PartnerStatus.FROZEN"
-                size="small"
-                type="success"
                 @click="unfreezePartner(row)"
               >
                 解冻
-              </el-button>
-            </div>
+              </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
       <div v-else v-loading="loading" class="partner-cards">
         <div v-for="row in list" :key="row.id" class="partner-card">
@@ -158,14 +155,11 @@
         </div>
       </div>
 
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        layout="total, prev, pager, next"
-        @current-change="loadList"
-        class="page-pager"
-      />
+      :disabled="loading" @change="loadList" />
     </el-card>
 
     <el-drawer v-model="detailVisible" title="B 入驻审核详情" size="820px">
@@ -229,7 +223,7 @@
           <div class="partner-drawer__toolbar">
             <el-button type="primary" @click="transferDialogVisible = true">手动调整客户归属</el-button>
           </div>
-          <el-table :data="customerList" v-loading="customerLoading" stripe>
+          <AdminListTable :data="customerList" :loading="customerLoading" :error="customerError" @retry="loadCustomers">
             <el-table-column label="客户" min-width="130">
               <template #default="{ row }">{{ row.nickname || '-' }}</template>
             </el-table-column>
@@ -252,15 +246,12 @@
             <el-table-column label="绑定时间" width="170">
               <template #default="{ row }">{{ formatDate(row.boundAt) }}</template>
             </el-table-column>
-          </el-table>
-          <el-pagination
+          </AdminListTable>
+          <AdminListPagination
             v-model:current-page="customerPage"
             v-model:page-size="customerPageSize"
             :total="customerTotal"
-            layout="total, prev, pager, next"
-            class="partner-drawer__pager"
-            @current-change="loadCustomers"
-          />
+          :disabled="customerLoading" @change="loadCustomers" />
         </el-tab-pane>
 
         <el-tab-pane label="邀请记录" name="invitations">
@@ -280,7 +271,7 @@
               <el-empty v-if="invitationCodes.length === 0" description="暂无邀请码" />
             </div>
 
-            <el-table :data="invitationRecords" stripe>
+            <AdminListTable :data="invitationRecords" :loading="invitationLoading" :error="invitationError" @retry="loadInvitations">
               <el-table-column prop="code" label="邀请码" width="120" />
               <el-table-column label="用户" min-width="130">
                 <template #default="{ row }">{{ row.userNickname || '-' }}</template>
@@ -301,15 +292,12 @@
               <el-table-column label="时间" width="170">
                 <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
               </el-table-column>
-            </el-table>
-            <el-pagination
+            </AdminListTable>
+            <AdminListPagination
               v-model:current-page="invitationPage"
               v-model:page-size="invitationPageSize"
               :total="invitationTotal"
-              layout="total, prev, pager, next"
-              class="partner-drawer__pager"
-              @current-change="loadInvitations"
-            />
+            :disabled="invitationLoading" @change="loadInvitations" />
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -351,6 +339,11 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { partnerApi } from '@/api/partner'
@@ -362,6 +355,10 @@ import {
   type PartnerStatusValue,
   type PartnerType,
 } from '@blisstribe/shared'
+
+const invitationError = ref('')
+const customerError = ref('')
+const listError = ref('')
 
 type TagType = '' | 'success' | 'warning' | 'danger' | 'info'
 
@@ -408,6 +405,7 @@ onUnmounted(() => window.removeEventListener('resize', updateWidth))
 
 const loadList = async (): Promise<void> => {
   loading.value = true
+  listError.value = ''
   try {
     const data = await partnerApi.list({
       page: page.value,
@@ -417,6 +415,8 @@ const loadList = async (): Promise<void> => {
     })
     list.value = data.list
     total.value = data.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }
@@ -469,6 +469,7 @@ const handleDetailTabChange = (name: string | number): void => {
 const loadCustomers = async (): Promise<void> => {
   if (!currentPartner.value) return
   customerLoading.value = true
+  customerError.value = ''
   try {
     const data = await partnerApi.customers(currentPartner.value.id, {
       page: customerPage.value,
@@ -476,6 +477,8 @@ const loadCustomers = async (): Promise<void> => {
     })
     customerList.value = data.list
     customerTotal.value = data.total
+  } catch {
+    customerError.value = '列表加载失败，请重试'
   } finally {
     customerLoading.value = false
   }
@@ -484,6 +487,7 @@ const loadCustomers = async (): Promise<void> => {
 const loadInvitations = async (): Promise<void> => {
   if (!currentPartner.value) return
   invitationLoading.value = true
+  invitationError.value = ''
   try {
     const data = await partnerApi.invitations(currentPartner.value.id, {
       page: invitationPage.value,
@@ -492,6 +496,8 @@ const loadInvitations = async (): Promise<void> => {
     invitationCodes.value = data.codes
     invitationRecords.value = data.records.list
     invitationTotal.value = data.records.total
+  } catch {
+    invitationError.value = '列表加载失败，请重试'
   } finally {
     invitationLoading.value = false
   }

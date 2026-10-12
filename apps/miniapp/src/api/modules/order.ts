@@ -17,6 +17,7 @@ export interface OrderItem {
 }
 
 export interface Order {
+  refunds?: Array<{ id: string; status: string; createdAt: string }>
   id: string
   orderNo: string
   userId: string

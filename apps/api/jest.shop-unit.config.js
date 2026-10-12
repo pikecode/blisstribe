@@ -6,6 +6,8 @@ module.exports = {
   rootDir: path.join(__dirname, '../..'),
   testMatch: [
     '**/tests/shop/payment-safety.spec.ts',
+    '**/tests/shop/payment-client.spec.ts',
+    '**/tests/shop/payment-webhooks.spec.ts',
     '**/tests/shop/payment-exception-review.spec.ts',
     '**/tests/shop/refund-recovery.spec.ts',
     '**/tests/shop/wechat-pay-adapter.spec.ts',

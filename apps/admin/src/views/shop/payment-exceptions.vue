@@ -1,12 +1,12 @@
 <template>
   <section class="exceptions">
-    <div class="toolbar">
-      <el-select v-model="status" clearable placeholder="全部状态" @change="load">
+    <AdminListToolbar>
+      <el-select v-model="status" clearable placeholder="全部状态" @change="handleSearch">
         <el-option label="待核查" value="pending_review" />
       </el-select>
       <el-button :icon="Refresh" @click="load">刷新</el-button>
-    </div>
-    <el-table :data="rows" v-loading="loading" row-key="id">
+    </AdminListToolbar>
+    <AdminListTable :data="rows" :loading="loading" row-key="id" :error="listError" @retry="load">
       <el-table-column prop="outTradeNo" label="商户订单号" min-width="170" />
       <el-table-column prop="wechatTransactionId" label="微信交易号" min-width="190" />
       <el-table-column label="金额" width="110" align="right">
@@ -22,20 +22,19 @@
         <template #default="{ row }">{{ resultLabel(row.reviews[0]?.channelCheckResult) }}</template>
       </el-table-column>
       <el-table-column prop="createdAt" label="发生时间" min-width="170" />
-      <el-table-column label="操作" width="110" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openReview(row)">记录核查</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-pagination
+      <el-table-column label="操作" width="88" fixed="right" align="center">
+          <template #default="{ row }">
+            <AdminListActions>
+              <AdminListAction label="记录核查" icon="DocumentChecked" @click="openReview(row)" />
+            </AdminListActions>
+          </template>
+        </el-table-column>
+    </AdminListTable>
+    <AdminListPagination
       v-model:current-page="page"
       v-model:page-size="pageSize"
       :total="total"
-      :page-sizes="[10, 20, 50]"
-      layout="total, sizes, prev, pager, next"
-      @change="load"
-    />
+    :disabled="loading" @change="load" />
     <el-dialog v-model="dialogVisible" title="记录渠道核查" width="520px">
       <div v-if="selected" class="review-context">
         <div>订单：{{ selected.order.orderNo }}</div>
@@ -69,10 +68,18 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { paymentExceptionApi, type ChannelCheckResult, type PaymentException } from '@/api/payment-exception'
+
+const listError = ref('')
+
 
 const rows = ref<PaymentException[]>([])
 const total = ref(0)
@@ -88,8 +95,14 @@ const form = reactive<{ channelCheckResult: ChannelCheckResult; resolutionNote: 
   resolutionNote: '',
 })
 
+function handleSearch() {
+  page.value = 1
+  load()
+}
+
 async function load() {
   loading.value = true
+  listError.value = ''
   try {
     const result = await paymentExceptionApi.list({
       page: page.value,
@@ -98,6 +111,8 @@ async function load() {
     })
     rows.value = result.list
     total.value = result.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }
@@ -138,7 +153,7 @@ onMounted(load)
 
 <style scoped>
 .exceptions { display: grid; gap: 16px; }
-.toolbar { display: flex; justify-content: flex-end; gap: 8px; }
+
 .review-context { display: grid; gap: 8px; margin-bottom: 18px; color: #606266; overflow-wrap: anywhere; }
 .review-history { padding-top: 8px; border-top: 1px solid #ebeef5; }
 </style>

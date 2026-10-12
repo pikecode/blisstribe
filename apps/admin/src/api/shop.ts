@@ -39,6 +39,7 @@ export interface ShopProduct {
   reservedStock: number
   soldStock: number
   skus: ShopProductSku[]
+  available: number
   status: number
   sortOrder: number
   createdAt: string
@@ -116,6 +117,7 @@ export const shopApi = {
     pageSize?: number
     categoryId?: number
     keyword?: string
+    status?: number
   }) {
     return request.get<ProductListResult>('/admin/shop/products', { params })
   },

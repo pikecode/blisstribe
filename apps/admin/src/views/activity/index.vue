@@ -11,7 +11,7 @@
         </div>
       </template>
 
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-input v-model="keyword" placeholder="搜索活动标题/说明" clearable style="width: 240px" @keyup.enter="handleSearch" />
         <el-select v-model="moduleId" placeholder="全部模块" clearable style="width: 150px">
           <el-option v-for="item in modules" :key="item.id" :label="item.name" :value="item.id" />
@@ -28,9 +28,9 @@
         </el-select>
         <el-button type="primary" @click="handleSearch">筛选</el-button>
         <el-button @click="resetSearch">重置</el-button>
-      </div>
+      </AdminListToolbar>
 
-      <el-table :data="activities" v-loading="loading" stripe>
+      <AdminListTable :data="activities" :loading="loading" :error="listError" @retry="loadActivities">
         <el-table-column label="活动" min-width="260">
           <template #default="{ row }">
             <div class="activity-info">
@@ -79,27 +79,24 @@
             <el-tag :type="statusType(row.status)">{{ activityStatusText(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openDialog(row)">编辑</el-button>
-              <el-button v-if="row.status !== 1" size="small" type="success" plain @click="publish(row)">发布</el-button>
-              <el-button v-else size="small" type="warning" plain @click="unpublish(row)">下线</el-button>
-            </div>
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="openDialog(row)" />
+              <template #more>
+                <el-dropdown-item v-if="row.status !== 1" @click="publish(row)">发布</el-dropdown-item>
+                <el-dropdown-item v-else @click="unpublish(row)">下线</el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        class="page-pager"
-        @current-change="loadActivities"
-        @size-change="loadActivities"
-      />
+      :disabled="loading" @change="loadActivities" />
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑活动' : '新增活动'" width="820px" :close-on-click-modal="false">
@@ -242,6 +239,11 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
@@ -249,6 +251,9 @@ import { activityApi, activityStatusText, activityTypeText, type Activity, type 
 import { productApi, type Product, type ProductModule, type TagDictionary } from '@/api/product'
 import { venueApi, weekdayText, type Venue } from '@/api/venue'
 import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
+
+const listError = ref('')
+
 
 type ActivityForm = Omit<ActivityPayload, 'startAt' | 'endAt' | 'registrationStartAt' | 'registrationEndAt'> & {
   activityTimeRange: string[]
@@ -348,6 +353,7 @@ async function loadOptions() {
 
 async function loadActivities() {
   loading.value = true
+  listError.value = ''
   try {
     const result = await activityApi.listActivities({
       page: page.value,
@@ -359,6 +365,8 @@ async function loadActivities() {
     })
     activities.value = result.list
     total.value = result.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }

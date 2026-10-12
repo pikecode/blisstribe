@@ -11,7 +11,7 @@
         </div>
       </template>
 
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-input
           v-model="keyword"
           placeholder="搜索分类名/编码"
@@ -31,9 +31,9 @@
         </el-select>
         <el-button type="primary" @click="loadCategories">搜索</el-button>
         <el-button @click="resetSearch">重置</el-button>
-      </div>
+      </AdminListToolbar>
 
-      <el-table :data="categories" v-loading="loading" stripe>
+      <AdminListTable :data="categories" :loading="loading" :error="listError" @retry="loadCategories">
         <el-table-column prop="name" label="分类名" min-width="150" />
         <el-table-column prop="code" label="编码" min-width="150" />
         <el-table-column prop="description" label="描述" min-width="200" />
@@ -46,22 +46,22 @@
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" min-width="160" />
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openDialog(row)">编辑</el-button>
-              <el-button
-                size="small"
-                :type="row.status === 1 ? 'warning' : 'success'"
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="openDialog(row)" />
+              <template #more>
+                <el-dropdown-item
                 @click="toggleStatus(row)"
               >
                 {{ row.status === 1 ? '禁用' : '启用' }}
-              </el-button>
-              <el-button size="small" type="danger" @click="deleteCategory(row)">删除</el-button>
-            </div>
+              </el-dropdown-item>
+                <el-dropdown-item @click="deleteCategory(row)" class="admin-list-danger">删除</el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
     </el-card>
 
     <el-dialog
@@ -109,10 +109,17 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { shopApi, type ShopCategory } from '@/api/shop'
 import type { FormInstance } from 'element-plus'
+
+const listError = ref('')
+
 
 const categories = ref<ShopCategory[]>([])
 const loading = ref(false)
@@ -158,6 +165,7 @@ const rules = {
 
 async function loadCategories() {
   loading.value = true
+  listError.value = ''
   try {
     categories.value = await shopApi.listCategories()
     if (keyword.value || status.value !== '') {
@@ -170,6 +178,8 @@ async function loadCategories() {
         return matchKeyword && matchStatus
       })
     }
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }
@@ -304,9 +314,4 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-.table-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 </style>

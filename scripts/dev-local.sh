@@ -55,5 +55,16 @@ pnpm --filter @blisstribe/api exec prisma migrate deploy
 pnpm db:generate
 pnpm --filter @blisstribe/shared build
 
-log '启动 API（:4000）和管理后台（:5174）；按 Ctrl+C 停止'
-exec pnpm dev
+# 先等待 API 监听端口，再请求代理，避免启动期间反复触发连接拒绝日志。
+READY_COMMAND='pnpm exec wait-on --timeout 120000 tcp:127.0.0.1:4000 && pnpm exec wait-on --timeout 120000 http-get://localhost:5174 http-get://localhost:5174/api/v1/agreements/current/user && printf "\n========== 本地系统已就绪 ==========\n管理后台：http://localhost:5174\nAPI：http://127.0.0.1:4000/api/v1\n按 Ctrl+C 停止应用\n====================================\n"'
+DEV_COMMANDS=("pnpm dev:api" "pnpm dev:admin")
+DEV_NAMES='api,admin'
+if [[ "${1:-}" == '--all' ]]; then
+  log '启动 API、管理后台和小程序编译；按 Ctrl+C 停止应用（数据库服务保留）'
+  log '微信开发者工具导入：apps/miniapp/dist/dev/mp-weixin'
+  DEV_COMMANDS+=("pnpm dev:miniapp")
+  DEV_NAMES+=',miniapp'
+fi
+# 就绪提示正常退出时保留应用；启动失败或超时则停止其他进程。
+exec pnpm exec concurrently --kill-others-on-fail -n "$DEV_NAMES,ready" \
+  "${DEV_COMMANDS[@]}" "$READY_COMMAND"

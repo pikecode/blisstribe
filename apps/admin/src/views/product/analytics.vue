@@ -11,7 +11,7 @@
         </div>
       </template>
 
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-select v-model="filters.moduleId" placeholder="全部模块" clearable style="width: 170px">
           <el-option v-for="item in modules" :key="item.id" :label="item.name" :value="item.id" />
         </el-select>
@@ -34,7 +34,7 @@
         />
         <el-button type="primary" @click="handleSearch">筛选</el-button>
         <el-button @click="resetSearch">重置</el-button>
-      </div>
+      </AdminListToolbar>
 
       <div class="metric-grid" v-loading="loading">
         <div v-for="item in metrics" :key="item.label" class="metric-item">
@@ -45,7 +45,7 @@
       </div>
 
       <div class="section-title">产品转化排行</div>
-      <el-table :data="analytics.productStats" v-loading="loading" stripe>
+      <AdminListTable :data="analytics.productStats" :loading="loading" :error="listError" @retry="loadAnalytics">
         <el-table-column label="产品" min-width="220">
           <template #default="{ row }">
             <div class="product-title">{{ row.product?.title || `产品 #${row.productId}` }}</div>
@@ -65,10 +65,10 @@
         <el-table-column label="线索率" width="110" sortable prop="leadRate">
           <template #default="{ row }">{{ row.leadRate }}%</template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
       <div class="section-title">活动报名排行</div>
-      <el-table :data="analytics.activityStats" v-loading="loading" stripe>
+      <AdminListTable :data="analytics.activityStats" :loading="loading">
         <el-table-column label="活动" min-width="220">
           <template #default="{ row }">
             <div class="product-title">{{ row.activity?.title || `活动 #${row.activityId}` }}</div>
@@ -82,34 +82,39 @@
         <el-table-column label="报名率" width="110" sortable prop="registrationRate">
           <template #default="{ row }">{{ row.registrationRate }}%</template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
       <div class="section-title">来源场景转化</div>
-      <el-table :data="analytics.sourceStats" v-loading="loading" stripe>
+      <AdminListTable :data="analytics.sourceStats" :loading="loading">
         <el-table-column prop="key" label="来源场景" min-width="180" />
         <el-table-column prop="impressions" label="曝光" />
         <el-table-column prop="clicks" label="点击" />
         <el-table-column prop="leads" label="线索" />
         <el-table-column prop="activityRegistrations" label="活动报名" />
-      </el-table>
+      </AdminListTable>
 
       <div class="section-title">每日趋势</div>
-      <el-table :data="analytics.trend" v-loading="loading" stripe>
+      <AdminListTable :data="analytics.trend" :loading="loading">
         <el-table-column prop="date" label="日期" min-width="140" />
         <el-table-column prop="impressions" label="曝光" />
         <el-table-column prop="clicks" label="点击" />
         <el-table-column prop="assessments" label="评估" />
         <el-table-column prop="leads" label="线索" />
         <el-table-column prop="activityRegistrations" label="活动报名" />
-      </el-table>
+      </AdminListTable>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { productApi, productTypeText, type ProductModule, type RecommendationAnalytics } from '@/api/product'
+
+const listError = ref('')
+
 
 const emptyAnalytics = (): RecommendationAnalytics => ({
   overview: {
@@ -170,6 +175,7 @@ async function loadModules() {
 
 async function loadAnalytics() {
   loading.value = true
+  listError.value = ''
   try {
     analytics.value = await productApi.analytics({
       moduleId: filters.moduleId,
@@ -179,6 +185,7 @@ async function loadAnalytics() {
       endDate: dateRange.value ? dateRange.value[1] : undefined,
     })
   } catch {
+    listError.value = '列表加载失败，请重试'
     ElMessage.error('推荐效果加载失败')
   } finally {
     loading.value = false

@@ -151,3 +151,21 @@ describe('OrderService SKU checkout', () => {
     })
   })
 })
+
+describe('发货与退款互斥', () => {
+  it('退款处理中不允许发货', async () => {
+    const tx: any = {
+      $queryRaw: jest.fn(async () => []),
+      shopOrder: {
+        findUnique: jest.fn(async () => ({ paymentStatus: 'paid', fulfillmentStatus: 'pending' })),
+        update: jest.fn(),
+      },
+      shopRefund: { findFirst: jest.fn(async () => ({ status: 'processing' })) },
+    }
+    const prisma: any = { $transaction: jest.fn(async (callback: any) => callback(tx)) }
+    const service = new OrderService(prisma, {} as never, {} as never, {} as never)
+    await expect(service.shipOrder(10n, { trackingNo: 'TEST' })).rejects.toThrow('进行中的退款')
+    expect(tx.shopOrder.update).not.toHaveBeenCalled()
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1)
+  })
+})

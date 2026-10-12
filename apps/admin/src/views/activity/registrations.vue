@@ -11,7 +11,7 @@
         </div>
       </template>
 
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-input v-model="keyword" placeholder="搜索活动/用户/留言" clearable style="width: 240px" @keyup.enter="handleSearch" />
         <el-select v-model="activityId" placeholder="全部活动" clearable filterable style="width: 240px">
           <el-option v-for="item in activities" :key="item.id" :label="item.title" :value="item.id" />
@@ -21,9 +21,9 @@
         </el-select>
         <el-button type="primary" @click="handleSearch">筛选</el-button>
         <el-button @click="resetSearch">重置</el-button>
-      </div>
+      </AdminListToolbar>
 
-      <el-table :data="registrations" v-loading="loading" stripe>
+      <AdminListTable :data="registrations" :loading="loading" :error="listError" @retry="loadRegistrations">
         <el-table-column label="活动" min-width="220">
           <template #default="{ row }">
             <div class="table-title">{{ row.activity.title }}</div>
@@ -54,26 +54,23 @@
         <el-table-column label="报名时间" width="170">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="170" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openDetail(row)">详情</el-button>
-              <el-button size="small" type="primary" plain @click="openStatusDialog(row)">处理</el-button>
-            </div>
+            <AdminListActions>
+              <AdminListAction label="详情" icon="View" @click="openDetail(row)" />
+              <template #more>
+                <el-dropdown-item @click="openStatusDialog(row)">处理</el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        class="page-pager"
-        @current-change="loadRegistrations"
-        @size-change="loadRegistrations"
-      />
+      :disabled="loading" @change="loadRegistrations" />
     </el-card>
 
     <el-dialog v-model="statusDialogVisible" title="处理报名" width="520px">
@@ -130,6 +127,11 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -139,6 +141,8 @@ import {
   type ActivityRegistration,
   type ActivityRegistrationStatus,
 } from '@/api/activity'
+
+const listError = ref('')
 
 const activities = ref<Activity[]>([])
 const registrations = ref<ActivityRegistration[]>([])
@@ -174,6 +178,7 @@ async function loadActivities() {
 
 async function loadRegistrations() {
   loading.value = true
+  listError.value = ''
   try {
     const result = await activityApi.listRegistrations({
       page: page.value,
@@ -184,6 +189,8 @@ async function loadRegistrations() {
     })
     registrations.value = result.list
     total.value = result.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }

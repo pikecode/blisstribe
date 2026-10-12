@@ -1,4 +1,6 @@
 import {
+  UnauthorizedException,
+  InternalServerErrorException,
   Controller,
   Post,
   Param,
@@ -23,6 +25,13 @@ export class PaymentController {
     private wechatPayService: WechatPayService,
     private authService: AuthService
   ) {}
+
+  @Post('orders/:id/payment/query')
+  @UseGuards(JwtAuthGuard)
+  async confirmPayment(@Param('id') id: string, @Req() req: Request) {
+    const userId = BigInt((req as Request & { user: { userId: string } }).user.userId)
+    return this.paymentService.confirmPayment(BigInt(id), userId)
+  }
 
   @Post('orders/:id/payment')
   @UseGuards(JwtAuthGuard)
@@ -58,9 +67,9 @@ export class PaymentWebhookController {
     try {
       // Get headers
       const headers = {
-        'wechat-pay-timestamp': req.get('wechat-pay-timestamp') || '',
-        'wechat-pay-nonce': req.get('wechat-pay-nonce') || '',
-        'wechat-pay-signature': req.get('wechat-pay-signature') || '',
+        'wechat-pay-timestamp': req.get('wechatpay-timestamp') || '',
+        'wechat-pay-nonce': req.get('wechatpay-nonce') || '',
+        'wechat-pay-signature': req.get('wechatpay-signature') || '',
         'wechat-pay-serial': req.get('wechatpay-serial') || '',
       }
 
@@ -71,10 +80,7 @@ export class PaymentWebhookController {
       const isValid = this.wechatPayService.verifyNotifySignature(rawBody, headers)
 
       if (!isValid) {
-        return {
-          code: 'INVALID_REQUEST_SIGNATURE',
-          message: '签名验证失败',
-        }
+        throw new UnauthorizedException('签名验证失败')
       }
 
       // Decrypt data via wechatPay.decryptNotify()
@@ -87,10 +93,8 @@ export class PaymentWebhookController {
       // Return success
       return { code: 'SUCCESS' }
     } catch (error) {
-      return {
-          code: 'FAIL',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
+      if (error instanceof UnauthorizedException) throw error
+      throw new InternalServerErrorException('微信通知处理失败，请重试')
     }
   }
 }

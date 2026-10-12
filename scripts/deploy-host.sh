@@ -41,21 +41,24 @@ rsync -az --delete \
 log "服务器安装依赖并构建"
 ssh "$SSH_HOST" "cd '$RELEASE_DIR' && \
   pnpm install --frozen-lockfile && \
-  pnpm --filter @blisstribe/shared build && \
   pnpm --filter @blisstribe/api exec prisma generate && \
+  pnpm --filter @blisstribe/shared build && \
   pnpm --filter @blisstribe/api build"
 
 if [ "$CUTOVER" = "1" ]; then
   log "执行数据库迁移"
-  ssh "$SSH_HOST" "cd '$RELEASE_DIR' && \
-    set -a && . /etc/blisstribe/api.env && set +a && \
-    pnpm --filter @blisstribe/api exec prisma migrate deploy"
+  ssh "$SSH_HOST" "cd '$RELEASE_DIR/apps/api' && \
+    sudo -u postgres env DATABASE_URL='postgresql://postgres@localhost/blisstribe?host=/var/run/postgresql&schema=public' \
+    /usr/bin/node ../../node_modules/prisma/build/index.js migrate deploy && \
+    sudo -u postgres psql -v ON_ERROR_STOP=1 -d blisstribe \
+    -c 'GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO blisstribe' \
+    -c 'GRANT USAGE,SELECT,UPDATE ON ALL SEQUENCES IN SCHEMA public TO blisstribe'"
 
   log "切换当前版本并重启 API"
   ssh "$SSH_HOST" "ln -sfn '$RELEASE_DIR' '$SERVER_DIR/current' && \
     systemctl restart blisstribe-api && \
     systemctl is-active --quiet blisstribe-api && \
-    curl -fsS http://127.0.0.1:14000/api/v1/agreements/current/user >/dev/null"
+    curl -fsS --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:14000/api/v1/agreements/current/user >/dev/null"
 else
   log "已完成构建，跳过生产数据库迁移和版本切换: CUTOVER=$CUTOVER"
 fi

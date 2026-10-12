@@ -26,7 +26,7 @@
         </button>
       </div>
 
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-input v-model="keyword" placeholder="搜索产品/用户/留言" clearable style="width: 220px" @keyup.enter="handleSearch" />
         <el-select v-model="status" placeholder="全部状态" clearable style="width: 160px">
           <el-option v-for="item in leadStatuses" :key="item.value" :label="item.label" :value="item.value" />
@@ -38,9 +38,9 @@
         </el-select>
         <el-button type="primary" @click="handleSearch">筛选</el-button>
         <el-button @click="resetSearch">重置</el-button>
-      </div>
+      </AdminListToolbar>
 
-      <el-table :data="leads" v-loading="loading" stripe>
+      <AdminListTable :data="leads" :loading="loading" :error="listError" @retry="loadLeads">
         <el-table-column label="产品" min-width="180">
           <template #default="{ row }">{{ row.product.title }}</template>
         </el-table-column>
@@ -75,26 +75,23 @@
         <el-table-column label="创建时间" width="180">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="170" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openDetail(row)">详情</el-button>
-              <el-button size="small" type="primary" plain @click="openFollowDialog(row)">跟进</el-button>
-            </div>
+            <AdminListActions>
+              <AdminListAction label="详情" icon="View" @click="openDetail(row)" />
+              <template #more>
+                <el-dropdown-item @click="openFollowDialog(row)">跟进</el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        class="page-pager"
-        @current-change="loadLeads"
-        @size-change="loadLeads"
-      />
+      :disabled="loading" @change="loadLeads" />
     </el-card>
 
     <el-dialog v-model="followDialogVisible" title="线索跟进" width="520px">
@@ -180,9 +177,17 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { productApi, type ProductLead, type ProductLeadSummary } from '@/api/product'
+
+const listError = ref('')
+
 
 const leads = ref<ProductLead[]>([])
 const summary = ref<ProductLeadSummary>({
@@ -301,6 +306,7 @@ async function loadSummary() {
 
 async function loadLeads() {
   loading.value = true
+  listError.value = ''
   try {
     const res = await productApi.listLeads({
       page: page.value,
@@ -311,6 +317,8 @@ async function loadLeads() {
     })
     leads.value = res.list
     total.value = res.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }

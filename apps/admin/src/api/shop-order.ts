@@ -29,6 +29,7 @@ export interface ShopOrder {
     nickname: string
     phoneMasked: string
   }
+  refunds?: Array<{ id: string; status: string; createdAt: string }>
   items?: ShopOrderItem[]
 }
 

@@ -14,7 +14,7 @@
         </div>
       </template>
 
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-input v-model="keyword" placeholder="搜索场地/地址" clearable style="width: 240px" @keyup.enter="handleSearch" />
         <el-input v-model="city" placeholder="城市" clearable style="width: 140px" @keyup.enter="handleSearch" />
         <el-select v-model="status" placeholder="全部状态" clearable style="width: 130px">
@@ -23,9 +23,9 @@
         </el-select>
         <el-button type="primary" @click="handleSearch">筛选</el-button>
         <el-button @click="resetSearch">重置</el-button>
-      </div>
+      </AdminListToolbar>
 
-      <el-table :data="venues" v-loading="loading" stripe>
+      <AdminListTable :data="venues" :loading="loading" :error="listError" @retry="loadVenues">
         <el-table-column label="场地" min-width="260">
           <template #default="{ row }">
             <div class="venue-info">
@@ -63,29 +63,26 @@
             <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="230" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openSchedule(row)">排期</el-button>
-              <el-button size="small" @click="openDialog(row)">编辑</el-button>
-              <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" plain @click="toggleStatus(row)">
+            <AdminListActions>
+              <AdminListAction label="排期" icon="Calendar" @click="openSchedule(row)" />
+              <template #more>
+                <el-dropdown-item @click="openDialog(row)">编辑</el-dropdown-item>
+                <el-dropdown-item @click="toggleStatus(row)">
                 {{ row.status === 1 ? '停用' : '启用' }}
-              </el-button>
-            </div>
+              </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
 
-      <el-pagination
+      <AdminListPagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        class="page-pager"
-        @current-change="loadVenues"
-        @size-change="loadVenues"
-      />
+      :disabled="loading" @change="loadVenues" />
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑场地' : '新增场地'" width="860px" :close-on-click-modal="false">
@@ -185,7 +182,7 @@
         <el-input v-model="facilityKeyword" placeholder="搜索设施" clearable style="width: 220px" @keyup.enter="loadFacilities" />
         <el-button type="primary" @click="openFacilityDialog()">新增设施</el-button>
       </div>
-      <el-table :data="facilities" v-loading="facilityLoading" stripe>
+      <AdminListTable :data="facilities" :loading="facilityLoading" :error="facilityError" @retry="loadFacilities">
         <el-table-column label="设施名称" prop="name" min-width="140" />
         <el-table-column label="说明" prop="description" min-width="180" show-overflow-tooltip />
         <el-table-column label="排序" prop="sortOrder" width="90" />
@@ -194,15 +191,19 @@
             <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button size="small" @click="openFacilityDialog(row)">编辑</el-button>
-            <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" plain @click="toggleFacilityStatus(row)">
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="openFacilityDialog(row)" />
+              <template #more>
+                <el-dropdown-item @click="toggleFacilityStatus(row)">
               {{ row.status === 1 ? '停用' : '启用' }}
-            </el-button>
+            </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
     </el-dialog>
 
     <el-dialog v-model="facilityFormVisible" :title="facilityEditingId ? '编辑设施' : '新增设施'" width="480px" :close-on-click-modal="false">
@@ -274,6 +275,11 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
@@ -287,6 +293,10 @@ import {
   type VenueScheduleDay,
 } from '@/api/venue'
 import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
+
+const facilityError = ref('')
+const listError = ref('')
+
 
 const weekdays = [
   { label: '周一', value: 1 },
@@ -370,6 +380,7 @@ const facilityRules: FormRules<VenueFacilityPayload> = {
 
 async function loadVenues() {
   loading.value = true
+  listError.value = ''
   try {
     const result = await venueApi.list({
       page: page.value,
@@ -380,6 +391,8 @@ async function loadVenues() {
     })
     venues.value = result.list
     total.value = result.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }
@@ -387,8 +400,11 @@ async function loadVenues() {
 
 async function loadFacilities() {
   facilityLoading.value = true
+  facilityError.value = ''
   try {
     facilities.value = await venueApi.listFacilities({ keyword: facilityKeyword.value || undefined })
+  } catch {
+    facilityError.value = '列表加载失败，请重试'
   } finally {
     facilityLoading.value = false
   }

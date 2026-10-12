@@ -4,7 +4,7 @@
       <!-- 产品列表标签页 -->
       <el-tab-pane label="产品列表" name="products">
         <!-- 工具栏 -->
-        <div class="toolbar">
+        <AdminListToolbar>
           <div class="toolbar__search">
             <el-input
               v-model="keyword"
@@ -54,11 +54,11 @@
             <!-- 新增产品按钮 -->
             <el-button type="primary" @click="openProductDialog()">新增产品</el-button>
           </div>
-        </div>
+        </AdminListToolbar>
 
         <!-- 产品表格 -->
         <div class="table-wrapper">
-          <el-table :data="products" v-loading="loading" stripe style="width: 100%">
+          <AdminListTable :data="products" :loading="loading" style="width: 100%" :error="listError" @retry="loadProducts">
             <el-table-column type="index" label="序号" width="60" />
             <el-table-column label="产品" min-width="260">
               <template #default="{ row }">
@@ -95,32 +95,28 @@
                 <el-tag v-else type="warning" effect="light" round>草稿</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="140" fixed="right" align="center">
-              <template #default="{ row }">
-                <div class="table-actions">
-                  <el-button type="primary" link size="small" @click="editProduct(row)">编辑</el-button>
-                  <el-divider direction="vertical" />
-                  <el-button v-if="row.status !== 1" type="success" link size="small" @click="publishProduct(row)">上架</el-button>
-                  <el-button v-else type="danger" link size="small" @click="unpublishProduct(row)">下架</el-button>
-                </div>
+            <el-table-column label="操作" width="88" fixed="right" align="center">
+          <template #default="{ row }">
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="editProduct(row)" />
+              <template #more>
+                <el-dropdown-item v-if="row.status !== 1" @click="publishProduct(row)">上架</el-dropdown-item>
+                <el-dropdown-item v-else @click="unpublishProduct(row)">下架</el-dropdown-item>
               </template>
-            </el-table-column>
-          </el-table>
+            </AdminListActions>
+          </template>
+        </el-table-column>
+          </AdminListTable>
 
-          <el-empty v-if="!loading && products.length === 0" description="暂无产品数据" />
         </div>
 
         <!-- 分页 -->
         <div class="pagination-wrapper">
-          <el-pagination
+          <AdminListPagination
             v-model:current-page="page"
             v-model:page-size="pageSize"
             :total="total"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            @current-change="loadProducts"
-            @size-change="loadProducts"
-          />
+          :disabled="loading" @change="loadProducts" />
         </div>
       </el-tab-pane>
 
@@ -132,7 +128,7 @@
         </div>
 
         <div class="table-wrapper">
-          <el-table :data="modules" stripe style="width: 100%">
+          <AdminListTable :data="modules" style="width: 100%" :loading="moduleLoading" :error="moduleError" @retry="loadModules">
             <el-table-column prop="name" label="模块名称" width="160" />
             <el-table-column prop="code" label="编码" width="120" show-overflow-tooltip />
             <el-table-column prop="icon" label="图标文案" width="100" />
@@ -152,18 +148,17 @@
               </template>
             </el-table-column>
             <el-table-column prop="sortOrder" label="排序" width="80" />
-            <el-table-column label="操作" width="140" fixed="right">
-              <template #default="{ row }">
-                <div class="table-actions">
-                  <el-button type="primary" link size="small" @click="openModuleDialog(row)">编辑</el-button>
-                  <el-divider direction="vertical" />
-                  <el-button type="danger" link size="small" @click="deleteModule(row)">删除</el-button>
-                </div>
+            <el-table-column label="操作" width="88" fixed="right" align="center">
+          <template #default="{ row }">
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="openModuleDialog(row)" />
+              <template #more>
+                <el-dropdown-item @click="deleteModule(row)" class="admin-list-danger">删除</el-dropdown-item>
               </template>
-            </el-table-column>
-          </el-table>
-
-          <el-empty v-if="modules.length === 0" description="暂无模块数据" />
+            </AdminListActions>
+          </template>
+        </el-table-column>
+          </AdminListTable>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -365,11 +360,21 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
+import AdminListPagination from '@/components/AdminListPagination.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { productApi, type Product, type ProductModule, type ProductModulePayload, type ProductPayload, type ProductType, type TagDictionary } from '@/api/product'
 import { buildTagOptionGroups, mapTagNamesToIds, tagOptionLabel } from '@/utils/tags'
 import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
+
+const moduleError = ref('')
+const moduleLoading = ref(false)
+const listError = ref('')
+
 
 const activeTab = ref('products')
 const modules = ref<ProductModule[]>([])
@@ -478,7 +483,15 @@ function productTypeTagType(value?: string) {
 }
 
 async function loadModules() {
-  modules.value = await productApi.listModules()
+  moduleLoading.value = true
+  moduleError.value = ''
+  try {
+    modules.value = await productApi.listModules()
+  } catch {
+    moduleError.value = '列表加载失败，请重试'
+  } finally {
+    moduleLoading.value = false
+  }
 }
 
 async function loadTags() {
@@ -487,6 +500,7 @@ async function loadTags() {
 
 async function loadProducts() {
   loading.value = true
+  listError.value = ''
   try {
     const res = await productApi.listProducts({
       page: page.value,
@@ -498,6 +512,8 @@ async function loadProducts() {
     })
     products.value = res.list
     total.value = res.total
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }
@@ -712,87 +728,6 @@ onMounted(async () => {
   }
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $space-16;
-  background: $color-bg-white;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  padding: $space-16;
-  flex-wrap: wrap;
-
-  &__search {
-    display: flex;
-    align-items: center;
-    gap: $space-12;
-    flex: 1;
-    min-width: 300px;
-
-    :deep(.el-input) {
-      .el-input__wrapper {
-        background: $color-surface-soft;
-
-        &:hover {
-          border-color: $color-primary;
-        }
-      }
-    }
-  }
-
-  &__filters {
-    display: flex;
-    align-items: center;
-    gap: $space-12;
-    flex-wrap: wrap;
-
-    :deep(.el-select) {
-      background: $color-surface-soft;
-
-      .el-input__wrapper {
-        background: $color-surface-soft;
-
-        &:hover {
-          border-color: $color-primary;
-        }
-      }
-    }
-  }
-}
-
-.table-wrapper {
-  background: $color-bg-white;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  overflow: hidden;
-  box-shadow: $shadow-sm;
-
-  :deep(.el-table) {
-    --el-table-border-color: #{$color-border};
-    --el-table-header-bg-color: #{$color-surface-soft};
-    --el-table-header-text-color: #{$color-text};
-    --el-table-row-hover-bg-color: #{$color-bg-hover};
-
-    thead {
-      background: $color-surface-soft;
-
-      th {
-        background: $color-surface-soft;
-        font-weight: 600;
-        color: $color-text;
-        border-bottom: 1px solid $color-border;
-      }
-    }
-
-    tbody tr {
-      &:hover > td {
-        background: $color-bg-hover !important;
-      }
-    }
-  }
-}
-
 .product-info {
   display: flex;
   align-items: flex-start;
@@ -831,47 +766,6 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: $space-6;
   align-items: center;
-}
-
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: $space-8;
-
-  :deep(.el-button) {
-    padding: 0;
-    height: auto;
-    font-size: $font-size-sm;
-
-    &.is-link {
-      text-decoration: none;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-
-  :deep(.el-divider--vertical) {
-    margin: 0 $space-6;
-    background-color: $color-border;
-  }
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  padding: $space-16;
-  background: $color-bg-white;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-
-  :deep(.el-pagination) {
-    --el-pagination-font-size: #{$font-size-sm};
-    --el-pagination-bg-color: transparent;
-    --el-pagination-button-bg-color: #{$color-surface-soft};
-    --el-pagination-button-disabled-bg-color: #{$color-bg};
-  }
 }
 
 :deep(.el-dialog) {

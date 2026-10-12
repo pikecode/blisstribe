@@ -35,7 +35,7 @@
       <view v-for="order in orders" :key="order.id" class="order-card" @tap="goDetail(order.id)">
         <view class="order-card__header">
           <text class="order-card__no">订单号：{{ order.orderNo }}</text>
-          <text class="order-card__status" :class="statusClass(order.status)">{{ statusText(order.status) }}</text>
+          <text class="order-card__status" :class="statusClass(order.status)">{{ refundStatusText(order) || statusText(order.status) }}</text>
         </view>
 
         <view class="order-card__items">
@@ -75,6 +75,7 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { orderApi, type Order, type OrderStatus } from '@/api/modules/order'
 import { shopApi } from '@/api/modules/shop'
+import { refundStatusText } from '@/utils/order-refund'
 
 type FilterStatus = OrderStatus | ''
 
@@ -186,9 +187,12 @@ function goDetail(id: string): void {
 
 async function handlePayment(id: string): Promise<void> {
   try {
-    await shopApi.createPayment(id)
+    const result = await shopApi.createPayment(id)
     await loadOrders()
-    uni.showToast({ title: '支付成功', icon: 'success' })
+    uni.showToast({
+      title: result.paymentStatus === 'paid' ? '支付成功' : '支付结果确认中，请稍后刷新订单',
+      icon: result.paymentStatus === 'paid' ? 'success' : 'none',
+    })
   } catch {
     uni.showToast({ title: '微信支付暂不可用，请稍后重试', icon: 'none' })
   }

@@ -292,6 +292,7 @@ export class OrderService {
             },
           },
           items: true,
+          refunds: { select: { id: true, status: true, createdAt: true }, orderBy: { createdAt: 'desc' } },
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -336,39 +337,33 @@ export class OrderService {
     orderId: bigint,
     dto: { trackingNo: string; logisticsCompany?: string }
   ) {
-    const order = await this.orderRepository.findById(orderId)
-
-    if (!order) {
-      throw new NotFoundException('Order not found')
-    }
-
-    if (order.paymentStatus !== 'paid') {
-      throw new BadRequestException('Order payment not completed')
-    }
-
-    if (order.fulfillmentStatus !== 'pending') {
-      throw new BadRequestException('Order has already been shipped or completed')
-    }
-
-    const updated = await this.prisma.shopOrder.update({
-      where: { id: orderId },
-      data: {
-        trackingNo: dto.trackingNo,
-        fulfillmentStatus: 'shipped',
-        shippedAt: new Date(),
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            nickname: true,
-            phoneMasked: true,
-          },
+    return this.prisma.$transaction(async (tx) => {
+      // 与退款申请使用同一订单行锁，避免退款审批和发货并发推进。
+      await tx.$queryRaw`SELECT id FROM "ShopOrder" WHERE id = ${orderId} FOR UPDATE`
+      const order = await tx.shopOrder.findUnique({ where: { id: orderId } })
+      if (!order) throw new NotFoundException('Order not found')
+      if (order.paymentStatus !== 'paid') {
+        throw new BadRequestException('Order payment not completed')
+      }
+      if (order.fulfillmentStatus !== 'pending') {
+        throw new BadRequestException('Order has already been shipped or completed')
+      }
+      const refund = await tx.shopRefund.findFirst({
+        where: { orderId, status: { in: ['pending', 'processing', 'approved'] } },
+      })
+      if (refund) throw new BadRequestException('订单有进行中的退款，暂不能发货')
+      return tx.shopOrder.update({
+        where: { id: orderId },
+        data: {
+          trackingNo: dto.trackingNo,
+          fulfillmentStatus: 'shipped',
+          shippedAt: new Date(),
         },
-        items: true,
-      },
+        include: {
+          user: { select: { id: true, nickname: true, phoneMasked: true } },
+          items: true,
+        },
+      })
     })
-
-    return updated
   }
 }

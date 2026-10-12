@@ -19,7 +19,7 @@
         title="标签是评估、产品和推荐规则的统一口径。产品标签、评估选项标签、规则命中标签应优先从这里选择。"
       />
 
-      <div class="page-toolbar">
+      <AdminListToolbar>
         <el-input v-model="keyword" placeholder="搜索编码/名称/说明" clearable style="width: 240px" @keyup.enter="loadTags" />
         <el-select v-model="moduleId" placeholder="全部模块" clearable style="width: 160px" @change="loadTags">
           <el-option v-for="item in modules" :key="item.id" :label="item.name" :value="item.id" />
@@ -33,9 +33,9 @@
         </el-select>
         <el-button type="primary" @click="loadTags">搜索</el-button>
         <el-button @click="resetSearch">重置</el-button>
-      </div>
+      </AdminListToolbar>
 
-      <el-table :data="tags" v-loading="loading" stripe>
+      <AdminListTable :data="tags" :loading="loading" :error="listError" @retry="loadTags">
         <el-table-column prop="code" label="编码" min-width="160" />
         <el-table-column prop="name" label="名称" width="130" />
         <el-table-column prop="group" label="分组" width="130" />
@@ -49,17 +49,19 @@
             <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openDialog(row)">编辑</el-button>
-              <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="openDialog(row)" />
+              <template #more>
+                <el-dropdown-item @click="toggleStatus(row)">
                 {{ row.status === 1 ? '停用' : '启用' }}
-              </el-button>
-            </div>
+              </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑标签' : '新增标签'" width="560px">
@@ -102,9 +104,16 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
+import AdminListToolbar from '@/components/AdminListToolbar.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { productApi, type ProductModule, type TagDictionary, type TagDictionaryPayload } from '@/api/product'
+
+const listError = ref('')
+
 
 const modules = ref<ProductModule[]>([])
 const tags = ref<TagDictionary[]>([])
@@ -135,6 +144,7 @@ async function loadModules() {
 
 async function loadTags() {
   loading.value = true
+  listError.value = ''
   try {
     tags.value = await productApi.listTags({
       keyword: keyword.value || undefined,
@@ -142,6 +152,8 @@ async function loadTags() {
       group: group.value || undefined,
       status: status.value,
     })
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }

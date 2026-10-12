@@ -19,7 +19,7 @@
         title="每个产品模块可维护启用中的评估模板，小程序会优先读取后台配置。题目目前支持单选，选项标签用于产品推荐和线索跟进。"
       />
 
-      <el-table :data="templates" v-loading="loading" stripe>
+      <AdminListTable :data="templates" :loading="loading" :error="listError" @retry="loadData">
         <el-table-column label="模块" width="130">
           <template #default="{ row }">{{ row.module?.name || moduleName(row.moduleId) }}</template>
         </el-table-column>
@@ -44,17 +44,19 @@
         <el-table-column label="更新时间" width="180">
           <template #default="{ row }">{{ formatTime(row.updatedAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button size="small" @click="openDialog(row)">编辑</el-button>
-              <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" @click="toggleStatus(row)">
+            <AdminListActions>
+              <AdminListAction label="编辑" icon="Edit" @click="openDialog(row)" />
+              <template #more>
+                <el-dropdown-item @click="toggleStatus(row)">
                 {{ row.status === 1 ? '停用' : '启用' }}
-              </el-button>
-            </div>
+              </el-dropdown-item>
+              </template>
+            </AdminListActions>
           </template>
         </el-table-column>
-      </el-table>
+      </AdminListTable>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑评估模板' : '新增评估模板'" width="860px">
@@ -145,6 +147,9 @@
 </template>
 
 <script setup lang="ts">
+import AdminListAction from '@/components/AdminListAction.vue'
+import AdminListActions from '@/components/AdminListActions.vue'
+import AdminListTable from '@/components/AdminListTable.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -157,6 +162,9 @@ import {
   type TagDictionary,
 } from '@/api/product'
 import { buildTagOptionGroups, mapTagNamesToIds, tagOptionLabel } from '@/utils/tags'
+
+const listError = ref('')
+
 
 type QuestionDraft = Omit<AssessmentQuestion, 'id'> & { id?: number }
 
@@ -294,6 +302,7 @@ function fillSampleQuestions() {
 
 async function loadData() {
   loading.value = true
+  listError.value = ''
   try {
     const [moduleRows, templateRows, tagRows] = await Promise.all([
       productApi.listModules(),
@@ -303,6 +312,8 @@ async function loadData() {
     modules.value = moduleRows
     templates.value = templateRows
     tags.value = tagRows
+  } catch {
+    listError.value = '列表加载失败，请重试'
   } finally {
     loading.value = false
   }

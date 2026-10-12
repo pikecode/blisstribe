@@ -5,8 +5,16 @@
       <input v-model="receiverName" class="address-edit__input" maxlength="40" placeholder="请输入收货人姓名" />
       <text class="address-edit__label">联系电话</text>
       <input v-model="receiverPhone" class="address-edit__input" maxlength="30" placeholder="请输入联系电话" />
+      <text class="address-edit__label">所在地区</text>
+      <picker mode="region" :value="region" :disabled="saving" @change="changeRegion">
+        <view class="address-edit__region" :class="{ 'address-edit__region--empty': !region.length }">
+          <text>{{ region.length ? region.join(' / ') : '请选择省、市、区' }}</text>
+          <text class="address-edit__arrow">›</text>
+        </view>
+      </picker>
+      <text v-if="legacyAddress" class="address-edit__hint">原地址已保留，请选择地区，并从下方移除重复的省市区。</text>
       <text class="address-edit__label">详细地址</text>
-      <textarea v-model="fullAddress" class="address-edit__textarea" maxlength="200" placeholder="请输入省、市、区及详细地址" />
+      <textarea v-model="fullAddress" class="address-edit__textarea" maxlength="200" placeholder="请输入街道、小区、楼栋及门牌号" />
       <view class="address-edit__default">
         <view>
           <text class="address-edit__default-title">设为默认地址</text>
@@ -23,13 +31,20 @@
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { addressApi } from '@/api/modules/address'
+import { splitAddress, joinAddress } from '@/utils/shop-address'
 
 const id = ref('')
 const receiverName = ref('')
 const receiverPhone = ref('')
 const fullAddress = ref('')
+const region = ref<string[]>([])
+const legacyAddress = ref(false)
 const isDefault = ref(false)
 const saving = ref(false)
+
+function changeRegion(event: { detail: { value: string[] } }) {
+  region.value = event.detail.value
+}
 
 function changeDefault(event: Event) {
   isDefault.value = (event as Event & { detail: { value: boolean } }).detail.value
@@ -45,11 +60,19 @@ onLoad(async (options) => {
   if (!address) return
   receiverName.value = address.receiverName
   receiverPhone.value = address.receiverPhone
-  fullAddress.value = address.fullAddress
+  const parsed = splitAddress(address.fullAddress)
+  region.value = parsed.region
+  fullAddress.value = parsed.detail
+  legacyAddress.value = !parsed.region.length
   isDefault.value = address.isDefault
 })
 
 async function save() {
+  if (saving.value) return
+  if (region.value.length !== 3 || region.value.some((item) => !item.trim())) {
+    uni.showToast({ title: '请选择省、市、区', icon: 'none' })
+    return
+  }
   if (!receiverName.value.trim() || !receiverPhone.value.trim() || !fullAddress.value.trim()) {
     uni.showToast({ title: '请填写完整收货信息', icon: 'none' })
     return
@@ -59,8 +82,12 @@ async function save() {
     const data = {
       receiverName: receiverName.value.trim(),
       receiverPhone: receiverPhone.value.trim(),
-      fullAddress: fullAddress.value.trim(),
+      fullAddress: joinAddress(region.value, fullAddress.value),
       isDefault: isDefault.value,
+    }
+    if (data.fullAddress.length > 200) {
+      uni.showToast({ title: '完整地址不能超过200字', icon: 'none' })
+      return
     }
     if (id.value) await addressApi.update(id.value, data)
     else await addressApi.create(data)
@@ -85,6 +112,10 @@ async function save() {
   &__textarea { box-sizing: border-box; width: 100%; padding: 20rpx; border: 1rpx solid var(--color-border); border-radius: 14rpx; background: var(--color-bg-subtle); font-size: 26rpx; }
   &__input { height: 84rpx; }
   &__textarea { height: 180rpx; }
+  &__region { display: flex; align-items: center; justify-content: space-between; min-height: 84rpx; box-sizing: border-box; padding: 20rpx; border: 1rpx solid var(--color-border); border-radius: 14rpx; background: var(--color-bg-subtle); font-size: 26rpx; color: var(--color-text); }
+  &__region--empty, &__arrow { color: var(--color-text-tertiary); }
+  &__arrow { font-size: 36rpx; }
+  &__hint { display: block; margin-top: 12rpx; font-size: 22rpx; color: var(--color-text-tertiary); line-height: 1.6; }
   &__default { display: flex; align-items: center; justify-content: space-between; margin-top: 28rpx; padding-top: 24rpx; border-top: 1rpx solid var(--color-border); }
   &__default-title { display: block; color: var(--color-text); font-size: 26rpx; font-weight: 700; }
   &__default-desc { display: block; margin-top: 5rpx; color: var(--color-text-tertiary); font-size: 22rpx; }
