@@ -28,6 +28,8 @@
 - [API 设计](engineering/API.md)
 - [数据库设计](engineering/DATABASE.md)
 - [商城数据库](engineering/DATABASE-SHOP.md)
+- [支付与退款参考技术架构](engineering/PAYMENT_REFUND_REFERENCE_ARCHITECTURE.md)：用于其他应用设计与开发。
+- [本项目付款与退款实现记录](engineering/PAYMENT_AND_REFUND.md)：当前源码及生产验收状态。
 - [前端架构](engineering/FRONTEND.md)
 - [安全设计](engineering/SECURITY.md)
 
