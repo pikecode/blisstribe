@@ -2,6 +2,10 @@
 
 心悦部落 — 小程序 + 后台管理 + API monorepo。
 
+## 部署
+
+后续部署、回滚与验收优先参考 [当前部署指南](docs/operations/DEPLOYMENT_GUIDE.md)；微信支付配置与验收参考 [支付部署记录](docs/operations/WECHAT_PAY_DEPLOYMENT.md)。
+
 ## 目录结构
 
 ```
@@ -63,6 +67,22 @@ pnpm --filter @blisstribe/api prisma:seed   # 创建初始管理员 + 协议
 
 ### 5. 启动开发服务
 
+**macOS 本地启动**：在项目根目录执行启动脚本：
+
+```bash
+./start.sh
+```
+
+依次准备本机 PostgreSQL/Redis、应用待执行迁移、生成 Prisma Client、构建共享包，再启动 API 和管理后台。需预先安装依赖并配置本地 `apps/api/.env`。按 `Ctrl+C` 停止应用；数据库服务保留。
+
+同时开启小程序热编译：
+
+```bash
+./start.sh --miniapp
+```
+
+微信开发者工具导入 `apps/miniapp/dist/dev/mp-weixin`，源码修改后自动重新编译。
+
 **Docker 环境**：自动检查 Docker → 启动数据库 → 启动 API + Admin
 
 ```bash
@@ -91,17 +111,14 @@ pnpm dev:miniapp      # 小程序（需微信开发者工具导入 dist/dev/mp-w
 
 ## 文档
 
-详见 `docs/` 目录：
+项目文档统一入口：[文档索引](docs/README.md)。
 
-- [PRD](docs/PRD.md) — 产品需求
-- [系统架构](docs/ARCHITECTURE.md)
-- [API 设计](docs/API.md)
-- [数据库设计](docs/DATABASE.md)
-- [前端架构](docs/FRONTEND.md)
-- [安全设计](docs/SECURITY.md)
-- [Docker 部署标准](docs/DEPLOYMENT.md)
-- [上线前检查清单](docs/GO_LIVE_CHECKLIST.md)
-- [产品精准推荐阶段路线图](docs/plans/2026-08-25-product-recommendation-roadmap.md)
+- [部署与回滚](docs/operations/DEPLOYMENT_GUIDE.md)
+- [微信支付与验收](docs/operations/WECHAT_PAY_DEPLOYMENT.md)
+- [系统架构](docs/engineering/ARCHITECTURE.md)
+- [API 与数据设计](docs/engineering/API.md)
+
+历史方案和报告统一归档到 `docs/archive/`，不作为当前上线依据。
 
 ## 技术栈
 
