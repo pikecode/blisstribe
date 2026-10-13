@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -67,6 +68,7 @@ export class AdminOrderController {
   @Get('orders')
   @UseGuards(AdminJwtGuard)
   async listOrders(
+    @Query('tab') tab?: string,
     @Query('status') status?: string,
     @Query('paymentStatus') paymentStatus?: string,
     @Query('fulfillmentStatus') fulfillmentStatus?: string,
@@ -74,12 +76,20 @@ export class AdminOrderController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
+    @Query('pageSize') pageSize?: string
   ) {
-    const offset = page ? (parseInt(page, 10) - 1) * parseInt(limit || '20', 10) : 0
-    const limit_ = limit ? parseInt(limit, 10) : 20
+    const page_ = Number(page || '1')
+    const limit_ = Number(pageSize || limit || '20')
+    if (!Number.isSafeInteger(page_) || page_ < 1 ||
+        !Number.isSafeInteger(limit_) || limit_ < 1 || limit_ > 100 ||
+        !Number.isSafeInteger((page_ - 1) * limit_)) {
+      throw new BadRequestException('分页参数无效')
+    }
+    const offset = (page_ - 1) * limit_
 
     return this.orderService.listAdminOrders({
+      tab,
       status,
       paymentStatus,
       fulfillmentStatus,

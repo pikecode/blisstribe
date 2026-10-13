@@ -57,6 +57,7 @@ export const shopOrderApi = {
   listOrders(params: {
     page?: number
     pageSize?: number
+    tab?: string
     status?: string
     paymentStatus?: string
     fulfillmentStatus?: string

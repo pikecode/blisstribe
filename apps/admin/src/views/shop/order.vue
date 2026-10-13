@@ -15,23 +15,6 @@
           <el-button type="primary" @click="handleSearch">搜索</el-button>
         </div>
 
-        <!-- 状态筛选 -->
-        <el-select
-          v-model="statusFilter"
-          placeholder="订单状态"
-          clearable
-          style="width: 140px"
-          @change="handleSearch"
-        >
-          <el-option label="待支付" value="pending_payment" />
-          <el-option label="确认支付状态中" value="closing" />
-          <el-option label="已支付" value="paid" />
-          <el-option label="处理中" value="processing" />
-          <el-option label="已发货" value="shipped" />
-          <el-option label="已完成" value="completed" />
-          <el-option label="已取消" value="cancelled" />
-        </el-select>
-
         <!-- 支付状态筛选 -->
         <el-select
           v-model="paymentStatusFilter"
@@ -73,6 +56,10 @@
         <el-button plain icon="Refresh" @click="resetSearch">重置</el-button>
       </div>
     </AdminListToolbar>
+
+    <el-tabs v-model="selectedTab" class="order-tabs" @tab-change="handleSearch">
+      <el-tab-pane v-for="tab in orderTabs" :key="tab.value" :label="tab.label" :name="tab.value" />
+    </el-tabs>
 
     <!-- 表格容器 -->
     <div class="table-wrapper">
@@ -377,7 +364,16 @@ const pageSize = ref(20)
 
 // 过滤条件
 const keyword = ref('')
-const statusFilter = ref('')
+const selectedTab = ref('all')
+const orderTabs = [
+  { label: '全部', value: 'all' },
+  { label: '待付款', value: 'pending_payment' },
+  { label: '待发货', value: 'pending_shipment' },
+  { label: '已发货', value: 'shipped' },
+  { label: '已完成', value: 'completed' },
+  { label: '退款 / 售后', value: 'refunds' },
+  { label: '已取消', value: 'cancelled' },
+]
 const paymentStatusFilter = ref('')
 const fulfillmentStatusFilter = ref('')
 const dateRange = ref<[Date, Date] | null>(null)
@@ -402,8 +398,11 @@ const shipRules = {
   ],
 }
 
+// 忽略快速切换筛选时较早请求的结果。
+let listRequestId = 0
 // 加载订单列表
 const loadOrders = async () => {
+  const requestId = ++listRequestId
   loading.value = true
   listError.value = ''
   try {
@@ -411,20 +410,22 @@ const loadOrders = async () => {
     const result = await shopOrderApi.listOrders({
       page: page.value,
       pageSize: pageSize.value,
-      status: statusFilter.value,
+      tab: selectedTab.value,
       paymentStatus: paymentStatusFilter.value,
       fulfillmentStatus: fulfillmentStatusFilter.value,
       keyword: keyword.value,
       startDate: startDate ? startDate.toISOString().split('T')[0] : undefined,
       endDate: endDate ? endDate.toISOString().split('T')[0] : undefined,
     })
+    if (requestId !== listRequestId) return
     orders.value = result.orders
     total.value = result.total
   } catch (error) {
+    if (requestId !== listRequestId) return
     listError.value = '列表加载失败，请重试'
     ElMessage.error('加载订单列表失败')
   } finally {
-    loading.value = false
+    if (requestId === listRequestId) loading.value = false
   }
 }
 
@@ -437,7 +438,6 @@ const handleSearch = () => {
 // 重置搜索
 const resetSearch = () => {
   keyword.value = ''
-  statusFilter.value = ''
   paymentStatusFilter.value = ''
   fulfillmentStatusFilter.value = ''
   dateRange.value = null
@@ -612,7 +612,11 @@ onMounted(() => {
   .toolbar__filters { width: 100%; gap: 10px; }
   .toolbar__search { flex-wrap: nowrap; }
   .toolbar__search :deep(.el-input) { width: 290px; }
-  .table-wrapper { overflow: hidden; border-radius: 12px 12px 0 0; }
+  .order-tabs { padding: 0 16px; background: #fff; border: 1px solid #e4e7ed; border-bottom: 0; border-radius: 12px 12px 0 0; }
+  .order-tabs :deep(.el-tabs__header) { margin: 0; }
+  .order-tabs :deep(.el-tabs__item) { height: 52px; font-size: 14px; }
+  .order-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; }
+  .table-wrapper { overflow: hidden; border-radius: 0; }
   .pagination-wrapper { margin-top: -1px; padding: 0 16px; border: 1px solid #e4e7ed; border-top: 0; border-radius: 0 0 12px 12px; background: #fff; }
   .order-number { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .order-user__name { font-weight: 500; color: #303133; }

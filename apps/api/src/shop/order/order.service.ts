@@ -226,6 +226,7 @@ export class OrderService {
   }
 
   async listAdminOrders(filters: {
+    tab?: string
     status?: string
     paymentStatus?: string
     fulfillmentStatus?: string
@@ -236,6 +237,7 @@ export class OrderService {
     limit: number
   }) {
     const {
+      tab,
       status,
       paymentStatus,
       fulfillmentStatus,
@@ -247,6 +249,24 @@ export class OrderService {
     } = filters
 
     const where: any = {}
+    const tabFilters: Record<string, object> = {
+      all: {},
+      pending_payment: { status: { in: ['pending_payment', 'closing'] }, paymentStatus: 'unpaid' },
+      pending_shipment: {
+        paymentStatus: 'paid', fulfillmentStatus: 'pending',
+        refunds: { none: { status: { in: ['pending', 'approved', 'processing'] } } },
+      },
+      shipped: { fulfillmentStatus: 'shipped' },
+      completed: { fulfillmentStatus: 'completed' },
+      refunds: { refunds: { some: {} } },
+      cancelled: { status: 'cancelled' },
+    }
+    if (tab) {
+      if (!Object.prototype.hasOwnProperty.call(tabFilters, tab)) {
+        throw new BadRequestException('订单分类无效')
+      }
+      where.AND = [tabFilters[tab]]
+    }
 
     if (status) {
       where.status = status
