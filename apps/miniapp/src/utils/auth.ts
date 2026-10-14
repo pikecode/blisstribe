@@ -4,7 +4,7 @@ import { storage } from '@/utils/storage'
 const AUTH_REDIRECT_KEY = 'authRedirectUrl'
 
 export function checkLogin(): boolean {
-  return !!storage.get<string>('token')
+  return !!storage.get<string>('token') || !!storage.get<string>('refreshToken')
 }
 
 export function redirectToLogin(): void {

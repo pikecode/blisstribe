@@ -1,4 +1,4 @@
-import { request } from '@/api/request'
+import { restoreSession } from '@/api/request'
 import { useAuthStore } from '@/stores/modules/auth'
 import { APP_CONFIG } from '@/config'
 
@@ -10,7 +10,8 @@ export interface UploadAvatarResult {
 }
 
 export const fileApi = {
-  uploadAvatar(filePath: string, tempToken?: string): Promise<UploadAvatarResult> {
+  async uploadAvatar(filePath: string, tempToken?: string): Promise<UploadAvatarResult> {
+    if (!tempToken) await restoreSession()
     return new Promise<UploadAvatarResult>((resolve, reject) => {
       const authStore = useAuthStore()
       uni.uploadFile({

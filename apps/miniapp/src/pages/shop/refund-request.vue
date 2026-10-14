@@ -64,7 +64,7 @@
       <!-- Tips Section -->
       <view class="refund-request__tips">
         <text class="refund-request__tips-title">提示</text>
-        <text class="refund-request__tips-item">• 提交后需要等待审核，通常在24小时内处理</text>
+        <text class="refund-request__tips-item">• 提交后需要等待审核，可在退款详情查看处理进度</text>
         <text class="refund-request__tips-item">• 如有疑问，可联系客服进行咨询</text>
       </view>
 
@@ -103,7 +103,7 @@
       <view class="refund-request__success">
         <text class="refund-request__success-icon">✓</text>
         <text class="refund-request__success-title">申请已提交</text>
-        <text class="refund-request__success-desc">我们已收到您的退款申请，将在24小时内完成审核</text>
+        <text class="refund-request__success-desc">我们已收到您的退款申请，审核结果将在退款详情更新</text>
         <view class="refund-request__success-actions">
           <view class="refund-request__success-btn" @tap="goBack">返回订单详情</view>
         </view>

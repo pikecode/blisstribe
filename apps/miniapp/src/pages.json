@@ -199,7 +199,8 @@
     {
       "path": "pages/shop/refund-detail",
       "style": {
-        "navigationBarTitleText": "退款详情"
+        "navigationBarTitleText": "退款详情",
+        "enablePullDownRefresh": true
       }
     }
   ],

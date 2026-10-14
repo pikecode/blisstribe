@@ -6,6 +6,7 @@
 
 - [当前部署指南](operations/DEPLOYMENT_GUIDE.md)：后续发布、检查和回滚的首选依据。
 - [微信支付部署与验收](operations/WECHAT_PAY_DEPLOYMENT.md)：支付开关、凭证位置和真实验收待办。
+- [小程序退款客服接入](operations/MINIAPP_CUSTOMER_SERVICE.md)：原生客服、人员配置和真机接待验收。
 - [上线检查清单](operations/GO_LIVE_CHECKLIST.md)：结合当前部署指南逐项确认。
 - 本地 API 与后台：仓库根目录执行 `./start.sh`；附带小程序热编译用 `./start.sh --miniapp`。
 - 小程序仅热编译：`pnpm dev:miniapp`；开发和生产均连接线上 API，测试会写入生产数据。
@@ -18,10 +19,13 @@
 | `engineering/` | 架构、API、数据库、前端、安全 | 设计参考；字段、路由以现有源码为准 |
 | `operations/` | 部署、支付、上线检查 | 当前运维入口 |
 | `designs/` | 平台、推荐、活动、商城设计 | 查看模块边界和决策；带日期的计划需重新核对 |
+| `prototypes/` | 可点击页面与演示数据 | 用于产品交互评审，不连接真实业务 |
 | `archive/` | 历史部署、进度报告、旧方案、实施记录 | 仅供追溯，不照其中命令直接部署 |
 
 ## 产品与技术
 
+- [服务方案销售与履约需求确认文档](product/SERVICE_PROGRAM_REQUIREMENTS.md)：V1.2 第 17 章已于 2026-10-14 全部确认，作为后续原型、开发和验收依据。
+- [服务方案可点击交互原型](prototypes/service-program/README.md)：患者端与机构运营端共享演示流程，包含购买、预约、核销和退款；启动后在浏览器评审。
 - [注册功能 PRD](product/PRD.md)
 - [标签规范](product/TAGS.md)
 - [系统架构](engineering/ARCHITECTURE.md)
@@ -35,6 +39,8 @@
 
 ## 业务设计
 
+- [服务方案销售与多角色履约方案（评审稿）](designs/platform/SERVICE_PROGRAM_COMMERCE_REVIEW.md)：服务售卖、预约、人员协作、商城关联与收益结算。
+- [小程序登录态恢复](designs/platform/MINIAPP_SESSION_RECOVERY.md)
 - [platform](designs/platform/)
 - [recommendation](designs/recommendation/)
 - [activity](designs/activity/)

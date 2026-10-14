@@ -13,12 +13,12 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = ref<string>('')
   const tempToken = ref<string>('')
   const registerWxUserInfo = ref<RegisterWxUserInfo | null>(null)
-  const isLogin = computed(() => !!token.value)
+  const isLogin = computed(() => !!token.value || !!refreshToken.value)
 
-  const setToken = (newToken: string, newRefreshToken: string): void => {
+  const setToken = (newToken: string, newRefreshToken: string, expiresIn = 7200): void => {
     token.value = newToken
     refreshToken.value = newRefreshToken
-    storage.set('token', newToken, { expireSeconds: 7200 })
+    storage.set('token', newToken, { expireSeconds: expiresIn })
     storage.set('refreshToken', newRefreshToken, { expireSeconds: 7 * 24 * 3600 })
   }
 

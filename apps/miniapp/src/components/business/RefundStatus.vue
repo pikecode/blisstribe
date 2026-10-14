@@ -10,6 +10,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { shopApi } from '@/api/modules/shop'
 
 interface Props {
   status: string
@@ -23,6 +24,8 @@ const props = withDefaults(defineProps<Props>(), {
 const statusIcon = computed(() => {
   const icons: Record<string, string> = {
     pending: '⏳',
+    approved: '↻',
+    closed: '—',
     processing: '↻',
     rejected: '✕',
     success: '✓',
@@ -31,16 +34,8 @@ const statusIcon = computed(() => {
   return icons[props.status] || '•'
 })
 
-const statusLabel = computed(() => {
-  const labels: Record<string, string> = {
-    pending: '待审核',
-    processing: '退款处理中',
-    rejected: '已拒绝',
-    success: '退款已到账',
-    failed: '退款失败，请联系客服',
-  }
-  return labels[props.status] || props.status
-})
+const statusLabel = computed(() => shopApi.getRefundStatusLabel(props.status))
+
 </script>
 
 <style lang="scss" scoped>
@@ -94,6 +89,7 @@ const statusLabel = computed(() => {
     }
   }
 
+  &--approved,
   &--processing {
     background: #d1fae5;
     border-left-color: #10b981;

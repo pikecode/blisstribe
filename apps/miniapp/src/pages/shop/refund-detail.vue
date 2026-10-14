@@ -15,12 +15,31 @@
 
         <!-- Amount & Order Info -->
         <view class="refund-detail__section">
-          <text class="refund-detail__section-title">退款金额</text>
+          <view class="refund-detail__section-heading">
+            <text class="refund-detail__section-title">{{ refund.approvedAmountFen != null ? '批准退款金额' : '申请退款金额' }}</text>
+            <button class="refund-detail__refresh-btn" :loading="loading" :disabled="loading" @tap="loadRefund">刷新</button>
+          </view>
+          <view v-if="loadError" class="refund-detail__refresh-error">
+            <text>{{ loadError }}，当前显示上次加载的信息</text>
+            <button class="refund-detail__refresh-btn" :disabled="loading" @tap="loadRefund">重试</button>
+          </view>
           <view class="refund-detail__amount-box">
-            <text class="refund-detail__amount">¥{{ formatAmount(refund.requestedAmountFen) }}</text>
+            <text class="refund-detail__amount">¥{{ formatAmount(refund.approvedAmountFen ?? refund.requestedAmountFen) }}</text>
           </view>
 
           <text class="refund-detail__section-title" style="margin-top: 24rpx">订单信息</text>
+          <view class="refund-detail__info-item">
+            <text class="refund-detail__label">{{ orderNo ? '订单号' : '订单编号' }}</text>
+            <text class="refund-detail__value">{{ orderNo || refund.orderId }}</text>
+          </view>
+          <view class="refund-detail__info-item">
+            <text class="refund-detail__label">退款编号</text>
+            <text class="refund-detail__value">{{ refund.id }}</text>
+          </view>
+          <view v-if="refund.approvedAmountFen != null && refund.approvedAmountFen !== refund.requestedAmountFen" class="refund-detail__info-item">
+            <text class="refund-detail__label">申请金额</text>
+            <text class="refund-detail__value">¥{{ formatAmount(refund.requestedAmountFen) }}</text>
+          </view>
           <view class="refund-detail__info-item">
             <text class="refund-detail__label">申请时间</text>
             <text class="refund-detail__value">{{ formatDateTime(refund.createdAt) }}</text>
@@ -33,8 +52,8 @@
             <text class="refund-detail__label">退款单号</text>
             <text class="refund-detail__value">{{ refund.wechatRefundId }}</text>
           </view>
-          <view v-if="refund.completedAt" class="refund-detail__info-item">
-            <text class="refund-detail__label">到账时间</text>
+          <view v-if="refund.status === 'success' && refund.completedAt" class="refund-detail__info-item">
+            <text class="refund-detail__label">退款成功时间</text>
             <text class="refund-detail__value">{{ formatDateTime(refund.completedAt) }}</text>
           </view>
         </view>
@@ -43,62 +62,57 @@
         <view class="refund-detail__section">
           <text class="refund-detail__section-title">处理进度</text>
           <view class="refund-detail__timeline">
-            <view class="refund-detail__timeline-item" :class="{ completed: refund.status !== 'pending' }">
+            <view v-for="(step, index) in timeline" :key="index" class="refund-detail__timeline-item" :class="step.tone">
               <view class="refund-detail__timeline-dot"></view>
-              <text class="refund-detail__timeline-label">已提交申请</text>
-              <text class="refund-detail__timeline-time">{{ formatDateTime(refund.createdAt) }}</text>
-            </view>
-            <view class="refund-detail__timeline-item" :class="{ completed: isStatusAfter(['processing', 'success']) }">
-              <view class="refund-detail__timeline-dot"></view>
-              <text class="refund-detail__timeline-label">审核中</text>
-              <text v-if="refund.status === 'processing'" class="refund-detail__timeline-time">处理中...</text>
-            </view>
-            <view class="refund-detail__timeline-item" :class="{ completed: refund.status === 'success' }">
-              <view class="refund-detail__timeline-dot"></view>
-              <text class="refund-detail__timeline-label">退款完成</text>
-              <text v-if="refund.completedAt" class="refund-detail__timeline-time">{{ formatDateTime(refund.completedAt) }}</text>
+              <text class="refund-detail__timeline-label">{{ step.label }}</text>
+              <text v-if="step.detail" class="refund-detail__timeline-time">{{ step.detail }}</text>
             </view>
           </view>
         </view>
 
-        <!-- Tips -->
         <view class="refund-detail__tips">
-          <text class="refund-detail__tips-title">提示</text>
-          <text v-if="refund.status === 'pending'" class="refund-detail__tips-item">
-            • 您的退款申请正在审核中，通常在24小时内完成。请耐心等待
-          </text>
-          <text v-else-if="refund.status === 'processing'" class="refund-detail__tips-item">
-            • 申请已批准，退款将在3-5个工作日内到达您的账户
-          </text>
-          <text v-else-if="refund.status === 'rejected'" class="refund-detail__tips-item">
-            • 您的退款申请已被拒绝。如有疑问，请联系客服
-          </text>
-          <text v-else-if="refund.status === 'success'" class="refund-detail__tips-item">
-            • 退款已到账，请检查您的账户。如未收到，请联系客服
-          </text>
-          <text v-else-if="refund.status === 'failed'" class="refund-detail__tips-item">
-            • 退款未完成，请联系客服处理
-          </text>
+          <text class="refund-detail__tips-title">{{ statusText }}</text>
+          <text class="refund-detail__tips-item">{{ statusTip }}</text>
+        </view>
+
+        <!-- 客服咨询 -->
+        <view class="refund-detail__section refund-detail__support">
+          <text class="refund-detail__section-title">需要帮助？</text>
+          <text class="refund-detail__support-hint">进入会话后，可发送退款详情卡片方便客服核查。暂未回复时请留言。</text>
+          <button
+            class="refund-detail__contact-btn"
+            open-type="contact"
+            :session-from="`refund_${refund.id}`"
+            :show-message-card="true"
+            :send-message-title="contactTitle"
+            :send-message-path="contactPath"
+            send-message-img="/static/logo.png"
+            @error="handleContactError"
+          >在线客服</button>
+          <button class="refund-detail__copy-btn" @tap="copyConsultation">复制咨询信息</button>
+          <text class="refund-detail__support-note">客服无法打开时，可复制咨询信息后发送给客服。</text>
         </view>
 
         <!-- Actions -->
         <view class="refund-detail__actions">
           <view class="refund-detail__action-btn" @tap="goBack">返回</view>
-          <view class="refund-detail__action-btn refund-detail__action-btn--primary" @tap="contactService">联系客服</view>
         </view>
       </view>
 
       <!-- Loading -->
       <view v-else class="refund-detail__loading">
-        <text>加载中...</text>
+        <text>{{ loading ? '正在加载退款详情…' : loadError || '退款信息暂不可用' }}</text>
+        <text v-if="!loading" class="refund-detail__support-note">请检查网络后重试，或返回退款列表。</text>
+        <button v-if="!loading && refundId" class="refund-detail__contact-btn" @tap="loadRefund">重新加载</button>
+        <button v-if="!loading" class="refund-detail__copy-btn" @tap="goBack">返回退款列表</button>
       </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { ref, computed } from 'vue'
+import { onLoad, onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { shopApi, type RefundResponse } from '@/api/modules/shop'
 import { useAuthStore } from '@/stores/modules/auth'
 import RefundStatus from '@/components/business/RefundStatus.vue'
@@ -106,6 +120,46 @@ import RefundStatus from '@/components/business/RefundStatus.vue'
 const authStore = useAuthStore()
 const refundId = ref('')
 const refund = ref<RefundResponse | null>(null)
+const orderNo = ref('')
+const loading = ref(false)
+const loadError = ref('')
+const statusText = computed(() => shopApi.getRefundStatusLabel(refund.value?.status || ''))
+const statusTip = computed(() => {
+  const tips: Record<string, string> = {
+    pending: '申请已提交，请等待审核。您可以返回此页或下拉刷新查看进度。',
+    approved: '申请已批准，等待提交退款。实际结果以支付渠道返回的信息为准。',
+    processing: '退款正在处理中，请查看原支付账户的退款记录，到账时间以支付渠道及银行处理为准。',
+    success: '支付渠道已确认退款成功，请在原支付账户核对退款记录。如仍有疑问，可联系在线客服。',
+    rejected: '申请未通过审核，请查看拒绝原因。如有疑问，可联系在线客服。',
+    failed: '退款暂未成功，请联系在线客服核查处理，避免重复提交。',
+    closed: '本次退款已关闭，请联系在线客服确认原因和后续处理方式。',
+  }
+  return tips[refund.value?.status || ''] || '当前状态暂无法确认，请刷新或联系在线客服核查。'
+})
+const timeline = computed(() => {
+  const data = refund.value
+  if (!data) return []
+  const steps = [{ label: '申请已提交', detail: formatDateTime(data.createdAt), tone: 'completed' }]
+  if (data.status === 'pending') {
+    steps.push({ label: '等待审核', detail: '审核结果将在此页更新', tone: 'active' })
+  } else if (data.status === 'rejected') {
+    steps.push({ label: '审核未通过', detail: data.rejectionReason || '如需了解原因，请联系客服', tone: 'exception' })
+  } else if (['approved', 'processing', 'success', 'failed', 'closed'].includes(data.status)) {
+    steps.push({ label: '审核已批准', detail: '', tone: 'completed' })
+    steps.push({
+      label: statusText.value,
+      detail: data.status === 'success' && data.completedAt ? formatDateTime(data.completedAt) : statusTip.value,
+      tone: ['failed', 'closed'].includes(data.status) ? 'exception' : data.status === 'success' ? 'completed' : 'active',
+    })
+  } else {
+    steps.push({ label: '状态待确认', detail: '请刷新或联系客服核查', tone: 'active' })
+  }
+  return steps
+})
+const contactPath = computed(() => `/pages/shop/refund-detail?id=${encodeURIComponent(refund.value?.id || '')}`)
+const contactTitle = computed(() => refund.value
+  ? `退款咨询 #${refund.value.id} · ¥${formatAmount(refund.value.approvedAmountFen ?? refund.value.requestedAmountFen)} · ${statusText.value}`
+  : '退款咨询')
 
 function formatAmount(amountFen: number): string {
   return (amountFen / 100).toFixed(2)
@@ -121,46 +175,74 @@ function formatDateTime(dateStr: string): string {
   return `${year}-${month}-${day} ${hours}:${minutes}`
 }
 
-function isStatusAfter(statuses: string[]): boolean {
-  if (!refund.value) return false
-  return statuses.includes(refund.value.status)
-}
-
 async function loadRefund() {
-  if (!refundId.value) return
+  if (loading.value || !refundId.value) return
+  loading.value = true
+  loadError.value = ''
   try {
     const data = await shopApi.getRefundDetail(refundId.value)
     refund.value = data
+    // 订单号不影响退款信息展示，获取失败时保留订单编号。
+    if (!orderNo.value) {
+      void shopApi.getOrderDetail(data.orderId).then((order) => {
+        if (refund.value?.id === data.id) orderNo.value = order.orderNo
+      }).catch(() => {})
+    }
   } catch (error) {
     console.error('Failed to load refund:', error)
-    uni.showToast({
-      title: '加载失败',
-      icon: 'none',
-    })
+    loadError.value = '退款详情加载失败'
+  } finally {
+    loading.value = false
   }
 }
 
 function goBack() {
-  uni.navigateBack()
+  uni.navigateBack({ fail: () => uni.redirectTo({ url: '/pages/shop/refund-list' }) })
 }
 
-function contactService() {
-  // In a real app, this would open a customer service contact
-  uni.showToast({
-    title: '客服功能开发中',
-    icon: 'none',
+function handleContactError() {
+  uni.showToast({ title: '暂时无法打开客服，可复制咨询信息', icon: 'none' })
+}
+
+function copyConsultation() {
+  const data = refund.value
+  if (!data) return
+  const lines = [
+    '退款咨询',
+    orderNo.value ? `订单号：${orderNo.value}` : `订单编号：${data.orderId}`,
+    `退款编号：${data.id}`,
+    `申请金额：¥${formatAmount(data.requestedAmountFen)}`,
+    ...(data.approvedAmountFen != null ? [`批准金额：¥${formatAmount(data.approvedAmountFen)}`] : []),
+    `当前状态：${statusText.value}`,
+    `申请时间：${formatDateTime(data.createdAt)}`,
+    `申请原因：${data.reason || '未填写'}`,
+    ...(data.wechatRefundId ? [`微信退款单号：${data.wechatRefundId}`] : []),
+  ]
+  uni.setClipboardData({
+    data: lines.join('\n'),
+    success: () => uni.showToast({ title: '咨询信息已复制', icon: 'none' }),
+    fail: () => uni.showToast({ title: '复制失败，请重试', icon: 'none' }),
   })
 }
 
 onLoad((options) => {
+  refundId.value = options?.id || ''
+  if (!refundId.value) loadError.value = '缺少退款编号，请从退款列表重新进入'
+})
+
+onShow(() => {
   if (!authStore.isLogin) {
     uni.navigateTo({ url: '/pages/auth/auth' })
     return
   }
+  void loadRefund()
+})
 
-  refundId.value = options?.id || ''
-  if (refundId.value) {
-    loadRefund()
+onPullDownRefresh(async () => {
+  try {
+    await loadRefund()
+  } finally {
+    uni.stopPullDownRefresh()
   }
 })
 </script>
@@ -252,6 +334,11 @@ onLoad((options) => {
     word-break: break-word;
   }
 
+  &__section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; }
+  &__section-heading &__section-title { margin-bottom: 0; }
+  &__refresh-btn { margin: 0; padding: 0 16rpx; background: transparent; color: var(--color-primary); font-size: 24rpx; line-height: 56rpx; &::after { border: none; } }
+  &__refresh-error { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; color: #b45309; font-size: 22rpx; }
+
   &__timeline {
     display: flex;
     flex-direction: column;
@@ -293,6 +380,10 @@ onLoad((options) => {
       }
     }
   }
+
+  &__timeline-item.active &__timeline-dot { border-color: var(--color-primary); }
+  &__timeline-item.exception &__timeline-dot { border-color: #ef4444; background: #ef4444; }
+  &__timeline-item.exception &__timeline-label { color: #b91c1c; }
 
   &__timeline-dot {
     position: absolute;
@@ -343,6 +434,31 @@ onLoad((options) => {
     line-height: 1.6;
   }
 
+  &__support-hint,
+  &__support-note {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: 24rpx;
+    line-height: 1.6;
+  }
+
+  &__support-note { font-size: 22rpx; text-align: center; }
+
+  &__contact-btn,
+  &__copy-btn {
+    margin: 20rpx 0 0;
+    padding: 0 24rpx;
+    border-radius: 16rpx;
+    height: 84rpx;
+    line-height: 84rpx;
+    font-size: 28rpx;
+    font-weight: 600;
+    &::after { border: none; }
+  }
+
+  &__contact-btn { background: var(--color-primary); color: #fff; }
+  &__copy-btn { background: var(--color-bg-subtle); color: var(--color-text); margin-bottom: 16rpx; }
+
   &__actions {
     display: flex;
     gap: 12rpx;
@@ -379,6 +495,10 @@ onLoad((options) => {
 
   &__loading {
     display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+    padding: 32rpx;
+    text-align: center;
     align-items: center;
     justify-content: center;
     min-height: 400rpx;

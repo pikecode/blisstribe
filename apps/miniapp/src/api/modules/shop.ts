@@ -180,12 +180,14 @@ export const shopApi = {
   getRefundStatusLabel(status: string): string {
     const labels: Record<string, string> = {
       pending: '待审核',
+      approved: '已批准，待退款',
+      closed: '退款已关闭',
       processing: '退款处理中',
       rejected: '已拒绝',
-      success: '退款已到账',
+      success: '退款成功',
       failed: '退款失败',
     }
-    return labels[status] || status
+    return labels[status] || '状态待确认'
   },
 
   async createPayment(orderId: string) {

@@ -1,5 +1,7 @@
 // 请求封装：统一拦截、Token 刷新（并发锁）、skipAuthRefresh 避免递归
 import { useAuthStore } from '@/stores/modules/auth'
+import { useUserStore } from '@/stores/modules/user'
+import { storage } from '@/utils/storage'
 import { APP_CONFIG } from '@/config'
 import type { ApiResponse } from '@blisstribe/shared'
 
@@ -16,13 +18,21 @@ export interface RequestOptions {
 const TOKEN_EXPIRED_CODES = new Set([401002])
 const AUTH_REQUIRED_CODES = new Set([401001, 401003])
 
-let isRefreshing = false
 let refreshPromise: Promise<void> | null = null
 
 // 统一返回业务数据 T（已从 ApiResponse.data 中提取）
-export function request<T>(options: RequestOptions): Promise<T> {
+export async function request<T>(options: RequestOptions, retried = false): Promise<T> {
+  if (!options.skipAuthRefresh) {
+    try {
+      await restoreSession()
+    } catch (error) {
+      uni.showToast({ title: error instanceof Error ? error.message : '恢复登录失败', icon: 'none' })
+      throw error
+    }
+  }
   return new Promise<T>((resolve, reject) => {
     const authStore = useAuthStore()
+    const sentToken = authStore.token
 
     if (options.loading) {
       uni.showLoading({ title: '加载中...', mask: true })
@@ -45,21 +55,28 @@ export function request<T>(options: RequestOptions): Promise<T> {
           return
         }
 
-        if (TOKEN_EXPIRED_CODES.has(envelope.code) && !options.skipAuthRefresh && authStore.refreshToken) {
+        // 并发请求可能在续期后才返回旧令牌的错误，直接使用新令牌重试。
+        if (!options.skipAuthRefresh && !retried && authStore.token && authStore.token !== sentToken &&
+            (TOKEN_EXPIRED_CODES.has(envelope.code) || AUTH_REQUIRED_CODES.has(envelope.code))) {
+          request<T>(options, true).then(resolve).catch(reject)
+          return
+        }
+
+        if ((TOKEN_EXPIRED_CODES.has(envelope.code) || (envelope.code === 401003 && !!sentToken)) &&
+            !options.skipAuthRefresh && !retried && authStore.refreshToken) {
           refreshToken()
             .then(() => {
-              request<T>(options).then(resolve).catch(reject)
+              request<T>(options, true).then(resolve).catch(reject)
             })
-            .catch(() => {
-              authStore.clearToken()
-              uni.redirectTo({ url: '/pages/auth/auth' })
-              reject(new Error('登录已过期'))
+            .catch((error) => {
+              uni.showToast({ title: error instanceof Error ? error.message : '恢复登录失败', icon: 'none' })
+              reject(error)
             })
           return
         }
 
-        if (AUTH_REQUIRED_CODES.has(envelope.code) && !options.skipAuthRefresh) {
-          authStore.clearToken()
+        if ((AUTH_REQUIRED_CODES.has(envelope.code) || TOKEN_EXPIRED_CODES.has(envelope.code)) && !options.skipAuthRefresh) {
+          clearSession()
           uni.showToast({ title: '请先登录', icon: 'none' })
           uni.redirectTo({ url: '/pages/auth/auth' })
           reject(new Error('请先登录'))
@@ -82,42 +99,51 @@ export function request<T>(options: RequestOptions): Promise<T> {
   })
 }
 
-async function refreshToken(): Promise<void> {
-  if (isRefreshing && refreshPromise) {
-    return refreshPromise
-  }
+// 缓存中的访问令牌过期后，用仍有效的刷新令牌恢复会话。
+export async function restoreSession(): Promise<void> {
+  const authStore = useAuthStore()
+  if (refreshPromise) return refreshPromise
+  authStore.token = storage.get<string>('token') || ''
+  authStore.refreshToken = storage.get<string>('refreshToken') || ''
+  if (!authStore.token && authStore.refreshToken) await refreshToken()
+}
 
-  isRefreshing = true
+function clearSession(): void {
+  useAuthStore().clearToken()
+  useUserStore().clearUserInfo()
+}
+
+async function refreshToken(): Promise<void> {
+  if (refreshPromise) return refreshPromise
+  const authStore = useAuthStore()
+  const originalRefreshToken = authStore.refreshToken
   refreshPromise = new Promise<void>((resolve, reject) => {
-    const authStore = useAuthStore()
-    // 裸请求，避免递归触发刷新
     uni.request({
       url: `${APP_CONFIG.apiBaseUrl}/auth/refresh-token`,
       method: 'POST',
-      data: { refreshToken: authStore.refreshToken } as never,
+      data: { refreshToken: originalRefreshToken } as never,
       header: { 'Content-Type': 'application/json' },
       success: (res) => {
         const data = res.data as ApiResponse<{ token: string; refreshToken: string; expiresIn?: number }>
-        if (data.code === 200) {
-          authStore.setToken(data.data.token, data.data.refreshToken)
+        // 退出或重新登录后，忽略旧会话的刷新响应。
+        if (authStore.refreshToken !== originalRefreshToken) {
+          reject(new Error('登录状态已变更'))
+          return
+        }
+        if (data.code === 200 && data.data?.token && data.data?.refreshToken) {
+          authStore.setToken(data.data.token, data.data.refreshToken, data.data.expiresIn)
           resolve()
+        } else if (TOKEN_EXPIRED_CODES.has(data.code) || AUTH_REQUIRED_CODES.has(data.code)) {
+          clearSession()
+          reject(new Error('登录已过期，请重新登录'))
         } else {
-          authStore.clearToken()
-          uni.redirectTo({ url: '/pages/auth/auth' })
-          reject(new Error('登录已过期'))
+          reject(new Error(data.message || '暂时无法恢复登录，请稍后重试'))
         }
       },
-      fail: () => {
-        authStore.clearToken()
-        uni.redirectTo({ url: '/pages/auth/auth' })
-        reject(new Error('刷新失败'))
-      },
-      complete: () => {
-        isRefreshing = false
-        refreshPromise = null
-      },
+      fail: () => reject(new Error('网络异常，请稍后重试')),
     })
+  }).finally(() => {
+    refreshPromise = null
   })
-
   return refreshPromise
 }
