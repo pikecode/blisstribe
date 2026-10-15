@@ -35,10 +35,10 @@
     <view class="index__section">
       <view class="app-section-head">
         <view>
-          <text class="app-section-title">需求评估</text>
-          <text class="app-section-desc">按模块梳理需求，再生成推荐</text>
+          <text class="app-section-title">服务分类</text>
+          <text class="app-section-desc">浏览服务，也可通过需求问卷了解适合的方向</text>
         </view>
-        <text class="app-link-text">{{ assessmentCount }}/{{ productModules.length }} 已完成</text>
+        <text class="app-link-text">{{ productModules.length }} 个分类</text>
       </view>
       <ModuleAssessmentList :items="moduleAssessmentItems" @module-tap="handleModuleTap" />
     </view>
@@ -151,6 +151,7 @@ const moduleAssessmentItems = computed(() => productModules.value.map((item) => 
   coverUrl: item.coverUrl,
   icon: item.icon,
   done: hasAssessment(item.code),
+  assessmentEnabled: item.assessmentEnabled,
 })))
 const overviewText = computed(() => {
   if (recentLead.value) return `${leadStatusText(recentLead.value.status)}：${recentLead.value.product.title}`
@@ -294,7 +295,7 @@ const goProductModule = (item: ProductModule) => {
 }
 const handleModuleTap = (code: string) => {
   const module = productModules.value.find((item) => item.code === code)
-  if (module) goProductModule(module)
+  if (module) uni.navigateTo({ url: `/pages/products/index?moduleCode=${module.code}` })
 }
 const goEditProfile = () => {
   if (!isLogin.value) {

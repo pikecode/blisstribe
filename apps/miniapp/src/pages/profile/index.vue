@@ -115,6 +115,13 @@
         </view>
         <text class="profile__chevron">›</text>
       </view>
+      <view class="profile__menu-item" @tap="goServices">
+        <view>
+          <text class="profile__menu-title">我的服务</text>
+          <text class="profile__menu-desc">查看服务权益、有效期和履约进度</text>
+        </view>
+        <text class="profile__chevron">›</text>
+      </view>
       <view class="profile__menu-item" @tap="goShopAddresses">
         <view>
           <text class="profile__menu-title">收货地址</text>
@@ -432,6 +439,10 @@ function goShopCart(): void {
 
 function goShopOrders(): void {
   requireLogin(() => uni.navigateTo({ url: '/pages/shop/orders' }))
+}
+
+function goServices(): void {
+  requireLogin(() => uni.navigateTo({ url: '/pages/services/index' }))
 }
 
 function goShopAddresses(): void {

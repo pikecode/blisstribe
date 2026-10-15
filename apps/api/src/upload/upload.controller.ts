@@ -64,6 +64,14 @@ export class UploadController {
     return this.uploadService.saveBanner(file)
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('service-goods-evidence')
+  @UseInterceptors(AvatarFileInterceptor)
+  async uploadServiceGoodsEvidence(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('请上传文件')
+    return this.uploadService.saveServiceGoodsEvidence(file)
+  }
+
   @UseGuards(AdminJwtGuard)
   @Post('cover')
   @UseInterceptors(

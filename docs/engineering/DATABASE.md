@@ -582,3 +582,38 @@ DB_CONNECTION_TIMEOUT=5000
 **文档版本**: v2.0
 **更新日期**: 2026-07-01
 **作者**: AI Assistant
+
+
+## 服务产品一期新增模型（2026-10-14）
+
+实际定义以 `apps/api/prisma/schema.prisma` 和 `20261014000100` 至 `20261014001400` 迁移为准。
+
+| 模型 | 作用 |
+| --- | --- |
+| ServiceInstitution | 合作主体的履约机构、接待日与接待时间 |
+| ServiceOffering／ServiceOfferingItem | 可售方案、价格、有效期、服务项目与金额分摊 |
+| ServiceQualification | 咨询对应购买资格、确认医生、操作人、有效期和依据 |
+| ServiceOrder／ServiceOrderItem | 服务交易和购买时快照，客户端请求编号按患者唯一 |
+| ServicePayment | 原微信交易、预支付、渠道状态与异常记录 |
+| ServicePlan／ServiceEntitlement | 已生效服务计划、权益守恒、未到场后预约资格暂停 |
+| ServiceAppointmentSlot | 机构公开的具体时段与接待容量 |
+| ServiceAppointment | 预约、候选改约、确认期限、实际执行人员及履约时间 |
+| ServiceRefund／ServiceRefundItem／ServiceRefundEvent | 分次数退款、冻结、审核、渠道确认与处理记录 |
+| ServiceNotice | 按事件唯一的患者站内提醒与已读状态 |
+| AuditLog（复用） | 履约操作和机构等待区间，顺延按区间合并计算 |
+
+权益守恒：总数＝可用＋预约预留＋已使用＋退款冻结＋已退款＋到期数量。到期未使用次数停止预约，保留退款／客服处理依据，不记为已使用。容量占用按预约有效状态统计，候选建议不占容量。
+
+涉及支付与退款均以整数分记账。回调幂等、权益核销和退款结转依赖条件更新与事务。免费领取按患者行锁串行处理；预约容量按时段行锁检查，数据库验收仅连接独立验收库。
+
+后续阶段新增 `ServiceOfferingItem.retiredAt`，修改方案时停用原项目而非删除，保留历史订单外键关联。方案读取和新下单过滤已停用项目，历史成交内容仍以订单快照为准。
+
+`ServiceFollowUp` 关联服务计划，记录联系时间、负责人、目的、结果与患者一次反馈。状态为待联系、已完成、已取消；计划与请求编号联合唯一，安排和处理在事务中生成审计与站内消息，不额外消耗服务次数。创建与处理人保留管理账号编号，患者响应不暴露该编号。
+
+套餐实物复用 `ServiceOfferingItem`／`ServiceOrderItem`，增加类型、商城规格外键、交付方式、退货说明和商品快照。商城 `reservedStock`／`soldStock` 同时承担商城与套餐库存占用。实物不能被服务预约占用；实物寄送中使用权益预留数量、交付确认后使用已交付数量，退款中使用冻结数量。
+
+`ServiceGoodsReturn` 保存退货申请、数量、原因、照片、退回地址、寄回期限、物流、核验说明与关联服务退款。`ServiceRefundItem.fromGoodsReturn` 用于退款失败恢复已交付状态，`goodsReusable` 决定是否恢复可售库存。退货记录不删除；处于处理中的退货参与计划售后状态计算。服务订单行锁串行协调下单后关闭、支付、交付、退货和退款库存事务，多个规格按编号顺序结转。
+
+`ServiceDispute` 一对一关联原已完成预约，保存受理人、机构依据、方案、患者接受、复核、处理期限、暂停结算标记与关联退款。`ServiceDisputeEvent` 保存完整事件历史。纠正项目关联实际权益，重新安排关联新的已确认预约且保持唯一。原服务记录保留，使用 `correctionStatus`／`correctionReason` 记录修正事实。
+
+例外退费明细使用 `ServiceRefundItem.compensation=true`，数量为 0，仅改变资金退款额，不增减服务冻结／已用／已退次数。订单行锁协调异议、补偿退款和普通退款；条件更新防止重复恢复次数，`updatedAt` 用于方案版本校验。退款成功后在同一事务中结案并解除异议标记，退款失败继续保留工单。支持日历和超期提醒不通过超时自动结案。

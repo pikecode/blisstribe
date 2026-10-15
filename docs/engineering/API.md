@@ -507,3 +507,92 @@ interface User {
 **文档版本**: v1.0
 **创建日期**: 2026-07-01
 **作者**: AI Assistant
+
+
+## 服务方案一期接口（2026-10-14）
+
+当前线上基址为 `https://api.ytxybl.com/api/v1`。公开方案接口无需登录；患者接口校验本人会话，管理接口仅供平台管理后台使用。
+
+| 用途 | 方法与路径 |
+| --- | --- |
+| 产品可售方案／方案详情 | GET `/service-products/:productId/offerings`、GET `/service-offerings/:id` |
+| 购买资格和最早时段 | GET `/service-offerings/:id/eligibility` |
+| 下单、本人订单和取消 | POST／GET `/service-orders`、GET `/service-orders/:id`、POST `/service-orders/:id/cancel` |
+| 创建支付／主动确认 | POST `/service-orders/:id/payment`、POST `/service-orders/:id/payment/query` |
+| 本人服务计划 | GET `/service-plans`、GET `/service-plans/:id` |
+| 时段与提交预约 | GET `/service-institutions/:id/slots`、POST `/service-plans/:planId/appointments` |
+| 本人预约和改约确认 | GET `/service-appointments`、GET `/service-appointments/:id`、POST `/service-appointments/:id/accept-reschedule` |
+| 患者取消 | POST `/service-appointments/:id/cancel` |
+| 服务退款 | POST `/service-orders/:orderId/refunds`、GET `/service-refunds`、GET `/service-refunds/:id`、POST `/service-refunds/:id/withdraw` |
+| 站内消息与已读 | GET `/service-notices`、POST `/service-notices/:id/read` |
+| 机构、方案和资格 | `/admin/service-institutions`、`/admin/service-offerings`、`/admin/product-leads/:leadId/service-qualifications` |
+| 管理预约 | GET `/admin/service-appointments`，POST `/:id/confirm`、`/:id/arrive`、`/:id/complete`、`/:id/no-show`、`/:id/cancel`、`/:id/restore-booking`、`/:id/propose-reschedule` |
+| 开放／关闭时段 | GET／POST `/admin/service-appointments/slots`、POST `/admin/service-appointments/slots/:id/close` |
+| 管理退款 | GET `/admin/service-refunds`、GET `/:id`、POST `/:id/review`、`/:id/query-provider`、`/:id/resolve-closed` |
+| 管理订单／延期 | GET `/admin/service-orders`、GET `/:id`、POST `/:id/extend-plan` |
+| 微信支付／退款通知 | POST `/service-program/webhooks/wechat-pay`、POST `/service-program/webhooks/wechat-refund` |
+
+预约提交必须提供 `slotId`、`entitlementId`、`requestedStartAt` 和 `clientRequestId`；时间和时长以机构时段为准。完成履约需提供 `performedByName`。资格登记需填写 `professionalName` 和业务依据 `note`。退款金额由后端计算，患者仅提交项目次数和需取消的关联预约编号。
+
+站内提醒由业务事务生成；微信客服沿用小程序客服能力。当前没有启用微信订阅消息模板推送。
+
+### 套餐明细与随访（2026-10-14 后续阶段）
+
+方案 `items` 支持 1 至 50 个服务项目，`allocatedAmountFen` 为该项目全部次数的成交分摊总额，`institutionSettlementFen` 为每次机构结算单价。全部分摊合计必须等于售价；付费套餐的机构结算合计与默认推广收益不能超过售价。下架后编辑保留旧项目，新购买只使用当前明细，历史订单不受调整影响。
+
+| 用途 | 路由 |
+| --- | --- |
+| 运营查看／安排随访 | GET／POST `/admin/service-plans/:id/follow-ups` |
+| 完成或取消随访 | POST `/admin/service-follow-ups/:id/resolve` |
+| 患者查看本人随访 | GET `/service-plans/:id/follow-ups` |
+| 患者提交一次反馈 | POST `/service-follow-ups/:id/feedback` |
+
+安排请求：`clientRequestId`、`scheduledAt`（含时区的未来时间）、`contactName`、`purpose`。处理请求：`status`（`completed`／`cancelled`）、`outcome`（患者可见）。患者反馈请求：`feedback`，最多 500 字，仅已完成随访可提交。重复安排使用相同请求编号返回同一记录，重复相同处理不重复通知；其他状态冲突需刷新。
+
+随访只登记服务联系与体验反馈，不保存专业诊疗资料。当前运营入口仍使用平台管理权限，多机构隔离账号将在权限阶段建设。
+
+### 套餐实物交付与退货
+
+方案项目增加 `kind`（`service`／`goods`）；实物需提供 `skuId`、`deliveryMethod`（`pickup`／`shipping`）、`returnNotice`。商品名、规格和图片由服务端从商城保存快照；库存由服务端共用商城计数，患者不能上传自定商品快照。
+
+| 用途 | 路由 |
+| --- | --- |
+| 患者／运营查看实物交付 | GET `/service-plans/:id/goods`、`/admin/service-plans/:id/goods` |
+| 患者地址／收货 | POST `/service-goods/:id/action`：`address`＋本人 `addressId`，或 `receive` |
+| 运营交付登记 | POST `/admin/service-goods/:id/action`：`ready`、`ship`＋快递公司单号、`receive`＋交付依据、`recover`＋实物取回依据 |
+| 患者／运营查看退货 | GET `/service-plans/:id/goods-returns`、`/admin/service-plans/:id/goods-returns` |
+| 患者申请退货 | POST `/service-goods/:id/return`：`quantity`、`reason`、`reasonType`、`clientRequestId`、可选 `images`（最多 6 张） |
+| 患者撤回／寄回 | POST `/service-goods-returns/:id/action`：`withdraw` 或 `shipped`＋物流 |
+| 运营审核／核验 | POST `/admin/service-goods-returns/:id/action`：`approve`＋地址／说明、`reject`＋说明、`inspect`＋核验说明及 `reusable`、`dispute`＋依据 |
+| 患者上传商品问题照片 | POST `/upload/service-goods-evidence`，jpg／png，2 MB 上限 |
+
+退货核验不直接发放退款：有金额时创建服务退款申请，由财务继续审核、渠道确认；零元赠品记录本地退回结果，不产生微信资金退款。不可重售商品不自动恢复库存。已寄送商品只能在有实物取回依据后撤回寄送，不能仅取消物流标记便释放库存。
+
+### 已完成服务的异议与例外退费
+
+| 用途 | 路由 |
+| --- | --- |
+| 患者提交记录异议 | POST `/service-appointments/:id/disputes` |
+| 查询某条记录已有异议 | GET `/service-appointments/:id/dispute` |
+| 患者列表／详情 | GET `/service-disputes?planId=&page=`、GET `/service-disputes/:id` |
+| 患者接受／复核／不接受 | POST `/service-disputes/:id/action` |
+| 后台列表／详情 | GET `/admin/service-disputes?status=&keyword=&overdue=&page=`、GET `/admin/service-disputes/:id` |
+| 后台处理 | POST `/admin/service-disputes/:id/action` |
+
+提交字段：`reasonType`（`not_received`／`wrong_item`／`wrong_quantity`／`other`）、`description`、`clientRequestId`。每条原服务记录只对应一个异议工单；已有开放工单返回原记录，已结案后不通过重复提交再次恢复次数。
+
+患者动作：`accept`、`review`、`disagree`；后台动作：`contact`、`evidence`、`propose`、`review`、`extend`、`retry_refund`、`finish_rearrange`。双方动作均提交读取时的 `expectedUpdatedAt`，状态变化后需刷新。复核／不接受需原因，后台所有动作需说明。方案结果为 `maintain`、`restore`、`correct_item`、`rearrange`、`refund`。
+
+实际项目修正需 `correctedEntitlementId`，仅支持同一计划的其他有未使用次数的服务项目。重新安排在恢复权益后保持 `awaiting_rebooking`，运营提交 `replacementAppointmentId`，服务端确认属于同一计划、同一项目、患者接受方案后建立且已确认，才结案；同一新预约不能终结多个异议。
+
+例外退费提供整数分 `refundAmountFen`、`costBearer`（平台／机构／共同承担）及 `clawbackNote`。患者接受后生成补偿退款明细 `compensation=true`、`quantity=0`，只退款资金，不结转服务次数。单次分摊上限按整数分向上取整，并受订单剩余实付限制。原登记人、方案提出人及复核人不能审批该补偿退款；微信成功后结案，失败时继续协调或重新提出方案。待患者确认的方案可更新，患者须按新的版本明确接受。
+
+患者响应隐藏管理账号编号、冲回口径和其他内部资金字段。所有阶段保留事件、审计和站内提醒，患者沉默不自动结案。结算暂停标记供后续财务账本使用，当前尚未执行真实机构／主理人账本冻结。
+
+### 套餐检查与服务工作台（2026-10-15）
+
+以下接口均要求后台管理员登录：
+
+- `GET /admin/service-offerings/:id/readiness`：返回 `checkedAt`、`canPublish`、`availableNow`、`requiresQualification`、`summary` 和 `checks`；检查项包含 `key`、`label`、`passed`、`blocking`、`message`、`target`。后台套餐列表同时返回每行 `readiness`。
+- 套餐上架复用服务端检查，阻止缺少必填配置的上架请求；时段、库存和展示状态作为运营提示。`availableNow` 为资源及展示检查结果，不替代用户购买资格和实际下单校验。
+- `GET /admin/service-operations/workbench`：返回 `checkedAt`、北京时间 `date` 和 `items`，每项含 `key`、`label`、`count`、`path`、`query`。六类计数口径及边界见 [实施说明](../plans/2026-10-15-service-readiness-workbench.md)。

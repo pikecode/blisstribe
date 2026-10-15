@@ -24,9 +24,18 @@
         </div>
         <nav class="layout__nav">
           <div v-for="section in menuSections" :key="section.title" class="layout__nav-section">
-            <div class="layout__nav-section-title">{{ section.title }}</div>
+            <button
+              type="button"
+              class="layout__nav-section-title"
+              :aria-expanded="expandedSections.includes(section.title)"
+              @click="toggleSection(section.title)"
+            >
+              <span>{{ section.title }}</span>
+              <el-icon class="layout__nav-chevron" :class="{ expanded: expandedSections.includes(section.title) }"><ArrowDownIcon /></el-icon>
+            </button>
             <router-link
               v-for="item in section.items"
+              v-show="expandedSections.includes(section.title)"
               :key="item.path"
               :to="item.path"
               class="layout__nav-item"
@@ -51,9 +60,18 @@
       </div>
       <nav class="layout__nav">
         <div v-for="section in menuSections" :key="section.title" class="layout__nav-section">
-          <div class="layout__nav-section-title">{{ section.title }}</div>
+          <button
+              type="button"
+              class="layout__nav-section-title"
+              :aria-expanded="expandedSections.includes(section.title)"
+              @click="toggleSection(section.title)"
+            >
+              <span>{{ section.title }}</span>
+              <el-icon class="layout__nav-chevron" :class="{ expanded: expandedSections.includes(section.title) }"><ArrowDownIcon /></el-icon>
+            </button>
           <router-link
             v-for="item in section.items"
+              v-show="expandedSections.includes(section.title)"
             :key="item.path"
             :to="item.path"
             class="layout__nav-item"
@@ -109,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -118,6 +136,7 @@ import {
   CollectionTag,
   DataLine,
   Document,
+  DocumentChecked,
   EditPen,
   Goods,
   Lock,
@@ -129,6 +148,8 @@ import {
   ShoppingCart,
   SwitchButton,
   Tickets,
+  TrendCharts,
+  Warning,
   User,
 } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
@@ -163,44 +184,62 @@ onUnmounted(() => window.removeEventListener('resize', updateWidth))
 
 const menuSections: MenuSection[] = [
   {
-    title: '运营概览',
+    title: '工作台',
     items: [
       { path: '/dashboard', title: '数据看板', icon: DataLine, desc: '查看关键增长指标与注册趋势' },
     ],
   },
   {
-    title: '用户与增长',
+    title: '客户与伙伴',
     items: [
       { path: '/users', title: '用户管理', icon: User, desc: '检索用户资料、标签与账号状态' },
-      { path: '/invitations', title: '邀请管理', icon: Share, desc: '查看邀请效果、注册记录与关系链路' },
-      { path: '/partners', title: '服务伙伴审核', icon: OfficeBuilding, desc: '审核经营主体、客户归属与邀请记录' },
       { path: '/product-leads', title: '咨询线索', icon: Tickets, desc: '查看用户需求并记录线索跟进状态' },
+      { path: '/partners', title: '服务伙伴审核', icon: OfficeBuilding, desc: '审核经营主体、客户归属与邀请记录' },
+      { path: '/invitations', title: '邀请管理', icon: Share, desc: '查看邀请效果、注册记录与关系链路' },
     ],
   },
   {
-    title: '商城管理',
+    title: '服务经营',
+    items: [
+      { path: '/products', title: '产品介绍', icon: Goods, desc: '维护产品介绍、展示模块与上下架，关联可售服务套餐' },
+      { path: '/service-programs', title: '服务套餐', icon: DocumentChecked, desc: '维护履约机构、可售方案、价格与服务规则' },
+      { path: '/service-orders', title: '服务订单', icon: Tickets, desc: '查看服务支付、权益、预约与退款全貌' },
+      { path: '/service-appointments', title: '预约与核销', icon: Calendar, desc: '确认预约、登记到场并完成服务核销' },
+      { path: '/service-refunds', title: '服务退款', icon: DocumentChecked, desc: '审核服务退款并核对微信渠道结果' },
+      { path: '/service-disputes', title: '履约异议', icon: DocumentChecked, desc: '处理记录异议、独立复核和例外退费' },
+    ],
+  },
+  {
+    title: '商城经营',
     items: [
       { path: '/shop/categories', title: '商品分类', icon: CollectionTag, desc: '维护商城商品分类' },
-      { path: '/shop/products', title: '商品管理', icon: Goods, desc: '维护商城商品信息、库存、价格' },
-      { path: '/shop/orders', title: '订单管理', icon: Tickets, desc: '查看订单详情、发货和状态管理' },
+      { path: '/shop/products', title: '商城商品', icon: Goods, desc: '维护商城商品信息、库存、价格' },
+      { path: '/shop/orders', title: '商城订单', icon: Tickets, desc: '查看订单详情、发货和状态管理' },
+      { path: '/shop/refunds', title: '商城退款', icon: DocumentChecked, desc: '审核商城退款并跟进原路退回结果' },
+      { path: '/shop/payment-exceptions', title: '支付异常核查', icon: Warning, desc: '核查支付与订单状态异常并跟进处理' },
     ],
   },
   {
-    title: '产品与推荐',
+    title: '活动运营',
     items: [
-      { path: '/products', title: '产品管理', icon: Goods, desc: '维护产品模块、标签、推荐优先级与上下架' },
       { path: '/activities', title: '活动管理', icon: Calendar, desc: '维护活动内容、报名时间、名额和关联产品' },
-      { path: '/venues', title: '场地管理', icon: Location, desc: '维护活动场地、图片、可用时间和不可用时间' },
       { path: '/activity-registrations', title: '活动报名', icon: Tickets, desc: '查看报名用户、来源归属和现场确认状态' },
+      { path: '/venues', title: '场地管理', icon: Location, desc: '维护活动场地、图片、可用时间和不可用时间' },
+    ],
+  },
+  {
+    title: '评估与推荐',
+    items: [
       { path: '/assessment-templates', title: '评估管理', icon: EditPen, desc: '维护模块评估题目、选项和标签映射' },
-      { path: '/recommendation-rules', title: '推荐规则', icon: CollectionTag, desc: '配置评估标签命中后的产品加权和推荐理由' },
       { path: '/tags', title: '标签字典', icon: CollectionTag, desc: '维护评估、产品和推荐规则共用标签' },
+      { path: '/recommendation-rules', title: '推荐规则', icon: CollectionTag, desc: '配置评估标签命中后的产品加权和推荐理由' },
+      { path: '/recommendation-analytics', title: '推荐效果', icon: TrendCharts, desc: '查看推荐曝光、点击与转化表现' },
     ],
   },
   {
     title: '内容与系统',
     items: [
-      { path: '/banners', title: '首页 Banner', icon: Picture, desc: '维护小程序首页展示资源' },
+      { path: '/banners', title: '首页展示', icon: Picture, desc: '维护小程序首页展示资源' },
       { path: '/agreements', title: '协议管理', icon: Document, desc: '维护用户协议和隐私政策版本' },
       { path: '/admins', title: '管理员与权限', icon: Lock, desc: '管理后台账号、角色与权限' },
     ],
@@ -228,6 +267,38 @@ const breadcrumbs = computed(() => {
 const isActiveMenu = (path: string) => {
   return route.path === path || route.path.startsWith(`${path}/`)
 }
+
+// 只保存导航展开偏好；存储不可用时仍可正常切换菜单。
+const navigationStorageKey = 'blisstribe.admin.expanded-menu-sections'
+const expandedSections = ref<string[]>(readExpandedSections())
+
+function readExpandedSections(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(navigationStorageKey) || '[]')
+    return Array.isArray(saved)
+      ? menuSections.filter(section => saved.includes(section.title)).map(section => section.title)
+      : []
+  } catch {
+    return []
+  }
+}
+
+function toggleSection(title: string) {
+  expandedSections.value = expandedSections.value.includes(title)
+    ? expandedSections.value.filter(item => item !== title)
+    : [...expandedSections.value, title]
+}
+
+watch(expandedSections, (titles) => {
+  try { localStorage.setItem(navigationStorageKey, JSON.stringify(titles)) } catch { /* 浏览器禁止存储时仅保留本次状态 */ }
+})
+
+watch(() => route.path, () => {
+  const section = menuSections.find(item => item.items.some(menu => isActiveMenu(menu.path)))
+  if (section && !expandedSections.value.includes(section.title)) {
+    expandedSections.value = [...expandedSections.value, section.title]
+  }
+}, { immediate: true })
 
 const handleLogout = () => {
   authStore.clear()
@@ -376,12 +447,39 @@ onUnmounted(() => {
 }
 
 .layout__nav-section-title {
-  padding: $space-8 $space-12 $space-6;
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 36px;
+  padding: $space-8 $space-12;
+  border: 0;
+  border-radius: $radius-md;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+
+.layout__nav-section-title:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.layout__nav-section-title:focus-visible {
+  outline: 2px solid $color-primary-light;
+  outline-offset: 2px;
+}
+
+.layout__nav-chevron {
+  transform: rotate(-90deg);
+  transition: transform $transition-base;
+  &.expanded { transform: rotate(0); }
 }
 
 .layout__nav-item {
@@ -392,8 +490,11 @@ onUnmounted(() => {
   min-height: 42px;
   border-radius: $radius-md;
   border-left: 3px solid transparent;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: $font-size-sm;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
   text-decoration: none;
   transition: background $transition-base, color $transition-base, border-color $transition-base;
 }

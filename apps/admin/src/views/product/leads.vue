@@ -154,6 +154,28 @@
           <div v-if="detailLead.message" class="detail-message">{{ detailLead.message }}</div>
         </div>
 
+        <div class="detail-section qualification-section">
+          <div class="detail-title-row">
+            <div>
+              <div class="detail-title">购买资格</div>
+              <div class="muted">机构确认后，患者才能购买需要评估的方案</div>
+            </div>
+            <el-button type="primary" size="small" @click="openQualificationDialog">确认资格</el-button>
+          </div>
+          <div v-if="activeQualifications.length" class="qualification-list">
+            <div v-for="item in activeQualifications" :key="item.id" class="qualification-card">
+              <div>
+                <strong>{{ item.offering.name }}</strong>
+                <span>{{ item.offering.institution.name }} · ¥{{ (item.offering.priceFen / 100).toFixed(2) }}</span>
+              </div>
+              <el-tag :type="isQualificationExpired(item.expiresAt) ? 'info' : 'success'">
+                {{ isQualificationExpired(item.expiresAt) ? '已过期' : item.expiresAt ? `有效至 ${formatDate(item.expiresAt)}` : '长期有效' }}
+              </el-tag>
+            </div>
+          </div>
+          <el-empty v-else :image-size="48" description="尚未确认可购买方案" />
+        </div>
+
         <div class="detail-section">
           <div class="detail-title">跟进历史</div>
           <el-timeline v-if="detailLead.followUps.length">
@@ -173,6 +195,32 @@
         </div>
       </div>
     </el-drawer>
+
+    <el-dialog v-model="qualificationDialogVisible" title="确认购买资格" width="620px">
+      <el-alert title="这里只记录业务购买资格，不填写诊断、检查结果或其他专业病历内容。" type="info" :closable="false" show-icon />
+      <el-form label-position="top" class="qualification-form">
+        <el-form-item label="可购买方案（取消全部勾选将撤销资格）">
+          <el-checkbox-group v-model="qualificationForm.offeringIds" class="offering-options">
+            <el-checkbox v-for="item in availableOfferings" :key="item.id" :value="item.id" border>
+              <span class="offering-option__name">{{ item.name }}</span>
+              <span class="offering-option__meta">{{ item.institution.name }} · ¥{{ (item.priceFen / 100).toFixed(2) }}</span>
+            </el-checkbox>
+          </el-checkbox-group>
+          <el-empty v-if="!availableOfferings.length" :image-size="48" description="该产品暂无已上架方案，请先到服务方案中配置" />
+        </el-form-item>
+        <el-form-item label="确认医生" required><el-input v-model="qualificationForm.professionalName" maxlength="60" placeholder="填写线下确认医生姓名" /></el-form-item>
+        <el-form-item label="资格有效期">
+          <el-date-picker v-model="qualificationForm.expiresAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss.SSSZ" placeholder="不填写表示长期有效" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="业务说明">
+          <el-input v-model="qualificationForm.note" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="如：已完成线下评估，可购买所选方案" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="qualificationDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="qualificationSaving" @click="saveQualifications">确认保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -185,6 +233,7 @@ import AdminListPagination from '@/components/AdminListPagination.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { productApi, type ProductLead, type ProductLeadSummary } from '@/api/product'
+import { serviceProgramApi, type ServiceOffering, type ServiceQualification } from '@/api/service-program'
 
 const listError = ref('')
 
@@ -211,6 +260,17 @@ const detailLead = ref<ProductLead | null>(null)
 const detailVisible = ref(false)
 const followDialogVisible = ref(false)
 const followForm = reactive({ status: 'new', followUpNote: '', nextFollowAt: '' })
+const qualifications = ref<ServiceQualification[]>([])
+const availableOfferings = ref<ServiceOffering[]>([])
+const qualificationDialogVisible = ref(false)
+const qualificationSaving = ref(false)
+const qualificationForm = reactive<{ offeringIds: number[]; expiresAt: string; note: string; professionalName: string }>({
+  offeringIds: [],
+  professionalName: '',
+  expiresAt: '',
+  note: '',
+})
+const activeQualifications = computed(() => qualifications.value.filter((item) => item.status === 'active'))
 
 const leadStatuses = [
   { label: '线索创建', value: 'created' },
@@ -356,8 +416,55 @@ function openFollowDialog(row: ProductLead) {
 }
 
 async function openDetail(row: ProductLead) {
-  detailLead.value = await productApi.detailLead(row.id)
+  const [lead, qualificationRows] = await Promise.all([
+    productApi.detailLead(row.id),
+    serviceProgramApi.listLeadQualifications(row.id),
+  ])
+  detailLead.value = lead
+  qualifications.value = qualificationRows
   detailVisible.value = true
+}
+
+function isQualificationExpired(expiresAt: string | null) {
+  return !!expiresAt && new Date(expiresAt).getTime() <= Date.now()
+}
+
+async function openQualificationDialog() {
+  if (!detailLead.value) return
+  const result = await serviceProgramApi.listOfferings({
+    productId: detailLead.value.product.id,
+    status: 1,
+    page: 1,
+    pageSize: 100,
+  })
+  availableOfferings.value = result.list
+  qualificationForm.offeringIds = activeQualifications.value
+    .filter((item) => !isQualificationExpired(item.expiresAt))
+    .map((item) => item.offeringId)
+  qualificationForm.expiresAt = activeQualifications.value.find((item) => item.expiresAt)?.expiresAt || ''
+  qualificationForm.note = ''
+  qualificationForm.professionalName = activeQualifications.value[0]?.professionalName || ''
+  qualificationDialogVisible.value = true
+}
+
+async function saveQualifications() {
+  if (!detailLead.value) return
+  if (qualificationForm.offeringIds.length && (!qualificationForm.professionalName.trim() || !qualificationForm.note.trim())) { ElMessage.warning('请填写确认医生和业务确认依据'); return }
+  qualificationSaving.value = true
+  try {
+    qualifications.value = await serviceProgramApi.syncLeadQualifications(detailLead.value.id, {
+      offeringIds: qualificationForm.offeringIds,
+      professionalName: qualificationForm.professionalName.trim(),
+      expiresAt: qualificationForm.expiresAt || undefined,
+      note: qualificationForm.note.trim() || undefined,
+    })
+    detailLead.value = await productApi.detailLead(detailLead.value.id)
+    ElMessage.success(qualificationForm.offeringIds.length ? '购买资格已确认' : '购买资格已撤销')
+    qualificationDialogVisible.value = false
+    await loadAll()
+  } finally {
+    qualificationSaving.value = false
+  }
 }
 
 async function submitFollow() {
@@ -452,6 +559,76 @@ onMounted(loadAll)
   margin-bottom: 10px;
   color: #1f2937;
   font-weight: 600;
+}
+.detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.detail-title-row .detail-title {
+  margin-bottom: 3px;
+}
+.qualification-section {
+  padding: 16px;
+  border: 1px solid #dcefe9;
+  border-radius: 10px;
+  background: #f7fcfa;
+}
+.qualification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qualification-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+.qualification-card > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.qualification-card span {
+  color: #8a94a6;
+  font-size: 12px;
+}
+.qualification-form {
+  margin-top: 18px;
+}
+.offering-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  width: 100%;
+}
+.offering-options :deep(.el-checkbox) {
+  width: 100%;
+  height: auto;
+  min-height: 54px;
+  margin: 0;
+  padding: 10px 14px;
+}
+.offering-options :deep(.el-checkbox__label) {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.offering-option__name {
+  color: #111827;
+  font-weight: 700;
+}
+.offering-option__meta {
+  color: #8a94a6;
+  font-size: 12px;
 }
 .detail-main {
   margin-bottom: 4px;

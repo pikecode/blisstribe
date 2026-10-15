@@ -53,7 +53,7 @@ const routes: RouteRecordRaw[] = [
         path: 'banners',
         name: 'Banners',
         component: () => import('@/views/banner/index.vue'),
-        meta: { title: '首页 Banner', icon: 'Picture' },
+        meta: { title: '首页展示', icon: 'Picture' },
       },
       {
         path: 'tags',
@@ -65,7 +65,7 @@ const routes: RouteRecordRaw[] = [
         path: 'products',
         name: 'Products',
         component: () => import('@/views/product/index.vue'),
-        meta: { title: '产品管理', icon: 'Goods' },
+        meta: { title: '产品介绍', icon: 'Goods' },
       },
       {
         path: 'activities',
@@ -110,10 +110,40 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '咨询线索', icon: 'Tickets' },
       },
       {
+        path: 'service-programs',
+        name: 'ServicePrograms',
+        component: () => import('@/views/service-program/index.vue'),
+        meta: { title: '服务套餐', icon: 'DocumentChecked' },
+      },
+      {
+        path: 'service-appointments',
+        name: 'ServiceAppointments',
+        component: () => import('@/views/service-program/appointments.vue'),
+        meta: { title: '预约与核销', icon: 'Calendar' },
+      },
+      {
+        path: 'service-refunds',
+        name: 'ServiceRefunds',
+        component: () => import('@/views/service-program/refunds.vue'),
+        meta: { title: '服务退款', icon: 'DocumentChecked' },
+      },
+      {
+        path: 'service-disputes',
+        name: 'ServiceDisputes',
+        component: () => import('@/views/service-program/disputes.vue'),
+        meta: { title: '履约异议', icon: 'DocumentChecked' },
+      },
+      {
+        path: 'service-orders',
+        name: 'ServiceOrders',
+        component: () => import('@/views/service-program/orders.vue'),
+        meta: { title: '服务订单', icon: 'Tickets' },
+      },
+      {
         path: 'shop',
         name: 'Shop',
         redirect: '/shop/categories',
-        meta: { title: '商城管理', icon: 'ShoppingCart' },
+        meta: { title: '商城经营', icon: 'ShoppingCart' },
         children: [
           {
             path: 'categories',
@@ -125,19 +155,19 @@ const routes: RouteRecordRaw[] = [
             path: 'products',
             name: 'ShopProducts',
             component: () => import('@/views/shop/product.vue'),
-            meta: { title: '商品管理', icon: 'Goods' },
+            meta: { title: '商城商品', icon: 'Goods' },
           },
           {
             path: 'orders',
             name: 'ShopOrders',
             component: () => import('@/views/shop/order.vue'),
-            meta: { title: '订单管理', icon: 'List' },
+            meta: { title: '商城订单', icon: 'List' },
           },
           {
             path: 'refunds',
             name: 'ShopRefunds',
             component: () => import('@/views/shop/refund.vue'),
-            meta: { title: '退款管理', icon: 'Delete' },
+            meta: { title: '商城退款', icon: 'Delete' },
           },
           {
             path: 'payment-exceptions',

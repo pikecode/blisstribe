@@ -36,6 +36,11 @@ rsync -az --delete \
   --exclude 'apps/api/.env' \
   --exclude '.env*' \
   --exclude 'apps/miniapp/dist' \
+  --exclude 'apps/api/uploads' \
+  --exclude '.playwright-cli' \
+  --exclude 'output' \
+  --exclude '*.tsbuildinfo' \
+  --exclude '.DS_Store' \
   ./ "$SSH_HOST:$RELEASE_DIR/"
 
 log "服务器安装依赖并构建"

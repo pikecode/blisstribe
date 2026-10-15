@@ -1,5 +1,9 @@
 <template>
   <div class="product-page">
+    <el-alert class="product-entry-guide" type="info" :closable="false" show-icon>
+      <template #title>在这里维护服务介绍，价格、次数和套餐实物在“服务套餐”中配置。</template>
+      <div>单独售卖实物请前往 <el-button link type="primary" @click="router.push('/shop/products')">商城商品</el-button>。历史实物与组合介绍可继续维护。</div>
+    </el-alert>
     <el-tabs v-model="activeTab">
       <!-- 产品列表标签页 -->
       <el-tab-pane label="产品列表" name="products">
@@ -52,7 +56,7 @@
             <el-button plain icon="Refresh" @click="resetSearch">重置</el-button>
 
             <!-- 新增产品按钮 -->
-            <el-button type="primary" @click="openProductDialog()">新增产品</el-button>
+            <el-button type="primary" @click="openProductDialog()">新增服务产品</el-button>
           </div>
         </AdminListToolbar>
 
@@ -79,7 +83,7 @@
                 <el-tag :type="productTypeTagType(row.productType)" effect="light">{{ productTypeText(row.productType) }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="priceText" label="价格" width="100" />
+            <el-table-column prop="priceText" label="价格文案" width="120" />
             <el-table-column label="标签" min-width="140">
               <template #default="{ row }">
                 <div class="tags-container">
@@ -95,10 +99,11 @@
                 <el-tag v-else type="warning" effect="light" round>草稿</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="88" fixed="right" align="center">
+            <el-table-column label="操作" width="104" fixed="right" align="center">
           <template #default="{ row }">
             <AdminListActions>
               <AdminListAction label="编辑" icon="Edit" @click="editProduct(row)" />
+              <AdminListAction v-if="row.productType === 'service'" label="管理套餐" icon="DocumentChecked" @click="router.push({ path: '/service-programs', query: { productId: row.id } })" />
               <template #more>
                 <el-dropdown-item v-if="row.status !== 1" @click="publishProduct(row)">上架</el-dropdown-item>
                 <el-dropdown-item v-else @click="unpublishProduct(row)">下架</el-dropdown-item>
@@ -147,13 +152,14 @@
                 </el-tag>
               </template>
             </el-table-column>
+            <el-table-column label="模块状态" width="100"><template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag></template></el-table-column>
             <el-table-column prop="sortOrder" label="排序" width="80" />
             <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
             <AdminListActions>
               <AdminListAction label="编辑" icon="Edit" @click="openModuleDialog(row)" />
               <template #more>
-                <el-dropdown-item @click="deleteModule(row)" class="admin-list-danger">删除</el-dropdown-item>
+                <el-dropdown-item @click="toggleModuleStatus(row)">{{ row.status === 1 ? '停用模块' : '启用模块' }}</el-dropdown-item>
               </template>
             </AdminListActions>
           </template>
@@ -163,7 +169,7 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="productDialogVisible" :title="editingProductId ? '编辑产品' : '新增产品'" width="800px" :close-on-click-modal="false">
+    <el-dialog v-model="productDialogVisible" :title="editingProductId ? '编辑产品介绍' : '新增服务产品'" width="800px" :close-on-click-modal="false">
       <el-form ref="productFormRef" :model="productForm" :rules="productRules" label-width="100px">
         <el-tabs v-model="activeProductFormTab">
           <!-- 基础信息 -->
@@ -173,12 +179,12 @@
                 <el-option v-for="item in activeModules" :key="item.id" :label="item.name" :value="item.id" />
               </el-select>
             </el-form-item>
-            <el-form-item label="产品类型" prop="productType">
-              <el-radio-group v-model="productForm.productType">
-                <el-radio-button v-for="item in productTypeOptions" :key="item.value" :label="item.value">
-                  {{ item.label }}
-                </el-radio-button>
-              </el-radio-group>
+            <el-form-item label="产品类型">
+              <div class="product-type-guide">
+                <el-tag :type="productTypeTagType(productForm.productType)">{{ productTypeText(productForm.productType) }}</el-tag>
+                <span v-if="productForm.productType === 'service'">保存后可通过“管理套餐”配置购买方案，支持服务及配套实物。</span>
+                <span v-else>历史介绍仅用于展示和咨询，可继续修改内容。需要售卖服务请新增服务产品，单独售卖实物请使用商城商品。</span>
+              </div>
             </el-form-item>
             <el-form-item label="标题" prop="title">
               <el-input v-model="productForm.title" />
@@ -190,7 +196,7 @@
               <AdminCoverUpload v-model="productForm.coverUrl" tip="支持 jpg/png/webp，建议使用产品实拍或服务场景横图，文件不超过 5MB" />
             </el-form-item>
             <el-form-item label="价格文案">
-              <el-input v-model="productForm.priceText" placeholder="例如：199元起 / 到店咨询" />
+              <el-input v-model="productForm.priceText" placeholder="展示用，例如199元起；实际成交价在服务套餐中维护" />
             </el-form-item>
             <el-form-item label="优先级/排序">
               <div style="display: flex; gap: 12px">
@@ -366,10 +372,13 @@ import AdminListTable from '@/components/AdminListTable.vue'
 import AdminListToolbar from '@/components/AdminListToolbar.vue'
 import AdminListPagination from '@/components/AdminListPagination.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { productApi, type Product, type ProductModule, type ProductModulePayload, type ProductPayload, type ProductType, type TagDictionary } from '@/api/product'
 import { buildTagOptionGroups, mapTagNamesToIds, tagOptionLabel } from '@/utils/tags'
 import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
+
+const router = useRouter()
 
 const moduleError = ref('')
 const moduleLoading = ref(false)
@@ -448,8 +457,8 @@ const productRules = {
 
 const productTypeOptions: Array<{ label: string; value: ProductType }> = [
   { label: '服务产品', value: 'service' },
-  { label: '实物产品', value: 'physical' },
-  { label: '组合方案', value: 'package' },
+  { label: '实物介绍（历史）', value: 'physical' },
+  { label: '组合介绍（历史）', value: 'package' },
 ]
 
 const activeModules = computed(() => modules.value.filter((item) => item.status === 1))
@@ -590,7 +599,7 @@ async function submitProduct() {
   await productFormRef.value?.validate()
   submitting.value = true
   try {
-    const data = { ...productForm, tags: cleanTags(productForm.tags), tagIds: productForm.tagIds }
+    const data = { ...productForm, productType: editingProductId.value ? productForm.productType : 'service' as ProductType, tags: cleanTags(productForm.tags), tagIds: productForm.tagIds }
     if (editingProductId.value) {
       await productApi.updateProduct(editingProductId.value, data)
       ElMessage.success('产品已更新')
@@ -676,19 +685,19 @@ function unpublishProduct(row: Product) {
   unpublish(row)
 }
 
-async function deleteModule(row: ProductModule) {
+const moduleStatusSaving = ref(false)
+async function toggleModuleStatus(row: ProductModule) {
+  if (moduleStatusSaving.value) return
+  const enabled = row.status !== 1
   try {
-    await ElMessageBox.confirm(
-      `确定删除模块「${row.name}」？删除后无法恢复。`,
-      '提示',
-      { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' }
-    )
-    // await productApi.deleteModule(row.id)
-    ElMessage.success('模块已删除')
+    await ElMessageBox.confirm(enabled ? `启用“${row.name}”后，已上架产品可恢复展示。` : `停用“${row.name}”后，该模块及其产品将从公开浏览入口隐藏，已有订单仍保留。`, enabled ? '启用模块' : '停用模块', { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' })
+  } catch { return }
+  moduleStatusSaving.value = true
+  try {
+    await productApi.updateModule(row.id, { status: enabled ? 1 : 0 })
+    ElMessage.success(enabled ? '模块已启用' : '模块已停用')
     await loadModules()
-  } catch {
-    // 用户取消
-  }
+  } finally { moduleStatusSaving.value = false }
 }
 
 onMounted(async () => {
@@ -700,6 +709,9 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 @use '@/styles/variables.scss' as *;
+.product-entry-guide { margin-bottom: 16px; }
+.product-type-guide { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.product-type-guide > span { color: #64748b; font-size: 12px; line-height: 1.7; }
 .product-page {
   display: flex;
   flex-direction: column;

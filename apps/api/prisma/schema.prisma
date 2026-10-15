@@ -59,6 +59,11 @@ model User {
   shoppingCart          ShopCart?
   shopOrders            ShopOrder[]
   shopAddresses         ShopAddress[]
+  serviceOrders         ServiceOrder[]
+  servicePlans          ServicePlan[]
+  serviceAppointments   ServiceAppointment[]
+  serviceRefunds        ServiceRefund[]
+  serviceNotices        ServiceNotice[]
 
   @@index([status])
   @@index([createdAt])
@@ -241,6 +246,8 @@ model Partner {
   relationEvents        RelationEvent[]
   productLeads          ProductLead[]
   activityRegistrations ActivityRegistration[]
+  serviceInstitution    ServiceInstitution?
+  sourcedServiceOrders  ServiceOrder[]         @relation("ServiceOrderSourcePartner")
 
   @@index([status, auditStatus])
   @@index([type])
@@ -735,6 +742,7 @@ model Product {
   leads                ProductLead[]
   recommendationRules  AssessmentRecommendationRule[]
   recommendationEvents RecommendationEvent[]
+  serviceOfferings     ServiceOffering[]
 
   @@index([moduleId, status])
   @@index([productType, status])
@@ -809,10 +817,12 @@ model ProductLead {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @default(now()) @updatedAt
 
-  product   Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  partner   Partner?              @relation(fields: [partnerId], references: [id], onDelete: SetNull)
-  followUps ProductLeadFollowUp[]
+  product               Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner               Partner?               @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  followUps             ProductLeadFollowUp[]
+  serviceQualifications ServiceQualification[]
+  serviceOrders         ServiceOrder[]
 
   @@index([productId, createdAt])
   @@index([userId, createdAt])
@@ -972,6 +982,515 @@ model ProductLeadCleanup {
   @@index([cleanupType, executedAt])
 }
 
+// ========== 服务方案模块 Phase 1 ==========
+
+// 实际履约机构。Partner 表示合作经营主体，本表保存服务履约所需信息。
+model ServiceInstitution {
+  id           BigInt    @id @default(autoincrement())
+  partnerId    BigInt    @unique
+  name         String
+  address      String    @default("")
+  contactName  String    @default("")
+  contactPhone String    @default("")
+  receptionHours Json @default("{\"weekdays\":[1,2,3,4,5],\"startMinute\":540,\"endMinute\":1020}")
+  status       Int       @default(1) // 0停用 1启用
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  partner   Partner           @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  offerings ServiceOffering[]
+  orders    ServiceOrder[]
+  plans     ServicePlan[]
+  appointments ServiceAppointment[]
+
+  appointmentSlots ServiceAppointmentSlot[]
+
+  @@index([status, createdAt])
+  @@index([deletedAt])
+}
+
+// 服务产品下的可售方案。
+model ServiceOffering {
+  id                     BigInt    @id @default(autoincrement())
+  productId              BigInt
+  institutionId          BigInt
+  name                   String
+  subtitle               String    @default("")
+  priceFen               Int
+  validityDays           Int
+  requiresQualification  Boolean   @default(false)
+  appointmentNotice      String    @default("")
+  refundNotice           String    @default("")
+  defaultPromoterRateBps Int       @default(0)
+  version                Int       @default(1)
+  status                 Int       @default(0) // 0草稿 1上架 2下架
+  sortOrder              Int       @default(0)
+  publishedAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  deletedAt              DateTime?
+
+  product        Product                @relation(fields: [productId], references: [id], onDelete: Restrict)
+  institution    ServiceInstitution     @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  items          ServiceOfferingItem[]
+  qualifications ServiceQualification[]
+  orders         ServiceOrder[]
+
+  @@index([productId, status, sortOrder])
+  @@index([institutionId, status])
+  @@index([status, publishedAt])
+  @@index([deletedAt])
+}
+
+// 方案项目及成交金额分摊。首期 UI 只维护一个项目，数据结构支持后续套餐。
+model ServiceOfferingItem {
+  id                       BigInt   @id @default(autoincrement())
+  offeringId               BigInt
+  name                     String
+  description              String   @default("")
+  quantity                 Int      @default(1)
+  allocatedAmountFen       Int
+  institutionSettlementFen Int      @default(0)
+  sortOrder                Int      @default(0)
+  retiredAt                DateTime?
+  kind                     String   @default("service")
+  skuId                    BigInt?
+  deliveryMethod           String   @default("pickup")
+  returnNotice             String   @default("")
+  goodsSnapshot            Json     @default("{}")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  offering   ServiceOffering    @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  orderItems ServiceOrderItem[]
+  sku        ShopProductSku? @relation(fields: [skuId], references: [id], onDelete: Restrict)
+
+  @@index([offeringId, sortOrder])
+}
+
+// 机构确认患者可购买的具体方案；专业判断仍保留在机构系统。
+model ServiceQualification {
+  id                 BigInt    @id @default(autoincrement())
+  leadId             BigInt
+  offeringId         BigInt
+  status             String    @default("active") // active/revoked
+  note               String    @default("")
+  confirmedByAdminId BigInt
+  professionalName   String @default("")
+  confirmedAt        DateTime  @default(now())
+  expiresAt          DateTime?
+  revokedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  lead     ProductLead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  offering ServiceOffering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  orders   ServiceOrder[]
+
+  @@unique([leadId, offeringId])
+  @@index([leadId, status, expiresAt])
+  @@index([offeringId, status])
+}
+
+// 服务订单与商城订单独立，分别承担预约履约和商品发货规则。
+model ServiceOrder {
+  id                  BigInt    @id @default(autoincrement())
+  orderNo             String    @unique
+  clientRequestId     String
+  userId              BigInt
+  offeringId          BigInt
+  institutionId       BigInt
+  leadId              BigInt?
+  qualificationId     BigInt?
+  sourcePartnerId     BigInt?
+  status              String    @default("pending_payment") // pending_payment/paid/closed/partially_refunded/refunded
+  paymentStatus       String    @default("unpaid") // unpaid/paid/partially_refunded/refunded
+  totalAmountFen      Int
+  paymentAmountFen    Int
+  refundedAmountFen   Int       @default(0)
+  offeringSnapshot    Json
+  institutionSnapshot Json
+  pricingSnapshot     Json
+  expiresAt           DateTime
+  paidAt              DateTime?
+  closedAt            DateTime?
+  closeReason         String    @default("")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  offering      ServiceOffering       @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  institution   ServiceInstitution    @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  lead          ProductLead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  qualification ServiceQualification? @relation(fields: [qualificationId], references: [id], onDelete: SetNull)
+  sourcePartner Partner?              @relation("ServiceOrderSourcePartner", fields: [sourcePartnerId], references: [id], onDelete: SetNull)
+  items         ServiceOrderItem[]
+  plan          ServicePlan?
+  payments      ServicePayment[]
+  refunds       ServiceRefund[]
+
+  @@unique([userId, clientRequestId])
+  @@index([userId, createdAt])
+  @@index([institutionId, status, createdAt])
+  @@index([status, expiresAt])
+  @@index([paymentStatus, createdAt])
+}
+
+// 服务订单项目保存购买时的项目名称、数量与分摊金额。
+model ServiceOrderItem {
+  id                       BigInt   @id @default(autoincrement())
+  orderId                  BigInt
+  offeringItemId           BigInt
+  itemName                 String
+  itemDescription          String   @default("")
+  quantity                 Int
+  allocatedAmountFen       Int
+  institutionSettlementFen Int      @default(0)
+  kind                     String   @default("service")
+  skuId                    BigInt?
+  deliveryMethod           String   @default("pickup")
+  returnNotice             String   @default("")
+  goodsSnapshot            Json     @default("{}")
+  createdAt                DateTime @default(now())
+
+  order        ServiceOrder        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  offeringItem ServiceOfferingItem @relation(fields: [offeringItemId], references: [id], onDelete: Restrict)
+  entitlement  ServiceEntitlement?
+  sku          ShopProductSku? @relation(fields: [skuId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([offeringItemId])
+}
+
+// 服务订单支付记录；微信渠道成功与服务权益发放在同一事务中确认。
+model ServicePayment {
+  id                  BigInt    @id @default(autoincrement())
+  orderId             BigInt
+  outTradeNo          String    @unique
+  wechatTransactionId String?   @unique
+  prepayId            String?
+  amountFen           Int
+  status              String    @default("pending") // pending/success/closed/exception
+  paidAt              DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, status])
+}
+
+// 支付或免费确认后建立的患者服务计划。
+model ServicePlan {
+  id            BigInt   @id @default(autoincrement())
+  orderId       BigInt   @unique
+  userId        BigInt
+  institutionId BigInt
+  status        String   @default("active") // active/completed/refunded/expired
+  startsAt      DateTime
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  order        ServiceOrder         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  institution  ServiceInstitution   @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  entitlements ServiceEntitlement[]
+  appointments ServiceAppointment[]
+  followUps    ServiceFollowUp[]
+  disputes     ServiceDispute[]
+
+  @@index([userId, status, updatedAt])
+  @@index([institutionId, status])
+  @@index([expiresAt, status])
+}
+
+// 随访只保存服务沟通与体验反馈，不保存专业诊疗资料。
+model ServiceFollowUp {
+  id                 BigInt    @id @default(autoincrement())
+  planId             BigInt
+  clientRequestId    String
+  scheduledAt        DateTime
+  contactName        String
+  purpose            String
+  status             String    @default("scheduled") // scheduled/completed/cancelled
+  outcome            String    @default("")
+  patientFeedback    String    @default("")
+  feedbackAt         DateTime?
+  completedAt        DateTime?
+  createdByAdminId    BigInt
+  completedByAdminId BigInt?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  plan               ServicePlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, clientRequestId])
+  @@index([status, scheduledAt])
+}
+
+// 数量字段共同构成权益守恒，预约和退款阶段分别修改预留与冻结数量。
+model ServiceEntitlement {
+  id               BigInt   @id @default(autoincrement())
+  planId           BigInt
+  orderItemId      BigInt   @unique
+  totalQuantity    Int
+  reservedQuantity Int      @default(0)
+  bookingBlocked   Boolean  @default(false)
+  bookingBlockReason String @default("")
+  usedQuantity     Int      @default(0)
+  refundFrozen     Int      @default(0)
+  refundedQuantity Int      @default(0)
+  expiredQuantity  Int      @default(0)
+  deliveryStatus   String   @default("pending") // pending/ready/shipped/delivered
+  deliveryAddress  Json?
+  expressCompany   String   @default("")
+  trackingNo       String   @default("")
+  deliveredAt      DateTime?
+  deliveryEvidence String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  plan      ServicePlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  orderItem ServiceOrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  appointments ServiceAppointment[]
+  refundItems  ServiceRefundItem[]
+  goodsReturns ServiceGoodsReturn[]
+  correctedDisputes ServiceDispute[]
+
+  @@index([planId])
+}
+
+// 预约占用一份服务权益；完成后才从预留数量转为已使用数量。
+model ServiceGoodsReturn {
+  id              BigInt @id @default(autoincrement())
+  entitlementId   BigInt
+  clientRequestId String
+  quantity        Int
+  reason          String
+  images          String[] @default([])
+  status          String @default("requested")
+  returnAddress   String @default("")
+  deadline        DateTime?
+  expressCompany  String @default("")
+  trackingNo      String @default("")
+  note            String @default("")
+  refundId        BigInt?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  entitlement     ServiceEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Restrict)
+  refund          ServiceRefund? @relation(fields: [refundId], references: [id], onDelete: Restrict)
+
+  @@unique([entitlementId, clientRequestId])
+}
+
+model ServiceAppointment {
+  id                 BigInt    @id @default(autoincrement())
+  clientRequestId    String
+  planId             BigInt
+  entitlementId      BigInt
+  userId             BigInt
+  institutionId      BigInt
+  status             String    @default("pending") // pending/confirmed/arrived/completed/refund_pending/cancelled/no_show
+  refundId           BigInt?
+  slotId             BigInt?
+  proposedSlotId     BigInt?
+  proposalReason     String @default("")
+  proposalExpiresAt  DateTime?
+  confirmationDeadline DateTime?
+  requestedStartAt   DateTime
+  confirmedStartAt   DateTime?
+  durationMinutes    Int       @default(60)
+  assignedStaffName  String    @default("")
+  patientNote        String    @default("")
+  cancelReason       String    @default("")
+  confirmedByAdminId BigInt?
+  confirmedAt        DateTime?
+  arrivedAt          DateTime?
+  completedAt        DateTime?
+  performedByName    String @default("")
+  completedByAdminId BigInt?
+  correctionStatus String @default("none")
+  correctionReason String @default("")
+  cancelledAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  plan        ServicePlan        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  entitlement ServiceEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Restrict)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  dispute     ServiceDispute? @relation("DisputeOriginal")
+  replacementDispute ServiceDispute? @relation("DisputeReplacement")
+  institution ServiceInstitution @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  refund      ServiceRefund?     @relation(fields: [refundId], references: [id], onDelete: SetNull)
+  slot        ServiceAppointmentSlot? @relation("AppointmentSlot", fields: [slotId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, clientRequestId])
+  @@index([planId, status, requestedStartAt])
+  @@index([institutionId, status, requestedStartAt])
+  @@index([userId, status, requestedStartAt])
+  @@index([refundId])
+  proposedSlot ServiceAppointmentSlot? @relation("ProposedSlot", fields: [proposedSlotId], references: [id], onDelete: Restrict)
+
+  @@index([status, confirmationDeadline])
+  @@index([slotId, status])
+}
+
+model ServiceDispute {
+  id BigInt @id @default(autoincrement())
+  planId BigInt
+  appointmentId BigInt @unique
+  replacementAppointmentId BigInt? @unique
+  correctedEntitlementId BigInt?
+  clientRequestId String
+  reasonType String
+  description String
+  status String @default("submitted")
+  ownerAdminId BigInt?
+  ownerName String @default("")
+  proposedByAdminId BigInt?
+  reviewedByAdminId BigInt?
+  evidence String @default("")
+  outcome String @default("")
+  proposal String @default("")
+  refundAmountFen Int @default(0)
+  costBearer String @default("")
+  clawbackNote String @default("")
+  restoredExpiresAt DateTime?
+  refundId BigInt?
+  deadline DateTime?
+  acceptedAt DateTime?
+  resolvedAt DateTime?
+  overdueNotifiedAt DateTime?
+  settlementHeld Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  plan ServicePlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  appointment ServiceAppointment @relation("DisputeOriginal", fields: [appointmentId], references: [id], onDelete: Restrict)
+  replacementAppointment ServiceAppointment? @relation("DisputeReplacement", fields: [replacementAppointmentId], references: [id], onDelete: Restrict)
+  correctedEntitlement ServiceEntitlement? @relation(fields: [correctedEntitlementId], references: [id], onDelete: Restrict)
+  refund ServiceRefund? @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  events ServiceDisputeEvent[]
+
+  @@index([planId, status])
+  @@index([status, deadline])
+}
+
+model ServiceDisputeEvent {
+  id BigInt @id @default(autoincrement())
+  disputeId BigInt
+  actorType String
+  actorId BigInt
+  eventType String
+  detail String
+  createdAt DateTime @default(now())
+  dispute ServiceDispute @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+
+  @@index([disputeId, createdAt])
+}
+
+model ServiceAppointmentSlot {
+  id            BigInt @id @default(autoincrement())
+  institutionId BigInt
+  startAt       DateTime
+  endAt         DateTime
+  capacity      Int
+  enabled       Boolean @default(true)
+  createdAt     DateTime @default(now())
+  appointments  ServiceAppointment[] @relation("AppointmentSlot")
+  proposals ServiceAppointment[] @relation("ProposedSlot")
+  institution ServiceInstitution @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+
+  @@index([institutionId, enabled, startAt])
+}
+
+// 服务站内提醒与业务事件绑定，不依赖微信订阅消息授权。
+model ServiceNotice {
+  id BigInt @id @default(autoincrement())
+  eventKey String @unique
+  userId BigInt
+  title String
+  detail String
+  path String
+  readAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+}
+
+// 服务退款与商城退款独立，按未使用权益数量冻结和退款。
+model ServiceRefund {
+  id                    BigInt    @id @default(autoincrement())
+  orderId               BigInt
+  userId                BigInt
+  refundNo              String    @unique
+  outRefundNo           String    @unique
+  requestedAmountFen    Int
+  approvedAmountFen     Int?
+  reason                String
+  status                String    @default("pending") // pending/processing/success/rejected/withdrawn
+  wechatRefundId        String?   @unique
+  approvedByAdminId     BigInt?
+  approvedAt            DateTime?
+  adminNote             String    @default("")
+  completedAt           DateTime?
+  lastProviderStatus    String?
+  lastErrorCode         String?
+  lastAttemptAt         DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  order  ServiceOrder         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  user   User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items  ServiceRefundItem[]
+  events ServiceRefundEvent[]
+  goodsReturns ServiceGoodsReturn[]
+  disputes     ServiceDispute[]
+  appointments ServiceAppointment[]
+
+  @@index([orderId, status])
+  @@index([userId, createdAt])
+  @@index([status, lastAttemptAt])
+}
+
+model ServiceRefundItem {
+  id            BigInt @id @default(autoincrement())
+  refundId      BigInt
+  entitlementId BigInt
+  orderItemId   BigInt
+  quantity      Int
+  amountFen     Int
+  fromGoodsReturn Boolean @default(false)
+  goodsReusable   Boolean @default(false)
+  compensation    Boolean @default(false)
+
+  refund      ServiceRefund      @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  entitlement ServiceEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Restrict)
+
+  @@unique([refundId, entitlementId])
+  @@index([entitlementId])
+  @@index([orderItemId])
+}
+
+model ServiceRefundEvent {
+  id             BigInt   @id @default(autoincrement())
+  refundId       BigInt
+  eventType      String
+  actorType      String
+  actorId        BigInt?
+  fromStatus     String?
+  toStatus       String
+  providerStatus String?
+  detail         String    @default("")
+  createdAt      DateTime  @default(now())
+
+  refund ServiceRefund @relation(fields: [refundId], references: [id], onDelete: Restrict)
+
+  @@index([refundId, createdAt])
+}
+
 // ========== 商城模块 Phase 1 ==========
 
 // 商品分类
@@ -1029,6 +1548,8 @@ model ShopProductSku {
   product    ShopProduct     @relation(fields: [productId], references: [id], onDelete: Restrict)
   cartItems  ShopCartItem[]
   orderItems ShopOrderItem[]
+  serviceOfferingItems ServiceOfferingItem[]
+  serviceOrderItems    ServiceOrderItem[]
 
   @@unique([productId, specificationKey])
   @@index([productId, enabled])

@@ -16,7 +16,7 @@ import { OrderRepository } from './order/order.repository'
 import { OrderService } from './order/order.service'
 import { OrderController, AdminOrderController } from './order/order.controller'
 import { PaymentRepository } from './payment/payment.repository'
-import { WechatPayService } from './payment/wechat-pay.service'
+import { PaymentChannelModule } from '../payment-channel/payment-channel.module'
 import { PaymentService } from './payment/payment.service'
 import { AdminPaymentExceptionController } from './payment/payment-exception.controller'
 import { PaymentExceptionService } from './payment/payment-exception.service'
@@ -30,7 +30,7 @@ import { AddressController } from './address/address.controller'
 import { AddressService } from './address/address.service'
 
 @Module({
-  imports: [PrismaModule, ScheduleModule.forRoot(), AdminModule, AuthModule],
+  imports: [PrismaModule, ScheduleModule.forRoot(), AdminModule, AuthModule, PaymentChannelModule],
   controllers: [
     CategoryController,
     AdminCategoryController,
@@ -57,7 +57,6 @@ import { AddressService } from './address/address.service'
     OrderRepository,
     OrderService,
     PaymentRepository,
-    WechatPayService,
     PaymentService,
     PaymentExceptionService,
     RefundRepository,

@@ -12,3 +12,11 @@ export { cartApi, fenToYuan, yuanToFen } from './modules/cart'
 export type { Cart, CartItem, CartProduct } from './modules/cart'
 export { shopApi } from './modules/shop'
 export type { ShopCategory, ShopProduct, ShopProductListResult } from './modules/shop'
+export { serviceProgramApi } from './modules/service-program'
+export type {
+  ServiceEntitlement,
+  ServiceOffering,
+  ServiceOrder,
+  ServicePlan,
+  ServiceQualification,
+} from './modules/service-program'

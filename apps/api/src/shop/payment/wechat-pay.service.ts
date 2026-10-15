@@ -39,7 +39,10 @@ export class WechatPayService {
     }
   }
 
-  getNotifyUrl(event: 'wechat-pay' | 'wechat-refund'): string {
+  getNotifyUrl(
+    event: 'wechat-pay' | 'wechat-refund',
+    business: 'shop' | 'service-program' = 'shop'
+  ): string {
     let base: URL
     try {
       base = new URL(this.required('API_BASE_URL'))
@@ -56,7 +59,7 @@ export class WechatPayService {
         '微信支付回调基址必须是以 /api/v1 结尾的 HTTPS 地址'
       )
     }
-    return `${base.toString().replace(/\/+$/, '')}/shop/webhooks/${event}`
+    return `${base.toString().replace(/\/+$/, '')}/${business}/webhooks/${event}`
   }
 
   async createPrepay(params: {
@@ -168,15 +171,19 @@ export class WechatPayService {
     transactionId: string
     outRefundNo: string
     amount: number
+    totalAmount?: number
     reason: string
+    business?: 'shop' | 'service-program'
   }): Promise<{ refundId: string }> {
     const amount = this.validateAmount(params.amount)
+    const totalAmount = this.validateAmount(params.totalAmount ?? params.amount)
+    if (amount > totalAmount) throw new ServiceUnavailableException('微信退款金额不能超过原订单金额')
     const response = await this.request('POST', '/v3/refund/domestic/refunds', {
       transaction_id: params.transactionId,
       out_refund_no: params.outRefundNo,
       reason: params.reason.slice(0, 80),
-      notify_url: this.getNotifyUrl('wechat-refund'),
-      amount: { refund: amount, total: amount, currency: 'CNY' },
+      notify_url: this.getNotifyUrl('wechat-refund', params.business || 'shop'),
+      amount: { refund: amount, total: totalAmount, currency: 'CNY' },
     })
     const refundId = this.parseBody(response).refund_id
     if (typeof refundId !== 'string' || !refundId) {

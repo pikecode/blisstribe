@@ -14,7 +14,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "prisma:seed-shop-demo": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed-shop-demo.ts",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test:service-unit": "jest --config jest.service-unit.config.js --runInBand",
+    "test:service-db": "ts-node --project tsconfig.json ../../tests/service-program/database.check.ts"
   },
   "dependencies": {
     "@blisstribe/shared": "workspace:*",

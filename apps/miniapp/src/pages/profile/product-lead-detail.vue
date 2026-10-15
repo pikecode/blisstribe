@@ -70,6 +70,14 @@
         <view v-else class="lead-detail__empty">暂无跟进记录</view>
       </view>
 
+      <view class="lead-detail__panel">
+        <view class="lead-detail__panel-head"><text class="lead-detail__panel-title">下一步：选择服务套餐</text></view>
+        <text class="lead-detail__purchase-note">确认已沟通仅记录沟通进展。需要机构确认的套餐，将单独显示购买资格。</text>
+        <text v-if="purchaseLoading">正在加载套餐…</text>
+        <view v-else-if="purchaseError"><text>套餐信息加载失败</text><button size="mini" @tap="loadPurchaseOptions">重试</button></view>
+        <view v-else-if="!purchaseOptions.length" class="lead-detail__empty">暂未提供可选套餐，请等待机构安排。</view>
+        <view v-for="item in purchaseOptions" :key="item.id" class="lead-detail__purchase" @tap="goOffering(item.id)"><view><text>{{ item.name }}</text><text class="lead-detail__purchase-note">{{ qualificationText(item) }}</text></view><text>查看套餐 ›</text></view>
+      </view>
       <view class="lead-detail__actions">
         <view class="lead-detail__ghost" @tap="goProduct">查看产品</view>
         <view v-if="canConfirm" class="lead-detail__primary" :class="{ loading: confirming }" @tap="confirmContact">
@@ -88,14 +96,35 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { productApi, type ProductLead } from '@/api/modules/product'
+import { serviceProgramApi, type ServiceOffering, type ServiceQualification } from '@/api/modules/service-program'
 
 const leadId = ref(0)
 const lead = ref<ProductLead | null>(null)
 const loading = ref(false)
 const loadError = ref(false)
 const confirming = ref(false)
+const purchaseOptions = ref<ServiceOffering[]>([])
+const qualifications = ref<ServiceQualification[]>([])
+const purchaseError = ref(false)
+const purchaseLoading = ref(false)
+function qualificationText(item: ServiceOffering) {
+  if (!item.requiresQualification) return '无需资格确认，可查看套餐'
+  const qualified = qualifications.value.some(q => q.offeringId === item.id && q.status === 'active' && (!q.expiresAt || new Date(q.expiresAt).getTime() > Date.now()))
+  return qualified ? '机构已确认购买资格' : '等待机构确认购买资格'
+}
+async function loadPurchaseOptions() {
+  if (!lead.value) return
+  purchaseLoading.value = true; purchaseError.value = false
+  try {
+    const [options, qualified] = await Promise.all([serviceProgramApi.offerings(lead.value.product.id), serviceProgramApi.qualifications(lead.value.id)])
+    purchaseOptions.value = options; qualifications.value = qualified
+  } catch { purchaseOptions.value = []; purchaseError.value = true }
+  finally { purchaseLoading.value = false }
+}
+function goOffering(id: number) { uni.navigateTo({ url: `/pages/services/offering?id=${id}` }) }
+
 
 const statusMap: Record<string, string> = {
   created: '已创建',
@@ -154,6 +183,7 @@ async function loadLead() {
   loadError.value = false
   try {
     lead.value = await productApi.myLeadDetail(leadId.value)
+    void loadPurchaseOptions()
   } catch {
     lead.value = null
     loadError.value = true
@@ -189,11 +219,15 @@ function goLeads() {
 
 onLoad((query) => {
   leadId.value = Number(query?.id || 0)
-  loadLead()
 })
+onShow(() => { if (leadId.value) void loadLead() })
 </script>
 
 <style lang="scss">
+.lead-detail__purchase { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 24rpx 0; border-bottom: 1rpx solid #edf1ee; font-size: 26rpx; }
+.lead-detail__purchase > text { color: #16835d; white-space: nowrap; }
+.lead-detail__purchase-note { display: block; margin: 8rpx 0 16rpx; font-size: 23rpx; line-height: 1.7; color: #647067; }
+
 .lead-detail {
   min-height: 100vh;
   padding: 24rpx 24rpx 160rpx;

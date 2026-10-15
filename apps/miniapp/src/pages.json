@@ -15,6 +15,13 @@
       }
     },
     {
+      "path": "pages/services/notices",
+      "style": {
+        "navigationBarTitleText": "服务消息",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/auth/auth",
       "style": {
         "navigationBarTitleText": "授权登录",
@@ -91,6 +98,61 @@
       "path": "pages/products/detail",
       "style": {
         "navigationBarTitleText": "产品详情"
+      }
+    },
+    {
+      "path": "pages/services/offering",
+      "style": {
+        "navigationBarTitleText": "服务方案"
+      }
+    },
+    {
+      "path": "pages/services/checkout",
+      "style": {
+        "navigationBarTitleText": "确认购买"
+      }
+    },
+    {
+      "path": "pages/services/payment-result",
+      "style": {
+        "navigationBarTitleText": "支付结果"
+      }
+    },
+    {
+      "path": "pages/services/index",
+      "style": {
+        "navigationBarTitleText": "我的服务"
+      }
+    },
+    {
+      "path": "pages/services/detail",
+      "style": {
+        "navigationBarTitleText": "服务详情"
+      }
+    },
+    {
+      "path": "pages/services/appointment",
+      "style": {
+        "navigationBarTitleText": "预约服务"
+      }
+    },
+    {
+      "path": "pages/services/appointment-detail",
+      "style": {
+        "navigationBarTitleText": "预约详情"
+      }
+    },
+    {
+      "path": "pages/services/refund-request",
+      "style": {
+        "navigationBarTitleText": "申请服务退款"
+      }
+    },
+    {
+      "path": "pages/services/refund-detail",
+      "style": {
+        "navigationBarTitleText": "服务退款详情",
+        "enablePullDownRefresh": true
       }
     },
     {
@@ -201,6 +263,18 @@
       "style": {
         "navigationBarTitleText": "退款详情",
         "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/services/dispute-detail",
+      "style": {
+        "navigationBarTitleText": "服务异议"
+      }
+    },
+    {
+      "path": "pages/services/disputes",
+      "style": {
+        "navigationBarTitleText": "服务异议记录"
       }
     }
   ],

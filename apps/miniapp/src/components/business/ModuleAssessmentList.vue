@@ -17,7 +17,7 @@
         <view class="module-assessment-list__head">
           <text class="module-assessment-list__icon">{{ item.icon || item.name.slice(0, 2) }}</text>
           <text :class="['module-assessment-list__status', { done: item.done }]">
-            {{ item.done ? '已评估' : '待评估' }}
+            {{ item.assessmentEnabled === false ? '查看服务' : item.done ? '已完成问卷' : '可做需求问卷' }}
           </text>
         </view>
         <text class="module-assessment-list__title">{{ item.name }}</text>
@@ -34,7 +34,7 @@
           </text>
         </view>
         <text :class="['module-assessment-list__pill', item.done ? 'module-assessment-list__pill--done' : 'module-assessment-list__pill--todo']">
-          {{ item.done ? '已完成' : '待评估' }}
+          {{ item.assessmentEnabled === false ? '查看服务' : item.done ? '已完成问卷' : '可做需求问卷' }}
         </text>
       </template>
     </view>
@@ -48,6 +48,7 @@ export interface ModuleAssessmentListItem {
   description?: string
   coverUrl?: string
   icon?: string
+  assessmentEnabled?: boolean
   done: boolean
   summary?: string
 }

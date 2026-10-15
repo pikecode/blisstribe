@@ -27,31 +27,13 @@
       </div>
     </div>
 
-    <!-- 转漏指标 -->
-    <div class="funnel-section">
-      <div class="chart-card">
-        <div class="chart-card__header">
-          <h3 class="chart-card__title">用户转漏分析</h3>
-          <p class="chart-card__desc">邀请 → 注册 → 认证 → 完成评估</p>
-        </div>
-        <div class="funnel-metrics">
-          <div v-for="(metric, i) in funnelMetrics" :key="i" class="funnel-item">
-            <div class="funnel-item__stage">{{ metric.stage }}</div>
-            <div class="funnel-item__bar-wrapper">
-              <div
-                class="funnel-item__bar"
-                :style="{ width: metric.percentage + '%', '--color': metric.color }"
-              />
-            </div>
-            <div class="funnel-item__stats">
-              <span class="funnel-item__count">{{ metric.count.toLocaleString('zh-CN') }}</span>
-              <span class="funnel-item__percentage">{{ metric.percentage }}%</span>
-              <span class="funnel-item__conversion">↓ {{ metric.conversion }}%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <section class="service-workbench">
+      <div class="service-workbench__head"><div><h3>服务待办</h3><p>按北京时间统计；点击进入对应处理列表</p></div><el-button :loading="workbenchLoading" @click="loadWorkbench">刷新待办</el-button></div>
+      <el-skeleton v-if="workbenchLoading" :rows="2" animated />
+      <el-alert v-else-if="workbenchError" :title="workbenchError" type="error" :closable="false" />
+      <div v-else class="service-workbench__grid"><button v-for="item in workbench?.items" :key="item.key" class="service-workbench__item" @click="router.push({ path: item.path, query: item.query })"><span>{{ item.label }}</span><strong :class="{ overdue: item.key === 'overdue' && item.count > 0 }">{{ item.count }}</strong><small>查看处理 ›</small></button></div>
+      <p v-if="workbench && !workbenchError" class="service-workbench__time">更新于 {{ new Date(workbench.checkedAt).toLocaleString('zh-CN') }} · 各待办可能交叉，不作为订单总量相加。</p>
+    </section>
 
     <!-- 图表网格 -->
     <div class="dashboard__charts">
@@ -80,6 +62,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { serviceProgramApi, type ServiceWorkbench } from '@/api/service-program'
 import * as echarts from 'echarts'
 import { statsApi } from '@/api'
 import { CircleCheck, Remove, TrendCharts, User } from '@element-plus/icons-vue'
@@ -94,23 +78,28 @@ const loading = ref(true)
 const autoRefresh = ref(false)
 
 const statCards = ref([
-  { label: '总用户数', value: 0, icon: User, color: '#0f766e', trend: 12 },
-  { label: '活跃用户', value: 0, icon: CircleCheck, color: '#039855', trend: 8 },
-  { label: '今日新增', value: 0, icon: TrendCharts, color: '#2563eb', trend: -3 },
+  { label: '总用户数', value: 0, icon: User, color: '#0f766e', trend: 0 },
+  { label: '活跃用户', value: 0, icon: CircleCheck, color: '#039855', trend: 0 },
+  { label: '今日新增', value: 0, icon: TrendCharts, color: '#2563eb', trend: 0 },
   { label: '已禁用', value: 0, icon: Remove, color: '#d92d20', trend: 0 },
 ])
 
-const funnelMetrics = ref([
-  { stage: '邀请成功', count: 10000, percentage: 100, conversion: 0, color: '#0f766e' },
-  { stage: '用户注册', count: 8500, percentage: 85, conversion: 15, color: '#14b8a6' },
-  { stage: '完成认证', count: 6200, percentage: 62, conversion: 27, color: '#67e8f9' },
-  { stage: '完成评估', count: 3100, percentage: 31, conversion: 50, color: '#a5f3fc' },
-])
+const router = useRouter()
+const workbench = ref<ServiceWorkbench | null>(null)
+const workbenchLoading = ref(false)
+const workbenchError = ref('')
+async function loadWorkbench() {
+  if (workbenchLoading.value) return
+  workbenchLoading.value = true; workbenchError.value = ''
+  try { workbench.value = await serviceProgramApi.workbench() }
+  catch { workbenchError.value = '待办加载失败，请刷新重试' }
+  finally { workbenchLoading.value = false }
+}
 
 const refreshData = async () => {
   loading.value = true
   try {
-    await Promise.all([loadOverview(), loadTrend(), loadDistribution()])
+    await Promise.all([loadOverview(), loadTrend(), loadDistribution(), loadWorkbench()])
   } finally {
     loading.value = false
   }
@@ -222,7 +211,7 @@ const handleResize = () => {
 onMounted(async () => {
   loading.value = true
   try {
-    await Promise.all([loadOverview(), loadTrend(), loadDistribution()])
+    await Promise.all([loadOverview(), loadTrend(), loadDistribution(), loadWorkbench()])
   } finally {
     loading.value = false
   }
@@ -240,6 +229,20 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 @use '@/styles/variables.scss' as *;
 
+.service-workbench { background: #fff; border: 1px solid #e5e9ef; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+.service-workbench__head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px; }
+.service-workbench__head h3 { margin: 0 0 6px; font-size: 17px; }
+.service-workbench__head p, .service-workbench__time { color: #77838e; font-size: 12px; margin: 0; }
+.service-workbench__time { margin-top: 16px; }
+.service-workbench__grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.service-workbench__item { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px; border: 1px solid #e6edeb; border-radius: 10px; background: #f7faf9; cursor: pointer; text-align: left; color: #425450; font: inherit; }
+.service-workbench__item:hover { border-color: #0f766e; background: #edf8f5; }
+.service-workbench__item:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
+.service-workbench__item strong { font-size: 28px; color: #176c60; }
+.service-workbench__item strong.overdue { color: #b42318; }
+.service-workbench__item small { color: #7c8c87; }
+@media (max-width: 1200px) { .service-workbench__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 650px) { .service-workbench__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .dashboard {
   &__head {
     margin-bottom: $space-24;

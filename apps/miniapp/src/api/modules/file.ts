@@ -10,12 +10,13 @@ export interface UploadAvatarResult {
 }
 
 export const fileApi = {
-  async uploadAvatar(filePath: string, tempToken?: string): Promise<UploadAvatarResult> {
+  async uploadServiceGoodsEvidence(filePath: string): Promise<UploadAvatarResult> { return fileApi.uploadAvatar(filePath, undefined, 'service-goods-evidence') },
+  async uploadAvatar(filePath: string, tempToken?: string, route = 'avatar'): Promise<UploadAvatarResult> {
     if (!tempToken) await restoreSession()
     return new Promise<UploadAvatarResult>((resolve, reject) => {
       const authStore = useAuthStore()
       uni.uploadFile({
-        url: `${APP_CONFIG.apiBaseUrl}/upload/${tempToken ? 'register-avatar' : 'avatar'}`,
+        url: `${APP_CONFIG.apiBaseUrl}/upload/${tempToken ? 'register-avatar' : route}`,
         filePath,
         name: 'file',
         header: tempToken ? {} : {

@@ -68,6 +68,14 @@ export class UploadService {
     return { url: `${this.baseUrl}/uploads/${filename}` }
   }
 
+  async saveServiceGoodsEvidence(file: Express.Multer.File): Promise<{ url: string }> {
+    this.validateMagicBytes(file.buffer, file.mimetype)
+    const compressed = await sharp(file.buffer).resize({ width: 1600, withoutEnlargement: true }).webp({ quality: 85 }).toBuffer()
+    const filename = `service_goods_${randomUUID()}.webp`
+    writeFileSync(join(this.uploadDir, filename), compressed)
+    return { url: `${this.baseUrl}/uploads/${filename}` }
+  }
+
   async saveCover(file: Express.Multer.File): Promise<{ url: string }> {
     this.validateMagicBytes(file.buffer, file.mimetype)
     const compressed = await sharp(file.buffer)

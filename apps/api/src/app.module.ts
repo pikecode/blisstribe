@@ -19,6 +19,7 @@ import { ProductModule } from './product/product.module'
 import { ActivityModule } from './activity/activity.module'
 import { VenueModule } from './venue/venue.module'
 import { ShopModule } from './shop/shop.module'
+import { ServiceProgramModule } from './service-program/service-program.module'
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ShopModule } from './shop/shop.module'
     VenueModule,
     ActivityModule,
     ShopModule,
+    ServiceProgramModule,
   ],
 })
 export class AppModule {}

@@ -48,6 +48,28 @@
       </view>
       <text v-if="product.serviceProcess" class="detail__text detail__text--spaced">{{ product.serviceProcess }}</text>
     </view>
+    <view id="offering-options" v-if="offerings.length || offeringLoading || offeringError" class="detail__section">
+      <text v-if="offeringLoading">套餐加载中…</text>
+      <view v-else-if="offeringError"><text>套餐加载失败，点击重试</text><button size="mini" @tap="loadOfferings">重新加载套餐</button></view>
+      <view class="detail__section-head">
+        <text class="detail__section-title">可选服务方案</text>
+        <text class="detail__section-note">由机构实际提供服务</text>
+      </view>
+      <view v-for="item in offerings" :key="item.id" class="detail__offering" @tap="goOffering(item.id)">
+        <view class="detail__offering-main">
+          <text class="detail__offering-name">{{ item.name }}</text>
+          <text class="detail__offering-desc">{{ item.subtitle || `${item.items[0]?.name || '服务'} · ${item.validityDays}天有效` }}</text>
+          <view class="detail__offering-tags">
+            <text>{{ item.institution.name }}</text>
+            <text v-if="item.requiresQualification">需确认资格</text>
+          </view>
+        </view>
+        <view class="detail__offering-side">
+          <text class="detail__offering-price">{{ item.priceFen ? `¥${(item.priceFen / 100).toFixed(2)}` : '免费' }}</text>
+          <text class="detail__offering-arrow">›</text>
+        </view>
+      </view>
+    </view>
     <view class="detail__section" v-if="showPhysicalSection">
       <text class="detail__section-title">实物信息</text>
       <view class="detail__info-list">
@@ -84,7 +106,7 @@
       </view>
     </view>
 
-    <view class="detail__lead">
+    <view id="consultation-form" class="detail__lead">
       <text class="detail__section-title">我的需求</text>
       <text class="detail__lead-desc">提交后会进入后台线索池，运营人员或服务伙伴会根据你的需求跟进。</text>
       <view v-if="assessmentSummary" class="detail__assessment">
@@ -103,12 +125,12 @@
         </text>
       </view>
       <textarea class="detail__textarea" :value="message" placeholder="可以简单写下你的需求，便于后续匹配服务" maxlength="300" @input="onMessageInput" />
+      <button v-if="offerings.length || offeringError" size="mini" :disabled="submitting || hasSubmitted" @tap="submitLead">{{ submitButtonText }}</button>
     </view>
 
-    <view class="detail__footer">
-      <view class="detail__submit" :class="{ loading: submitting, disabled: hasSubmitted }" @tap="submitLead">
-        {{ submitButtonText }}
-      </view>
+    <view class="detail__footer detail__footer--purchase">
+      <button v-if="offerings.length || offeringError || offeringLoading" class="detail__consult" @tap="openConsultation">{{ hasSubmitted ? '咨询进展' : '咨询服务' }}</button>
+      <button class="detail__submit" :disabled="submitting || offeringLoading" @tap="primaryAction">{{ offeringLoading ? '加载套餐中…' : offeringError ? '重试加载套餐' : offerings.length ? '选择套餐' : hasSubmitted ? '查看咨询进展' : submitButtonText }}</button>
     </view>
 
     <view v-if="leadSuccess" class="detail__success-mask">
@@ -130,8 +152,9 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { productApi, productLeadActionText, productTypeText, serviceModeText, stockStatusText, type Product } from '@/api/modules/product'
+import { serviceProgramApi, type ServiceOffering } from '@/api/modules/service-program'
 import { useAuthStore } from '@/stores/modules/auth'
 import { useUserStore } from '@/stores/modules/user'
 import { useFreshUserInfo } from '@/composables/useFreshUserInfo'
@@ -152,6 +175,9 @@ const leadSuccess = ref(false)
 const submittedProductIds = ref<number[]>([])
 const assessmentTags = ref<string[]>([])
 const assessmentSummary = ref('')
+const offerings = ref<ServiceOffering[]>([])
+const offeringLoading = ref(false)
+const offeringError = ref(false)
 const userTags = computed(() => userStore.userInfo?.tags || [])
 const hasSubmitted = computed(() => product.value ? submittedProductIds.value.includes(product.value.id) : false)
 const showServiceSection = computed(() => product.value?.productType === 'service' || product.value?.productType === 'package')
@@ -180,13 +206,36 @@ async function loadDetail() {
   if (!productId.value) return
   submittedProductIds.value = storage.get<number[]>('submittedProductLeadIds') || []
   await refreshUserInfo()
-  const baseProduct = await productApi.detail(productId.value, userTags.value)
+  const [baseProduct] = await Promise.all([
+    productApi.detail(productId.value, userTags.value),
+    loadOfferings(),
+  ])
   const assessment = getAssessment(baseProduct.module.code)
   assessmentTags.value = assessment?.tags || []
   assessmentSummary.value = assessment?.summary || ''
   const tags = [...new Set([...userTags.value, ...assessmentTags.value])]
   product.value = await productApi.detail(productId.value, tags)
   needTags.value = product.value.matchedTags.length ? [...product.value.matchedTags] : assessmentTags.value.slice(0, 3)
+}
+
+async function loadOfferings() {
+  offeringLoading.value = true
+  offeringError.value = false
+  try { offerings.value = await serviceProgramApi.offerings(productId.value) }
+  catch { offerings.value = []; offeringError.value = true }
+  finally { offeringLoading.value = false }
+}
+function openConsultation() {
+  if (hasSubmitted.value) uni.navigateTo({ url: '/pages/profile/product-leads' })
+  else uni.pageScrollTo({ selector: '#consultation-form', duration: 250 })
+}
+function primaryAction() {
+  if (offeringLoading.value || submitting.value) return
+  if (offeringError.value) { void loadOfferings(); return }
+  if (offerings.value.length === 1) { goOffering(offerings.value[0].id); return }
+  if (offerings.value.length > 1) { uni.pageScrollTo({ selector: '#offering-options', duration: 250 }); return }
+  if (hasSubmitted.value) { openConsultation(); return }
+  void submitLead()
 }
 
 function toggleNeedTag(tag: string) {
@@ -239,13 +288,21 @@ function goBack() {
   uni.navigateBack()
 }
 
+function goOffering(id: number) {
+  uni.navigateTo({ url: `/pages/services/offering?id=${id}` })
+}
+
 onLoad((options) => {
   productId.value = Number(options?.id) || 0
-  loadDetail()
 })
+onShow(() => { if (productId.value) void loadDetail() })
 </script>
 
 <style lang="scss" scoped>
+.detail__footer--purchase { display: flex; align-items: center; gap: 16rpx; padding-bottom: calc(16rpx + env(safe-area-inset-bottom)) !important; }
+.detail__footer--purchase .detail__submit { flex: 1; margin: 0; padding: 0 20rpx; }
+.detail__consult { margin: 0; padding: 0 24rpx; height: 88rpx; line-height: 88rpx; font-size: 26rpx; color: #176c60; background: #edf8f5; border-radius: 44rpx; }
+
 .detail {
   min-height: 100vh;
   background: var(--color-bg);
@@ -687,6 +744,18 @@ onLoad((options) => {
       cursor: not-allowed;
     }
   }
+  &__section-head { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin-bottom: 18rpx; }
+  &__section-note { color: var(--color-text-tertiary); font-size: 22rpx; }
+  &__offering { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 24rpx 0; border-top: 1rpx solid var(--color-border); }
+  &__offering:first-of-type { border-top: 0; }
+  &__offering-main { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 8rpx; }
+  &__offering-name { color: var(--color-text); font-size: 28rpx; font-weight: 700; }
+  &__offering-desc { color: var(--color-text-secondary); font-size: 23rpx; line-height: 34rpx; }
+  &__offering-tags { display: flex; flex-wrap: wrap; gap: 10rpx; color: var(--color-primary); font-size: 21rpx; }
+  &__offering-tags text { padding: 5rpx 10rpx; border-radius: 8rpx; background: var(--color-primary-soft); }
+  &__offering-side { display: flex; align-items: center; gap: 12rpx; }
+  &__offering-price { color: #c2412d; font-size: 29rpx; font-weight: 800; }
+  &__offering-arrow { color: var(--color-text-tertiary); font-size: 36rpx; }
   &__empty {
     padding-top: 180rpx;
     text-align: center;
