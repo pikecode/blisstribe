@@ -14,7 +14,40 @@ export interface PartnerListResult {
   pageSize: number
 }
 
+export interface PartnerInvitationStats {
+  activeCodes: number
+  parsed: number
+  bound: number
+  invalid: number
+  skipped: number
+}
+
+export interface PartnerInvitationListResult {
+  list: Array<{
+    id: number
+    code: string
+    partnerId: number | null
+    partnerName: string | null
+    partnerNo: string | null
+    userId: number | null
+    userNickname: string | null
+    userPhoneMasked: string | null
+    status: number
+    failureReason: string | null
+    createdAt: string
+  }>
+  total: number
+  page: number
+  pageSize: number
+}
+
 export const partnerApi = {
+  invitationStats() {
+    return request.get<PartnerInvitationStats>('/admin/partners/invitations/stats')
+  },
+  allInvitations(params: { page?: number; pageSize?: number; status?: number; keyword?: string }) {
+    return request.get<PartnerInvitationListResult>('/admin/partners/invitations', { params })
+  },
   list(params: { page?: number; pageSize?: number; status?: number; keyword?: string }) {
     return request.get<PartnerListResult>('/admin/partners', { params })
   },

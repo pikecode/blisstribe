@@ -33,15 +33,22 @@ export class InvitationService {
       where: { code: normalized },
     })
     if (!invitation || invitation.status !== 1 || invitation.scene !== 'register' || invitation.ownerType !== 'partner') {
-      await this.createInvalidInvitationRecord(normalized, 'register', '邀请码无效')
+      const partnerInvitation = invitation?.ownerType === 'partner' ? invitation : null
+      await this.createInvalidInvitationRecord(
+        normalized,
+        invitation?.scene ?? 'register',
+        '邀请码无效',
+        partnerInvitation?.id,
+        partnerInvitation?.ownerId
+      )
       return { valid: false, code: normalized, reason: '邀请码无效' }
     }
     if (invitation.expiresAt && invitation.expiresAt < new Date()) {
-      await this.createInvalidInvitationRecord(normalized, invitation.scene, '邀请码已过期')
+      await this.createInvalidInvitationRecord(normalized, invitation.scene, '邀请码已过期', invitation.id, invitation.ownerId)
       return { valid: false, code: normalized, reason: '邀请码已过期' }
     }
     if (invitation.maxUses !== null && invitation.usedCount >= invitation.maxUses) {
-      await this.createInvalidInvitationRecord(normalized, invitation.scene, '邀请码已达使用上限')
+      await this.createInvalidInvitationRecord(normalized, invitation.scene, '邀请码已达使用上限', invitation.id, invitation.ownerId)
       return { valid: false, code: normalized, reason: '邀请码已达使用上限' }
     }
 
@@ -50,7 +57,7 @@ export class InvitationService {
       select: { id: true, partnerNo: true, displayName: true, type: true },
     })
     if (!partner) {
-      await this.createInvalidInvitationRecord(normalized, invitation.scene, '入驻主体不可用')
+      await this.createInvalidInvitationRecord(normalized, invitation.scene, '入驻主体不可用', invitation.id, invitation.ownerId)
       return { valid: false, code: normalized, reason: '入驻主体不可用' }
     }
 
@@ -87,10 +94,12 @@ export class InvitationService {
 
     const invitation = await tx.invitationCode.findUnique({ where: { code: normalized } })
     if (!invitation || invitation.status !== 1 || invitation.scene !== 'register' || invitation.ownerType !== 'partner') {
+      const partnerInvitation = invitation?.ownerType === 'partner' ? invitation : null
       await tx.invitationRecord.create({
         data: {
+          ...(partnerInvitation ? { codeId: partnerInvitation.id, partnerId: partnerInvitation.ownerId } : {}),
           code: normalized,
-          scene: 'register',
+          scene: invitation?.scene ?? 'register',
           userId,
           status: 3,
           failureReason: '邀请码无效',
@@ -222,9 +231,17 @@ export class InvitationService {
     return (code ?? '').trim().toUpperCase()
   }
 
-  private async createInvalidInvitationRecord(code: string, scene: string, reason: string): Promise<void> {
+  private async createInvalidInvitationRecord(
+    code: string,
+    scene: string,
+    reason: string,
+    codeId?: bigint,
+    partnerId?: bigint
+  ): Promise<void> {
     await this.prisma.invitationRecord.create({
       data: {
+        ...(codeId ? { codeId } : {}),
+        ...(partnerId ? { partnerId } : {}),
         code,
         scene,
         status: 3,

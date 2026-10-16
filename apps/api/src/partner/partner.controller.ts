@@ -55,6 +55,26 @@ export class PartnerController {
 export class PartnerAdminController {
   constructor(private readonly partnerService: PartnerService) {}
 
+  @Get('invitations/stats')
+  async invitationStats() {
+    return this.partnerService.getAdminInvitationStats()
+  }
+
+  @Get('invitations')
+  async allInvitations(
+    @Query('page') page = '1',
+    @Query('pageSize') pageSize = '20',
+    @Query('status') status?: string,
+    @Query('keyword') keyword?: string
+  ) {
+    return this.partnerService.listAdminInvitations({
+      page: Number(page) || 1,
+      pageSize: Number(pageSize) || 20,
+      status: status === undefined ? undefined : Number(status),
+      keyword,
+    })
+  }
+
   @Get()
   async list(
     @Query('page') page = '1',

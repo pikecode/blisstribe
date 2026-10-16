@@ -129,13 +129,6 @@
         </view>
         <text class="profile__chevron">›</text>
       </view>
-      <view class="profile__menu-item" @tap="goInvite">
-        <view>
-          <text class="profile__menu-title">邀请好友</text>
-          <text class="profile__menu-desc">分享服务并沉淀关系</text>
-        </view>
-        <text class="profile__chevron">›</text>
-      </view>
       <view class="profile__menu-item" @tap="goPartner">
         <view>
           <text class="profile__menu-title">{{ partnerEntryText }}</text>
@@ -415,10 +408,6 @@ function requireLogin(action: () => void): void {
 
 function goEdit(): void {
   requireLogin(() => uni.navigateTo({ url: '/pages/profile/edit' }))
-}
-
-function goInvite(): void {
-  requireLogin(() => uni.navigateTo({ url: '/pages/invite/invite' }))
 }
 
 function goProductLeads(): void {

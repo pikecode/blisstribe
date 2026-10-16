@@ -333,6 +333,80 @@ export class PartnerService {
     }
   }
 
+  async getAdminInvitationStats() {
+    const partnerCodes = { ownerType: 'partner', scene: 'register' }
+    const partnerRecords = { partnerId: { not: null } }
+    const [activeCodes, parsed, bound, invalid, skipped] = await Promise.all([
+      this.prisma.invitationCode.count({ where: { ...partnerCodes, status: 1 } }),
+      this.prisma.invitationRecord.count({ where: { ...partnerRecords, status: 0 } }),
+      this.prisma.invitationRecord.count({ where: { ...partnerRecords, status: 2 } }),
+      this.prisma.invitationRecord.count({ where: { ...partnerRecords, status: 3 } }),
+      this.prisma.invitationRecord.count({ where: { ...partnerRecords, status: 4 } }),
+    ])
+    return { activeCodes, parsed, bound, invalid, skipped }
+  }
+
+  async listAdminInvitations(params: {
+    page: number
+    pageSize: number
+    status?: number
+    keyword?: string
+  }) {
+    const where: Prisma.InvitationRecordWhereInput = { partnerId: { not: null } }
+    if ([0, 1, 2, 3, 4].includes(params.status ?? -1)) where.status = params.status
+    const keyword = params.keyword?.trim()
+    if (keyword) {
+      const [partners, codes, users] = await Promise.all([
+        this.prisma.partner.findMany({ where: { displayName: { contains: keyword } }, select: { id: true } }),
+        this.prisma.invitationCode.findMany({
+          where: { ownerType: 'partner', code: { contains: keyword } },
+          select: { code: true },
+        }),
+        this.prisma.user.findMany({ where: { nickname: { contains: keyword } }, select: { id: true } }),
+      ])
+      const matchingPartnerIds = partners.map(({ id }) => id)
+      const matchingCodes = codes.map(({ code }) => code)
+      const matchingUserIds = users.map(({ id }) => id)
+      where.OR = [
+        { code: { contains: keyword } },
+        ...(matchingPartnerIds.length ? [{ partnerId: { in: matchingPartnerIds } }] : []),
+        ...(matchingCodes.length ? [{ code: { in: matchingCodes } }] : []),
+        ...(matchingUserIds.length ? [{ userId: { in: matchingUserIds } }] : []),
+      ]
+    }
+    const [records, total] = await Promise.all([
+      this.prisma.invitationRecord.findMany({
+        where,
+        include: {
+          partner: { select: { id: true, displayName: true, partnerNo: true } },
+          user: { select: { id: true, nickname: true, phoneMasked: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+      }),
+      this.prisma.invitationRecord.count({ where }),
+    ])
+    return {
+      list: records.map((record) => ({
+        id: Number(record.id),
+        code: record.code,
+        partnerId: record.partner ? Number(record.partner.id) : null,
+        partnerName: record.partner?.displayName ?? null,
+        partnerNo: record.partner?.partnerNo ?? null,
+        userId: record.user ? Number(record.user.id) : null,
+        userNickname: record.user?.nickname ?? null,
+        userPhoneMasked: record.user?.phoneMasked ?? null,
+        status: record.status,
+        failureReason: record.failureReason,
+        createdAt: record.createdAt.toISOString(),
+      })),
+      total,
+      page: params.page,
+      pageSize: params.pageSize,
+    }
+  }
+
   async transferCustomerToPartner(
     partnerId: bigint,
     adminId: bigint,

@@ -7,8 +7,8 @@
     </view>
 
     <view class="partner-invite__actions">
+      <button class="partner-invite__btn partner-invite__btn--share" open-type="share" :disabled="!inviteCode">分享给微信好友</button>
       <view class="partner-invite__btn" @tap="copyCode">复制邀请码</view>
-      <view class="partner-invite__btn partner-invite__btn--ghost" @tap="copyPath">复制注册路径</view>
       <view class="partner-invite__btn partner-invite__btn--ghost" @tap="reload">刷新</view>
     </view>
   </view>
@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { partnerApi } from '@/api/modules/partner'
 
 const inviteCode = ref('')
@@ -31,12 +31,12 @@ function copyCode(): void {
   uni.setClipboardData({ data: inviteCode.value })
 }
 
-function copyPath(): void {
-  if (!inviteCode.value) return
-  uni.setClipboardData({ data: `/pages/index/index?inviteCode=${inviteCode.value}` })
-}
-
 onShow(reload)
+
+onShareAppMessage(() => ({
+  title: '邀请您了解服务',
+  path: `/pages/index/index?inviteCode=${encodeURIComponent(inviteCode.value)}`,
+}))
 </script>
 
 <style lang="scss" scoped>
@@ -61,10 +61,15 @@ onShow(reload)
     color: var(--color-text);
   }
   &__desc { display: block; font-size: 26rpx; color: var(--color-text-secondary); line-height: 1.6; }
-  &__actions { margin-top: 32rpx; display: flex; gap: 20rpx; }
+  &__actions { margin-top: 32rpx; display: flex; flex-direction: column; gap: 20rpx; }
   &__btn {
-    flex: 1;
+    box-sizing: border-box;
+    width: 100%;
     height: 84rpx;
+    padding: 0;
+    margin: 0;
+    font-size: 28rpx;
+    line-height: 84rpx;
     border-radius: 16rpx;
     background: var(--color-primary);
     color: #fff;
@@ -76,6 +81,7 @@ onShow(reload)
       color: var(--color-text);
       border: 1rpx solid var(--color-border);
     }
+    &--share { border: 0; }
   }
 }
 </style>
