@@ -88,7 +88,18 @@
               <template #default="{ row }">
                 <div class="tags-container">
                   <el-tag v-for="tag in row.tags.slice(0, 2)" :key="tag" size="small">{{ tag }}</el-tag>
-                  <el-tag v-if="row.tags.length > 2" size="small" type="info" effect="plain">+{{ row.tags.length - 2 }}</el-tag>
+                  <el-popover v-if="row.tags.length > 2" placement="top" :width="280" trigger="click">
+                    <template #reference>
+                      <el-tag class="tags-more" size="small" type="info" effect="plain" tabindex="0">
+                        +{{ row.tags.length - 2 }} 查看全部
+                      </el-tag>
+                    </template>
+                    <div class="tags-popover-title">产品标签（{{ row.tags.length }}）</div>
+                    <div class="tags-popover-content">
+                      <el-tag v-for="tag in row.tags" :key="tag" size="small" effect="light">{{ tag }}</el-tag>
+                    </div>
+                  </el-popover>
+                  <span v-if="!row.tags.length" class="tags-empty">—</span>
                 </div>
               </template>
             </el-table-column>
@@ -778,6 +789,26 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: $space-6;
   align-items: center;
+}
+
+.tags-more {
+  cursor: pointer;
+}
+
+.tags-empty {
+  color: $color-text-tertiary;
+}
+
+.tags-popover-title {
+  margin-bottom: 10px;
+  color: $color-text-secondary;
+  font-size: $font-size-xs;
+}
+
+.tags-popover-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-6;
 }
 
 :deep(.el-dialog) {
