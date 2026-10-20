@@ -1,5 +1,17 @@
 <template>
   <div class="shop-product-mgr">
+    <div class="catalog-workspace" :class="{ 'is-collapsed': categoryCollapsed }">
+      <aside v-if="!categoryCollapsed" class="category-panel" aria-label="商品分类">
+        <div class="category-panel__header"><strong>商品分类</strong><el-button text size="small" @click="categoryCollapsed = true">收起</el-button></div>
+        <div v-if="categoryLoadError" class="category-panel__feedback"><span>分类加载失败</span><el-button link type="primary" @click="loadCategories">重试</el-button></div>
+        <el-tree v-else :data="categoryTree" node-key="id" :current-node-key="selectedCategoryId" :props="{ label: 'name', children: 'children' }" default-expand-all highlight-current :expand-on-click-node="false" @node-click="selectCategory">
+          <template #default="{ data }"><span class="category-node" :title="data.name">{{ data.name }}</span></template>
+        </el-tree>
+      </aside>
+      <main class="catalog-main">
+        <div class="catalog-heading">
+          <div class="catalog-heading__title"><el-button v-if="categoryCollapsed" class="category-expand" plain size="small" @click="categoryCollapsed = false">展开分类</el-button><h2>{{ selectedCategoryId ? getCategoryName(selectedCategoryId) : '全部商品' }}</h2><span>{{ total }} 件商品</span></div>
+        </div>
     <!-- 工具栏 -->
     <AdminListToolbar role="region" aria-label="搜索和操作工具栏">
       <div class="toolbar__left">
@@ -20,6 +32,7 @@
 
       <div class="toolbar__right">
         <el-select
+          class="category-mobile-select"
           v-model="selectedCategoryId"
           placeholder="全部分类"
           clearable
@@ -134,6 +147,9 @@
       :disabled="loading" @change="loadProducts" />
     </div>
 
+    </main>
+    </div>
+
     <!-- 新增/编辑商品对话框 -->
     <el-dialog
       v-model="productDialogVisible"
@@ -145,7 +161,10 @@
       :close-on-click-modal="false"
     >
       <template #header>
-        <div class="editor-header"><div><h2>{{ editingProductId ? '编辑商品' : '新增商品' }}</h2><p>{{ editingProductId ? productForm.name : '完善商品信息，再配置售价与库存' }}</p></div><el-tag v-if="editingProductId" type="info" effect="plain">商品 #{{ editingProductId }}</el-tag></div>
+        <div class="editor-dialog-header">
+          <div class="editor-header"><div><h2>{{ editingProductId ? '编辑商品' : '新增商品' }}</h2><p>{{ editingProductId ? productForm.name : '完善商品信息，再配置售价与库存' }}</p></div><el-tag v-if="editingProductId" type="info" effect="plain">商品 #{{ editingProductId }}</el-tag></div>
+          <el-tabs v-model="editorTab" class="editor-tabs"><el-tab-pane label="商品信息" name="info" /><el-tab-pane :label="`规格与库存（${productForm.skus.length}）`" name="skus" /></el-tabs>
+        </div>
       </template>
       <el-form
         ref="productFormRef"
@@ -154,7 +173,6 @@
         label-position="top"
         :disabled="submitting"
       >
-        <el-tabs v-model="editorTab" class="editor-tabs"><el-tab-pane label="商品信息" name="info" /><el-tab-pane :label="`规格与库存（${productForm.skus.length}）`" name="skus" /></el-tabs>
         <div v-show="editorTab === 'info'" class="editor-info">
           <section class="editor-info__main"><h3 class="editor-section-title">基本信息</h3>
           <div class="form-grid">
@@ -318,6 +336,18 @@ const selectedCategoryId = ref<number | ''>('')
 const selectedStatus = ref<number | ''>('')
 
 const categories = ref<ShopCategory[]>([])
+const categoryCollapsed = ref(false)
+const categoryLoadError = ref(false)
+const categoryTree = computed(() => [{ id: '', name: '全部商品' }, ...categories.value
+  .filter(category => !category.parentId)
+  .map(category => ({ ...category, children: categories.value.filter(child => child.parentId === category.id) }))])
+
+function selectCategory(category: { id: number | '' }) {
+  if (selectedCategoryId.value === category.id) return
+  selectedCategoryId.value = category.id
+  handleSearch()
+}
+let productRequestVersion = 0
 const products = ref<ShopProduct[]>([])
 
 const productDialogVisible = ref(false)
@@ -364,7 +394,7 @@ function newSku(): SkuFormRow {
 }
 
 const defaultProductForm = () => ({
-  categoryId: categories.value[0]?.id || 0,
+  categoryId: selectedCategoryId.value || categories.value[0]?.id || 0,
   name: '',
   description: '',
   skus: [newSku()],
@@ -413,14 +443,17 @@ function getStatusType(status: number): string {
 }
 
 async function loadCategories() {
+  categoryLoadError.value = false
   try {
     categories.value = await shopApi.listCategories()
   } catch (error) {
+    categoryLoadError.value = true
     ElMessage.error('加载分类失败')
   }
 }
 
 async function loadProducts() {
+  const version = ++productRequestVersion
   loading.value = true
   listError.value = ''
   try {
@@ -431,13 +464,15 @@ async function loadProducts() {
       keyword: keyword.value || undefined,
       status: selectedStatus.value === '' ? undefined : selectedStatus.value,
     })
+    if (version !== productRequestVersion) return
     products.value = result.list
     total.value = result.total
   } catch (error) {
+    if (version !== productRequestVersion) return
     listError.value = '列表加载失败，请重试'
     ElMessage.error('加载商品列表失败')
   } finally {
-    loading.value = false
+    if (version === productRequestVersion) loading.value = false
   }
 }
 
@@ -680,6 +715,26 @@ onMounted(async () => {
 <style lang="scss" scoped>
 @use '@/styles/variables.scss' as *;
 
+/* 分类导航与商品表格共享现有筛选和分页状态。 */
+.catalog-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: start; gap: 20px; }
+.catalog-workspace.is-collapsed { grid-template-columns: minmax(0, 1fr); }
+.category-panel { position: sticky; top: 20px; max-height: calc(100vh - 160px); overflow: auto; padding: 12px 8px; background: #fff; border: 1px solid $color-border; border-radius: 10px; }
+.category-panel__header { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 12px; font-size: 14px; }
+.category-panel :deep(.el-tree-node__content) { height: 38px; border-radius: 6px; margin: 2px 0; }
+.category-panel :deep(.is-current > .el-tree-node__content) { background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-weight: 600; }
+.category-node { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.category-panel__feedback { display: flex; justify-content: space-around; padding: 20px 0; font-size: 13px; color: $color-text-secondary; }
+.catalog-main { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.catalog-heading__title { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-height: 32px; }
+.catalog-heading h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.catalog-heading span { font-size: 13px; color: $color-text-secondary; }
+.category-mobile-select { display: none; }
+@media (max-width: 1100px) {
+  .catalog-workspace { grid-template-columns: minmax(0, 1fr); }
+  .category-panel, .category-expand { display: none; }
+  .category-mobile-select { display: inline-flex; }
+}
+
 :global(.danger-menu-item:not(.is-disabled)) { color: #d92d20; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .list-count { margin-right: auto; color: $color-text-secondary; font-size: 13px; }
@@ -690,8 +745,9 @@ onMounted(async () => {
 .editor-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-right: 30px; }
 .editor-header h2 { margin: 0; font-size: 20px; font-weight: 600; }
 .editor-header p { margin: 5px 0 0; font-size: 12px; color: $color-text-secondary; }
-.editor-tabs { position: sticky; top: 0; z-index: 3; background: white; }
-.editor-tabs :deep(.el-tabs__header) { margin-bottom: 24px; }
+.editor-dialog-header { margin: -20px -24px 0; padding: 16px 24px 0; border-bottom: 1px solid #e5e7eb; background: #fff; }
+.editor-tabs { background: white; }
+.editor-tabs :deep(.el-tabs__header) { margin: 12px 0 0; }
 .editor-info { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; }
 .editor-info__media { border-left: 1px solid $color-border; padding-left: 24px; }
 .editor-section-title, .editor-skus__toolbar h3 { margin: 0 0 18px; font-size: 14px; font-weight: 600; }
@@ -720,7 +776,7 @@ onMounted(async () => {
 .dialog-footer-hint { margin-right: auto; font-size: 12px; color: $color-text-secondary; }
 .image-cover { position: absolute; top: 6px; left: 6px; color: white; background: $color-primary; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
 :global(.product-dialog) { display: flex; flex-direction: column; height: min(740px, 90vh); padding: 0; overflow: hidden; border-radius: 12px; }
-:global(.product-dialog .el-dialog__header) { margin: 0; padding: 20px 24px; border-bottom: 1px solid #e5e7eb; }
+:global(.product-dialog .el-dialog__header) { margin: 0; padding: 20px 24px 0; border-bottom: 0; }
 :global(.product-dialog .el-dialog__body) { flex: 1; overflow-y: auto; min-height: 0; padding: 0 24px 24px; background: white; }
 :global(.product-dialog .el-dialog__footer) { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid #e5e7eb; background: #f8fafc; }
 @media (max-width: 767px) { .editor-info, .form-grid { grid-template-columns: 1fr; } .editor-info { gap: 16px; } .editor-info__media { border-left: 0; padding-left: 0; } .dialog-footer-hint { display: none; } .sku-property-editor { padding: 12px; } }

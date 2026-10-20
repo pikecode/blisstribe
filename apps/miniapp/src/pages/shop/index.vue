@@ -4,6 +4,9 @@
       <text class="shop-hero__eyebrow">BLISS TRIBE STORE</text>
       <text class="shop-hero__title">把喜欢的生活带回家</text>
       <text class="shop-hero__desc">精选好物，陪你照顾身体与日常</text>
+    </view>
+
+    <view class="shop-search">
       <view class="search-bar" @click="navigateToSearch">
         <view class="search-icon"></view>
         <text class="search-placeholder">搜索商品</text>
@@ -23,19 +26,19 @@
           <view v-for="category in childCategories" :key="category.id" class="subcategory-item" :class="{ active: selectedCategoryId === category.id }" @tap="selectCategory(category.id)">{{ category.name }}</view>
         </view>
     <!-- Product List -->
-    <view class="hot-products-section">
+    <view class="hot-products-section" :class="{ 'is-loading': loadingHot }">
       <view class="section-header">
         <view>
           <text class="section-title">{{ categories.find(category => category.id === selectedCategoryId)?.name || '全部商品' }}</text>
         </view>
-        <text class="section-count">{{ total }} 件</text>
+        <text class="section-count">{{ loadingHot ? '加载中…' : `${total} 件` }}</text>
       </view>
 
-      <view v-if="loadingHot && hotProducts.length === 0" class="loading-container">
+      <view v-if="loadingHot" class="loading-container" :class="{ 'loading-overlay': hotProducts.length > 0 }">
         <text>加载中...</text>
       </view>
 
-      <view v-if="errorHot && hotProducts.length === 0" class="error-container">
+      <view v-if="errorHot" class="error-container">
         <text>{{ errorHot }}</text>
         <button class="retry-btn" @click="loadHotProducts(1)">重试</button>
       </view>
@@ -45,17 +48,17 @@
         <button class="empty-action" @tap="selectRoot(null)">查看全部商品</button>
       </view>
 
-      <view v-if="hotProducts.length > 0" class="products-grid">
+      <view v-if="hotProducts.length > 0 && !errorHot" class="products-grid">
         <product-card v-for="product in hotProducts" :key="product.id" :product="product" compact />
       </view>
 
-      <view v-if="hasMore && hotProducts.length > 0" class="load-more-container">
+      <view v-if="!errorHot && hasMore && hotProducts.length > 0" class="load-more-container">
         <button :loading="loadingMore" class="load-more-btn" @click="loadMore">
           {{ loadingMore ? '加载中...' : '加载更多' }}
         </button>
       </view>
 
-      <view v-if="!hasMore && hotProducts.length > 0" class="no-more">
+      <view v-if="!errorHot && !hasMore && hotProducts.length > 0" class="no-more">
         <text>已加载全部商品</text>
       </view>
     </view>
@@ -63,8 +66,6 @@
       </view>
     </view>
 
-    <!-- Tab Bar Placeholder -->
-    <view class="tab-bar-placeholder" />
   </view>
 </template>
 
@@ -139,10 +140,8 @@ function selectRoot(categoryId: string | null) {
 }
 
 function selectCategory(categoryId: string | null) {
+  if (selectedCategoryId.value === categoryId) return
   selectedCategoryId.value = categoryId
-  hotProducts.value = []
-  total.value = 0
-  hasMore.value = false
   loadHotProducts(1)
 }
 
@@ -158,7 +157,7 @@ function navigateToSearch() {
 .shop-index {
   background: var(--color-bg);
   min-height: 100vh;
-  padding-bottom: 120rpx;
+  padding-bottom: 24rpx;
 }
 
 .shop-hero {
@@ -191,11 +190,20 @@ function navigateToSearch() {
   }
 }
 
+.shop-search {
+  position: sticky;
+  top: var(--window-top, 0px);
+  z-index: 20;
+  padding: 16rpx 28rpx;
+  background: #f8fcfa;
+  border-bottom: 1rpx solid #edf2ee;
+}
+
 .search-bar {
   display: flex;
   align-items: center;
   height: 84rpx;
-  margin-top: 30rpx;
+  margin-top: 0;
   padding: 0 12rpx 0 26rpx;
   gap: 12rpx;
   background: #fff;
@@ -241,8 +249,23 @@ function navigateToSearch() {
 }
 
 .hot-products-section {
+  position: relative;
   margin-top: 16rpx;
   padding: 0 16rpx;
+}
+
+.is-loading .products-grid,
+.is-loading .load-more-container,
+.is-loading .no-more {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 90rpx;
+  left: 0;
+  right: 0;
 }
 
 .section-header {
@@ -317,15 +340,29 @@ function navigateToSearch() {
   font-size: 22rpx;
 }
 
-.tab-bar-placeholder {
-  height: 40rpx;
+.shop-layout { display: flex; align-items: flex-start; min-height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px) - 118rpx); background: #fff; }
+.category-sidebar {
+  position: sticky;
+  top: calc(var(--window-top, 0px) + 118rpx);
+  flex-shrink: 0;
+  width: 158rpx;
+  height: calc(100vh - var(--window-top, 0px) - var(--window-bottom, 0px) - 118rpx);
+  background: #f4f6f5;
 }
-.shop-layout { display: flex; align-items: flex-start; min-height: 65vh; background: #fff; }
-.category-sidebar { position: sticky; top: 0; flex-shrink: 0; width: 158rpx; height: 65vh; background: #f4f6f5; }
 .sidebar-item { padding: 30rpx 14rpx; color: #66736c; font-size: 24rpx; line-height: 1.5; border-left: 6rpx solid transparent; word-break: break-all; }
 .sidebar-item.active { color: #078447; font-weight: 700; background: #fff; border-left-color: #078447; }
 .shop-catalog { flex: 1; min-width: 0; padding-bottom: 24rpx; }
-.subcategory-list { display: flex; flex-wrap: wrap; gap: 12rpx; padding: 20rpx 16rpx 0; }
+.subcategory-list {
+  position: sticky;
+  top: calc(var(--window-top, 0px) + 118rpx);
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding: 20rpx 16rpx;
+  background: #fff;
+  border-bottom: 1rpx solid #edf2ee;
+}
 .subcategory-item { padding: 14rpx 20rpx; border-radius: 12rpx; background: #f4f6f5; color: #66736c; font-size: 22rpx; }
 .subcategory-item.active { color: #078447; background: #e7f6ec; font-weight: 700; }
 .category-retry { padding: 24rpx 12rpx; color: #078447; font-size: 22rpx; }
