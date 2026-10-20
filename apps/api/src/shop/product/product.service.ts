@@ -59,6 +59,12 @@ export class ProductService {
     return this.toProductSummary(product, true)
   }
 
+  async getAdminProductById(id: bigint): Promise<any> {
+    const product = await this.productRepository.findById(id)
+    if (!product || product.deletedAt) throw new NotFoundException('商品不存在')
+    return this.toProductSummary(product)
+  }
+
   async getPublishedProductsPage(params: {
     page?: number
     pageSize?: number
@@ -73,6 +79,7 @@ export class ProductService {
       categoryId: params.categoryId,
       keyword: params.keyword?.trim() || undefined,
       status: 1,
+      publicOnly: true,
     })
     return {
       list: result.list.map((product) => this.toProductSummary(product, true)),

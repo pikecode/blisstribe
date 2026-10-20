@@ -1,6 +1,7 @@
 import { request } from '@/api/request'
 
 export interface ShopCategory {
+  parentId?: string | null
   id: string
   code: string
   name: string
@@ -117,7 +118,7 @@ function withQuery(
 
 export const shopApi = {
   categories(): Promise<ShopCategory[]> {
-    return request<ShopCategory[]>({ url: '/shop/categories', method: 'GET' })
+    return request<ShopCategory[]>({ url: '/shop/categories', method: 'GET' }).then(categories => categories.map(category => ({ ...category, id: String(category.id), parentId: category.parentId == null ? null : String(category.parentId) })))
   },
 
   products(params?: { page?: number; pageSize?: number; categoryId?: string; keyword?: string }) {

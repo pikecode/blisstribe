@@ -1,5 +1,5 @@
 <template>
-  <view class="product-card">
+  <view class="product-card" :class="{ 'product-card--compact': compact }">
     <view class="product-image-container" @click="goToDetail">
       <image
         v-if="product.images && product.images.length > 0"
@@ -38,6 +38,7 @@ import { useCartStore } from '@/stores/modules/cart'
 
 const props = defineProps<{
   product: ShopProduct
+  compact?: boolean
 }>()
 const adding = ref(false)
 const cartStore = useCartStore()
@@ -171,5 +172,12 @@ async function handleAddToCart() {
     width: 38rpx;
     height: 38rpx;
   }
+}
+.product-card--compact {
+  .product-image-container { height: 236rpx; }
+  .product-info { padding: 16rpx 12rpx; }
+  .product-name { font-size: 24rpx; line-height: 34rpx; min-height: 68rpx; }
+  .product-price { font-size: 27rpx; }
+  .add-cart-btn { width: 56rpx; height: 56rpx; flex-shrink: 0; }
 }
 </style>

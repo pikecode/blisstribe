@@ -11,36 +11,24 @@
       </view>
     </view>
 
-    <!-- Categories Navigation -->
-    <view class="categories-section">
-      <scroll-view scroll-x class="categories-scroll">
-        <view
-          class="category-item"
-          :class="{ active: selectedCategoryId === null }"
-          @click="selectCategory(null)"
-        >
-          <text>全部</text>
-        </view>
-        <view
-          v-for="category in categories"
-          :key="category.id"
-          class="category-item"
-          :class="{ active: selectedCategoryId === category.id }"
-          @click="selectCategory(category.id)"
-        >
-          <text>{{ category.name }}</text>
-        </view>
+    <view class="shop-layout">
+      <scroll-view scroll-y class="category-sidebar">
+        <view class="sidebar-item" :class="{ active: !selectedRootId }" @tap="selectRoot(null)">全部商品</view>
+        <view v-for="category in rootCategories" :key="category.id" class="sidebar-item" :class="{ active: selectedRootId === category.id }" @tap="selectRoot(category.id)">{{ category.name }}</view>
+        <view v-if="categoryError" class="category-retry" @tap="loadCategories">分类加载失败，点击重试</view>
       </scroll-view>
-    </view>
-
+      <view class="shop-catalog">
+        <view v-if="childCategories.length" class="subcategory-list">
+          <view class="subcategory-item" :class="{ active: selectedCategoryId === selectedRootId }" @tap="selectCategory(selectedRootId)">全部</view>
+          <view v-for="category in childCategories" :key="category.id" class="subcategory-item" :class="{ active: selectedCategoryId === category.id }" @tap="selectCategory(category.id)">{{ category.name }}</view>
+        </view>
     <!-- Product List -->
     <view class="hot-products-section">
       <view class="section-header">
         <view>
-          <text class="section-title">精选商品</text>
-          <text class="section-desc">认真挑选每一件日常好物</text>
+          <text class="section-title">{{ categories.find(category => category.id === selectedCategoryId)?.name || '全部商品' }}</text>
         </view>
-        <text class="section-count">{{ hotProducts.length }} 件</text>
+        <text class="section-count">{{ total }} 件</text>
       </view>
 
       <view v-if="loadingHot && hotProducts.length === 0" class="loading-container">
@@ -49,15 +37,16 @@
 
       <view v-if="errorHot && hotProducts.length === 0" class="error-container">
         <text>{{ errorHot }}</text>
-        <button class="retry-btn" @click="loadHotProducts">重试</button>
+        <button class="retry-btn" @click="loadHotProducts(1)">重试</button>
       </view>
 
       <view v-if="!loadingHot && !errorHot && hotProducts.length === 0" class="empty-container">
-        <text>暂无商品</text>
+        <text>该分类暂无商品</text>
+        <button class="empty-action" @tap="selectRoot(null)">查看全部商品</button>
       </view>
 
       <view v-if="hotProducts.length > 0" class="products-grid">
-        <product-card v-for="product in hotProducts" :key="product.id" :product="product" />
+        <product-card v-for="product in hotProducts" :key="product.id" :product="product" compact />
       </view>
 
       <view v-if="hasMore && hotProducts.length > 0" class="load-more-container">
@@ -71,19 +60,28 @@
       </view>
     </view>
 
+      </view>
+    </view>
+
     <!-- Tab Bar Placeholder -->
     <view class="tab-bar-placeholder" />
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { shopApi, type ShopCategory, type ShopProduct } from '@/api/modules/shop'
 import ProductCard from '@/components/shop/ProductCard.vue'
 
 const categories = ref<ShopCategory[]>([])
 const hotProducts = ref<ShopProduct[]>([])
 const selectedCategoryId = ref<string | null>(null)
+const selectedRootId = ref<string | null>(null)
+const total = ref(0)
+const categoryError = ref(false)
+const rootCategories = computed(() => categories.value.filter(category => !category.parentId))
+const childCategories = computed(() => categories.value.filter(category => category.parentId === selectedRootId.value && category.parentId))
+let requestVersion = 0
 
 const currentPage = ref(1)
 const hasMore = ref(true)
@@ -98,84 +96,59 @@ onMounted(async () => {
 
 async function loadCategories() {
   try {
+    categoryError.value = false
     const res = await shopApi.categories()
     categories.value = res || []
   } catch (err) {
+    categoryError.value = true
     console.error('Failed to load categories:', err)
   }
 }
 
-async function loadHotProducts() {
-  if (loadingHot.value) return
-
-  loadingHot.value = true
+async function loadHotProducts(page = 1) {
+  const version = ++requestVersion
+  loadingHot.value = page === 1
+  loadingMore.value = page > 1
   errorHot.value = ''
-
   try {
-    const res = await shopApi.products({
-      page: currentPage.value,
-      pageSize: 10,
-      categoryId: selectedCategoryId.value || undefined,
-    })
-
-    if (currentPage.value === 1) {
-      hotProducts.value = res.list || []
-    } else {
-      hotProducts.value.push(...(res.list || []))
-    }
-
+    const res = await shopApi.products({ page, pageSize: 10, categoryId: selectedCategoryId.value || undefined })
+    if (version !== requestVersion) return
+    hotProducts.value = page === 1 ? res.list : [...hotProducts.value, ...res.list]
+    currentPage.value = page
+    total.value = res.total
     hasMore.value = res.hasMore
-  } catch (err: any) {
-    errorHot.value = '加载失败，请检查网络'
-    console.error('Failed to load hot products:', err)
+  } catch {
+    if (version !== requestVersion) return
+    if (page === 1) errorHot.value = '商品加载失败，请点击重试'
+    else uni.showToast({ title: '加载失败，请重试', icon: 'none' })
   } finally {
-    loadingHot.value = false
+    if (version === requestVersion) {
+      loadingHot.value = false
+      loadingMore.value = false
+    }
   }
 }
 
-async function loadMore() {
-  if (loadingMore.value || !hasMore.value) return
+function loadMore() {
+  if (!loadingHot.value && !loadingMore.value && hasMore.value) loadHotProducts(currentPage.value + 1)
+}
 
-  loadingMore.value = true
-  currentPage.value++
-
-  try {
-    const res = await shopApi.products({
-      page: currentPage.value,
-      pageSize: 10,
-      categoryId: selectedCategoryId.value || undefined,
-    })
-
-    hotProducts.value.push(...(res.list || []))
-    hasMore.value = res.hasMore
-  } catch (err) {
-    console.error('Failed to load more products:', err)
-    uni.showToast({
-      title: '加载失败',
-      icon: 'none',
-    })
-  } finally {
-    loadingMore.value = false
-  }
+function selectRoot(categoryId: string | null) {
+  selectedRootId.value = categoryId
+  selectCategory(categoryId)
 }
 
 function selectCategory(categoryId: string | null) {
   selectedCategoryId.value = categoryId
-  currentPage.value = 1
-  hasMore.value = true
   hotProducts.value = []
-  loadHotProducts()
+  total.value = 0
+  hasMore.value = false
+  loadHotProducts(1)
 }
 
 function navigateToSearch() {
   uni.navigateTo({
     url: '/pages/shop/list',
-  })
-}
-
-function goToDetail(productId: string) {
-  uni.navigateTo({
-    url: `/pages/shop/detail?id=${productId}`,
   })
 }
 
@@ -189,7 +162,7 @@ function goToDetail(productId: string) {
 }
 
 .shop-hero {
-  padding: 46rpx 28rpx 32rpx;
+  padding: 24rpx 28rpx;
   background: linear-gradient(145deg, #effaf3 0%, #f8fcfa 62%, #ffffff 100%);
 
   &__eyebrow {
@@ -224,7 +197,7 @@ function goToDetail(productId: string) {
   height: 84rpx;
   margin-top: 30rpx;
   padding: 0 12rpx 0 26rpx;
-  gap: 18rpx;
+  gap: 12rpx;
   background: #fff;
   border: 1rpx solid rgba(7, 193, 96, 0.1);
   border-radius: 22rpx;
@@ -267,40 +240,9 @@ function goToDetail(productId: string) {
   font-weight: 700;
 }
 
-.categories-section {
-  background: #fff;
-  padding: 20rpx 0 22rpx;
-}
-
-.categories-scroll {
-  white-space: nowrap;
-  width: 100%;
-}
-
-.category-item {
-  display: inline-flex;
-  align-items: center;
-  min-height: 60rpx;
-  padding: 0 26rpx;
-  margin-left: 14rpx;
-  border-radius: var(--radius-round);
-  background: var(--color-bg-gray);
-  color: var(--color-text-secondary);
-  font-size: 24rpx;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: all var(--duration-fast) ease;
-
-  &.active {
-    background: var(--color-primary);
-    color: #fff;
-    box-shadow: var(--shadow-action);
-  }
-}
-
 .hot-products-section {
   margin-top: 16rpx;
-  padding: 0 20rpx;
+  padding: 0 16rpx;
 }
 
 .section-header {
@@ -317,13 +259,6 @@ function goToDetail(productId: string) {
   color: var(--color-text);
 }
 
-.section-desc {
-  display: block;
-  margin-top: 4rpx;
-  color: var(--color-text-secondary);
-  font-size: 22rpx;
-}
-
 .section-count {
   color: var(--color-text-tertiary);
   font-size: 22rpx;
@@ -332,7 +267,7 @@ function goToDetail(productId: string) {
 .products-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18rpx;
+  gap: 12rpx;
 }
 
 .loading-container,
@@ -385,4 +320,15 @@ function goToDetail(productId: string) {
 .tab-bar-placeholder {
   height: 40rpx;
 }
+.shop-layout { display: flex; align-items: flex-start; min-height: 65vh; background: #fff; }
+.category-sidebar { position: sticky; top: 0; flex-shrink: 0; width: 158rpx; height: 65vh; background: #f4f6f5; }
+.sidebar-item { padding: 30rpx 14rpx; color: #66736c; font-size: 24rpx; line-height: 1.5; border-left: 6rpx solid transparent; word-break: break-all; }
+.sidebar-item.active { color: #078447; font-weight: 700; background: #fff; border-left-color: #078447; }
+.shop-catalog { flex: 1; min-width: 0; padding-bottom: 24rpx; }
+.subcategory-list { display: flex; flex-wrap: wrap; gap: 12rpx; padding: 20rpx 16rpx 0; }
+.subcategory-item { padding: 14rpx 20rpx; border-radius: 12rpx; background: #f4f6f5; color: #66736c; font-size: 22rpx; }
+.subcategory-item.active { color: #078447; background: #e7f6ec; font-weight: 700; }
+.category-retry { padding: 24rpx 12rpx; color: #078447; font-size: 22rpx; }
+.empty-action { margin-top: 24rpx; background: #e7f6ec; color: #078447; font-size: 24rpx; }
+.section-title { font-size: 28rpx; }
 </style>

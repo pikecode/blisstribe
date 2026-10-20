@@ -5,7 +5,7 @@
         <div class="card-header">
           <div>
             <div class="card-header__title">分类管理</div>
-            <div class="card-header__desc">维护商城分类信息</div>
+            <div class="card-header__desc">维护一级分类与二级分类，停用一级分类后其子分类商品同步隐藏</div>
           </div>
           <el-button type="primary" @click="openDialog()">新增分类</el-button>
         </div>
@@ -33,7 +33,7 @@
         <el-button @click="resetSearch">重置</el-button>
       </AdminListToolbar>
 
-      <AdminListTable :data="categories" :loading="loading" :error="listError" @retry="loadCategories">
+      <AdminListTable :data="categoryTree" row-key="id" default-expand-all :loading="loading" :error="listError" @retry="loadCategories">
         <el-table-column prop="name" label="分类名" min-width="150" />
         <el-table-column prop="code" label="编码" min-width="150" />
         <el-table-column prop="description" label="描述" min-width="200" />
@@ -46,9 +46,10 @@
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" min-width="160" />
-        <el-table-column label="操作" width="88" fixed="right" align="center">
+        <el-table-column label="操作" width="112" fixed="right" align="center">
           <template #default="{ row }">
             <AdminListActions>
+              <AdminListAction v-if="!row.parentId" label="新增二级分类" icon="Plus" @click="openDialog(undefined, row.id)" />
               <AdminListAction label="编辑" icon="Edit" @click="openDialog(row)" />
               <template #more>
                 <el-dropdown-item
@@ -71,6 +72,12 @@
       @close="resetForm"
     >
       <el-form :model="form" :rules="rules" label-width="90px" ref="formRef">
+        <el-form-item label="上级分类">
+          <el-select v-model="form.parentId" clearable placeholder="不选则为一级分类" style="width: 100%">
+            <el-option v-for="parent in parentOptions" :key="parent.id" :label="parent.name" :value="parent.id" />
+          </el-select>
+          <div class="category-hint">仅支持两级；已有子分类的分类不能改为二级。</div>
+        </el-form-item>
         <el-form-item label="分类名" prop="name">
           <el-input v-model="form.name" maxlength="60" placeholder="如 美容护肤" />
         </el-form-item>
@@ -113,7 +120,7 @@ import AdminListAction from '@/components/AdminListAction.vue'
 import AdminListActions from '@/components/AdminListActions.vue'
 import AdminListTable from '@/components/AdminListTable.vue'
 import AdminListToolbar from '@/components/AdminListToolbar.vue'
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { shopApi, type ShopCategory } from '@/api/shop'
 import type { FormInstance } from 'element-plus'
@@ -122,6 +129,15 @@ const listError = ref('')
 
 
 const categories = ref<ShopCategory[]>([])
+const parentOptions = computed(() => categories.value.filter((category) => !category.parentId && category.id !== editingId.value))
+const categoryTree = computed(() => {
+  const matchesKeyword = (category: ShopCategory) => !keyword.value || category.name.includes(keyword.value) || category.code.includes(keyword.value)
+  const matchesStatus = (category: ShopCategory) => status.value === '' || category.status === status.value
+  return categories.value.filter((category) => !category.parentId).map((root) => {
+    const children = categories.value.filter((category) => category.parentId === root.id)
+    return { ...root, children: children.filter((child) => matchesStatus(child) && (matchesKeyword(root) || matchesKeyword(child))) }
+  }).filter((root) => (matchesKeyword(root) && matchesStatus(root)) || root.children.length)
+})
 const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
@@ -132,6 +148,7 @@ const status = ref<number | ''>('')
 const formRef = ref<FormInstance>()
 
 const defaultForm = () => ({
+  parentId: null as number | null,
   name: '',
   code: '',
   description: '',
@@ -140,6 +157,7 @@ const defaultForm = () => ({
 })
 
 const form = reactive({
+  parentId: null as number | null,
   name: '',
   code: '',
   description: '',
@@ -155,8 +173,8 @@ const rules = {
   code: [
     { required: true, message: '请输入编码', trigger: 'blur' },
     {
-      pattern: /^[a-zA-Z0-9_]+$/,
-      message: '编码仅支持英文、数字和下划线',
+      pattern: /^[a-zA-Z0-9_-]+$/,
+      message: '编码仅支持英文、数字、下划线和连字符',
       trigger: 'blur',
     },
   ],
@@ -168,16 +186,7 @@ async function loadCategories() {
   listError.value = ''
   try {
     categories.value = await shopApi.listCategories()
-    if (keyword.value || status.value !== '') {
-      categories.value = categories.value.filter((cat) => {
-        const matchKeyword =
-          !keyword.value ||
-          cat.name.includes(keyword.value) ||
-          cat.code.includes(keyword.value)
-        const matchStatus = status.value === '' || cat.status === status.value
-        return matchKeyword && matchStatus
-      })
-    }
+
   } catch {
     listError.value = '列表加载失败，请重试'
   } finally {
@@ -191,10 +200,11 @@ function resetSearch() {
   loadCategories()
 }
 
-function openDialog(row?: ShopCategory) {
+function openDialog(row?: ShopCategory, parentId: number | null = null) {
   editingId.value = row?.id ?? null
   if (row) {
     Object.assign(form, {
+      parentId: row.parentId,
       name: row.name,
       code: row.code,
       description: row.description || '',
@@ -202,7 +212,7 @@ function openDialog(row?: ShopCategory) {
       status: row.status,
     })
   } else {
-    Object.assign(form, defaultForm())
+    Object.assign(form, defaultForm(), { parentId })
   }
   dialogVisible.value = true
 }
@@ -218,6 +228,7 @@ async function submit() {
   submitting.value = true
   try {
     const payload = {
+      parentId: form.parentId || null,
       name: form.name.trim(),
       code: form.code.trim(),
       description: form.description?.trim(),
@@ -314,4 +325,5 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.category-hint { margin-top: 6px; font-size: 12px; color: #909399; }
 </style>

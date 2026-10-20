@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
+import { isCategoryAvailable } from '../category/category-visibility'
 import { CartRepository } from './cart.repository'
 import { ProductRepository } from '../product/product.repository'
 import { AddCartItemDto, UpdateCartItemDto } from '../dto/cart.dto'
@@ -14,6 +15,7 @@ export class CartService {
     const cart = await this.cartRepository.findOrCreateByUserId(userId)
     const items = cart.items.map((item: any) => {
       const sku = item.sku
+      const availableForSale = sku.enabled && sku.product.status === 1 && !sku.product.deletedAt && isCategoryAvailable(sku.product.category)
       return {
         id: item.id,
         cartId: item.cartId,
@@ -27,13 +29,13 @@ export class CartService {
           totalStock: sku.totalStock,
           reservedStock: sku.reservedStock,
           soldStock: sku.soldStock,
-          available: Math.max(0, sku.totalStock - sku.reservedStock - sku.soldStock),
-          enabled: sku.enabled,
+          available: availableForSale ? Math.max(0, sku.totalStock - sku.reservedStock - sku.soldStock) : 0,
+          enabled: availableForSale,
           product: {
             id: sku.product.id,
             name: sku.product.name,
             images: sku.product.images,
-            status: sku.product.status,
+            status: availableForSale ? sku.product.status : 2,
           },
         },
       }
@@ -85,7 +87,7 @@ export class CartService {
     if (!sku || !sku.product || sku.product.deletedAt) {
       throw new NotFoundException(`SKU 不存在：${skuId.toString()}`)
     }
-    if (!sku.enabled || sku.product.status !== 1) {
+    if (!sku.enabled || sku.product.status !== 1 || !isCategoryAvailable(sku.product.category)) {
       throw new NotFoundException('商品规格已下架')
     }
 
@@ -115,7 +117,7 @@ export class CartService {
     if (dto.quantity !== undefined) {
       const sku = item.sku
       const available = sku.totalStock - sku.reservedStock - sku.soldStock
-      if (!sku.enabled || dto.quantity > available) throw new BadRequestException('库存不足或规格已下架')
+      if (!sku.enabled || sku.product.status !== 1 || !isCategoryAvailable(sku.product.category) || dto.quantity > available) throw new BadRequestException('库存不足或规格已下架')
       await this.cartRepository.updateItem(cart.id, item.skuId, dto.quantity)
     }
     return this.getCart(userId)
@@ -155,7 +157,7 @@ export class CartService {
     if (!item) throw new BadRequestException('该 SKU 不在购物车中')
     const available =
       item.sku.totalStock - item.sku.reservedStock - item.sku.soldStock
-    if (!item.sku.enabled || quantity > available) throw new BadRequestException('库存不足')
+    if (!item.sku.enabled || item.sku.product.status !== 1 || !isCategoryAvailable(item.sku.product.category) || quantity > available) throw new BadRequestException('库存不足')
     await this.cartRepository.updateItem(cart.id, skuId, quantity)
     return this.getCart(userId)
   }

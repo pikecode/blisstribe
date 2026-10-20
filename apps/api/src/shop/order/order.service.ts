@@ -1,3 +1,4 @@
+import { isCategoryAvailable } from '../category/category-visibility'
 import {
   Injectable,
   BadRequestException,
@@ -83,12 +84,12 @@ export class OrderService {
 
         const sku = await tx.shopProductSku.findUnique({
           where: { id: skuId },
-          include: { product: true },
+          include: { product: { include: { category: { include: { parent: true } } } } },
         })
         if (!sku || sku.product.deletedAt) {
           throw new NotFoundException(`SKU 不存在：${skuId}`)
         }
-        if (!sku.enabled || sku.product.status !== 1) {
+        if (!sku.enabled || sku.product.status !== 1 || !isCategoryAvailable(sku.product.category)) {
           throw new BadRequestException(`商品规格已下架：${sku.product.name}`)
         }
 

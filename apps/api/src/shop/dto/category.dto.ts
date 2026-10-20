@@ -1,6 +1,11 @@
 import { IsString, IsInt, IsOptional, IsNotEmpty, Min, IsBoolean } from 'class-validator'
 
 export class CreateCategoryDto {
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  parentId?: number | null
+
   @IsString()
   @IsNotEmpty()
   code!: string
@@ -28,6 +33,11 @@ export class CreateCategoryDto {
 }
 
 export class UpdateCategoryDto {
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  parentId?: number | null
+
   @IsString()
   @IsOptional()
   code?: string
@@ -55,6 +65,7 @@ export class UpdateCategoryDto {
 }
 
 export class CategoryResponseDto {
+  parentId!: number | null
   id!: number
   code!: string
   name!: string

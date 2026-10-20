@@ -5,6 +5,7 @@ module.exports = {
   testEnvironment: 'node',
   rootDir: path.join(__dirname, '../..'),
   testMatch: [
+    '**/tests/shop/category-hierarchy.spec.ts',
     '**/tests/shop/payment-safety.spec.ts',
     '**/tests/shop/payment-client.spec.ts',
     '**/tests/shop/payment-webhooks.spec.ts',

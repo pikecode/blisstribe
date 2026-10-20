@@ -1502,11 +1502,15 @@ model ShopCategory {
   imageUrl    String?
   sortOrder   Int      @default(0)
   status      Int      @default(1) // 0停用 1启用
+  parentId    BigInt?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   products ShopProduct[]
+  parent   ShopCategory?  @relation("ShopCategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children ShopCategory[] @relation("ShopCategoryTree")
 
+  @@index([parentId, sortOrder])
   @@index([sortOrder])
 }
 

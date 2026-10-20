@@ -17,12 +17,22 @@ import { ProductService } from '../../apps/api/src/shop/product/product.service'
 describe('ProductService SKU validation', () => {
   const productRepository: any = {
     create: jest.fn(),
+    findById: jest.fn(),
     findWithPagination: jest.fn(),
   }
   const categoryRepository: any = {
     findById: jest.fn(),
   }
   const service = new ProductService(productRepository as any, categoryRepository as any)
+
+  it('后台仍可读取停用分类下的商品与停用规格', async () => {
+    productRepository.findById.mockResolvedValue({ id: 1n, deletedAt: null, skus: [
+      { enabled: false, priceFen: 100, totalStock: 1, reservedStock: 0, soldStock: 0 },
+    ] })
+    const product = await service.getAdminProductById(1n)
+    expect(product.skus).toHaveLength(1)
+    expect(productRepository.findById).toHaveBeenCalledWith(1n)
+  })
 
   beforeEach(() => {
     jest.clearAllMocks()

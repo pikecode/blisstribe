@@ -1,6 +1,7 @@
 import request from '@/utils/request'
 
 export interface ShopCategory {
+  parentId: number | null
   id: number
   name: string
   code: string
@@ -12,6 +13,7 @@ export interface ShopCategory {
 }
 
 export interface CreateCategoryDto {
+  parentId?: number | null
   name: string
   code: string
   description?: string
@@ -20,6 +22,7 @@ export interface CreateCategoryDto {
 }
 
 export interface UpdateCategoryDto {
+  parentId?: number | null
   name?: string
   code?: string
   description?: string

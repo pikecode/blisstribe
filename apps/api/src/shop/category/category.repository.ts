@@ -32,6 +32,7 @@ export class CategoryRepository {
   }
 
   async create(data: {
+    parentId?: bigint | null
     code: string
     name: string
     description?: string
@@ -47,6 +48,7 @@ export class CategoryRepository {
   async update(
     id: bigint,
     data: {
+      parentId?: bigint | null
       code?: string
       name?: string
       description?: string

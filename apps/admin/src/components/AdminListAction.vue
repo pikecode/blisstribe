@@ -5,8 +5,8 @@
 </template>
 
 <script setup lang="ts">
-import { Calendar, DocumentChecked, Edit, View } from '@element-plus/icons-vue'
+import { Calendar, DocumentChecked, Edit, Plus, View } from '@element-plus/icons-vue'
 defineOptions({ inheritAttrs: false })
-defineProps<{ label: string; icon: 'Edit' | 'View' | 'Calendar' | 'DocumentChecked' }>()
-const icons = { Edit, View, Calendar, DocumentChecked }
+defineProps<{ label: string; icon: 'Edit' | 'View' | 'Calendar' | 'DocumentChecked' | 'Plus' }>()
+const icons = { Edit, View, Calendar, DocumentChecked, Plus }
 </script>

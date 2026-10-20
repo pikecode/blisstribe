@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../../common/prisma.service'
 import { randomUUID } from 'crypto'
 import { ShopProduct } from '@prisma/client'
+import { publicCategoryFilter } from '../category/category-visibility'
 
 @Injectable()
 export class ProductRepository {
@@ -33,6 +34,7 @@ export class ProductRepository {
     categoryId?: bigint
     keyword?: string
     status?: number
+    publicOnly?: boolean
   }): Promise<{ list: any[]; total: number }> {
     const page = params.page || 1
     const pageSize = params.pageSize || 20
@@ -47,7 +49,11 @@ export class ProductRepository {
     }
 
     if (params.categoryId !== undefined) {
-      where.categoryId = params.categoryId
+      where.OR = [{ categoryId: params.categoryId }, { category: { parentId: params.categoryId } }]
+    }
+
+    if (params.publicOnly) {
+      where.category = publicCategoryFilter
     }
 
     if (params.keyword) {
@@ -79,7 +85,7 @@ export class ProductRepository {
 
   async findPublishedById(id: bigint): Promise<any | null> {
     return this.prisma.shopProduct.findFirst({
-      where: { id, status: 1, deletedAt: null },
+      where: { id, status: 1, deletedAt: null, category: publicCategoryFilter },
       include: { skus: { where: { enabled: true }, orderBy: { id: 'asc' } } },
     })
   }
@@ -87,7 +93,7 @@ export class ProductRepository {
   async findSkuById(id: bigint): Promise<any | null> {
     return this.prisma.shopProductSku.findUnique({
       where: { id },
-      include: { product: true },
+      include: { product: { include: { category: { include: { parent: true } } } } },
     })
   }
 

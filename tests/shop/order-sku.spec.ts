@@ -39,6 +39,7 @@ describe('OrderService SKU checkout', () => {
       name: '测试 T 恤',
       images: ['shirt.jpg'],
       status: 1,
+      category: { status: 1, parentId: null },
       deletedAt: null,
     },
   }
@@ -72,6 +73,16 @@ describe('OrderService SKU checkout', () => {
     receiverPhone: '13800000000',
     shippingAddress: '测试地址',
   }
+
+  it('父分类停用时拒绝从历史页面下单，且不占用库存', async () => {
+    const { service, tx } = setup({ product: {
+      ...sku.product,
+      category: { status: 1, parentId: 2n, parent: { status: 0 } },
+    } })
+    await expect(service.createOrder(7n, checkout)).rejects.toThrow('已下架')
+    expect(tx.shopProductSku.update).not.toHaveBeenCalled()
+    expect(tx.shopOrder.create).not.toHaveBeenCalled()
+  })
 
   it('uses SKU price, reserves its inventory, and snapshots SKU details', async () => {
     const { service, tx } = setup()

@@ -26,7 +26,7 @@
           style="width: 160px"
           @change="handleSearch"
         >
-          <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
+          <el-option v-for="cat in categories" :key="cat.id" :label="getCategoryName(cat.id)" :value="cat.id" />
         </el-select>
 
         <el-select v-model="selectedStatus" placeholder="全部状态" clearable style="width: 130px" aria-label="商品状态筛选" @change="handleSearch">
@@ -171,7 +171,7 @@
             <el-option
               v-for="cat in categories"
               :key="cat.id"
-              :label="cat.name"
+              :label="getCategoryName(cat.id)"
               :value="cat.id"
             />
           </el-select>
@@ -395,7 +395,9 @@ const uploadAction = `${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/upload/c
 const uploadHeaders = computed(() => ({ Authorization: authStore.token }))
 
 function getCategoryName(categoryId: number): string {
-  return categories.value.find(cat => String(cat.id) === String(categoryId))?.name || '-'
+  const category = categories.value.find(cat => String(cat.id) === String(categoryId))
+  const parent = categories.value.find(cat => String(cat.id) === String(category?.parentId))
+  return category ? (parent ? `${parent.name} / ${category.name}` : category.name) : '-'
 }
 
 function getStatusText(status: number): string {

@@ -21,21 +21,26 @@
         <scroll-view scroll-x class="shop-list__category-scroll">
           <view
             class="shop-list__category-item"
-            :class="{ active: !selectedCategory }"
-            @tap="selectCategory()"
+            :class="{ active: !selectedRoot }"
+            @tap="selectRoot()"
           >
             全部
           </view>
           <view
-            v-for="cat in categories"
+            v-for="cat in rootCategories"
             :key="cat.id"
             class="shop-list__category-item"
-            :class="{ active: selectedCategory === cat.id }"
-            @tap="selectCategory(cat.id)"
+            :class="{ active: selectedRoot === cat.id }"
+            @tap="selectRoot(cat.id)"
           >
             {{ cat.name }}
           </view>
         </scroll-view>
+      </view>
+
+      <view v-if="childCategories.length" class="shop-list__subcategories">
+        <view :class="{ active: selectedCategory === selectedRoot }" @tap="selectCategory(selectedRoot)">全部</view>
+        <view v-for="cat in childCategories" :key="cat.id" :class="{ active: selectedCategory === cat.id }" @tap="selectCategory(cat.id)">{{ cat.name }}</view>
       </view>
 
       <!-- Sort options -->
@@ -158,6 +163,10 @@ const currentPage = ref(1)
 const pageSize = 10
 const hasMore = ref(false)
 const categories = ref<ShopCategory[]>([])
+const selectedRoot = ref('')
+const rootCategories = computed(() => categories.value.filter(category => !category.parentId))
+const childCategories = computed(() => categories.value.filter(category => category.parentId === selectedRoot.value && category.parentId))
+let requestVersion = 0
 
 const sortedProducts = computed(() => {
   if (sortBy.value === 'default') return products.value
@@ -172,6 +181,8 @@ const sortedProducts = computed(() => {
 async function loadCategories() {
   try {
     categories.value = await shopApi.categories()
+    const selected = categories.value.find(category => category.id === selectedCategory.value)
+    selectedRoot.value = selected?.parentId || selected?.id || ''
   } catch (err) {
     console.error('Failed to load categories:', err)
   }
@@ -179,6 +190,7 @@ async function loadCategories() {
 
 // Load products
 async function loadProducts(page = 1, isRefresh = false) {
+  const version = ++requestVersion
   try {
     if (page === 1) {
       loading.value = true
@@ -198,6 +210,7 @@ async function loadProducts(page = 1, isRefresh = false) {
     if (searchInput.value.trim()) params.keyword = searchInput.value.trim()
 
     const result = await shopApi.products(params)
+    if (version !== requestVersion) return
 
     if (isRefresh || page === 1) {
       products.value = result.list
@@ -209,12 +222,15 @@ async function loadProducts(page = 1, isRefresh = false) {
     currentPage.value = page
 
   } catch (err) {
+    if (version !== requestVersion) return
     console.error('Failed to load products:', err)
     loadError.value = true
   } finally {
-    loading.value = false
-    loadingMore.value = false
-    refreshing.value = false
+    if (version === requestVersion) {
+      loading.value = false
+      loadingMore.value = false
+      refreshing.value = false
+    }
   }
 }
 
@@ -229,6 +245,11 @@ function handleLoadMore() {
   if (hasMore.value && !loadingMore.value && !loading.value) {
     loadProducts(currentPage.value + 1)
   }
+}
+
+function selectRoot(id = '') {
+  selectedRoot.value = id
+  selectCategory(id)
 }
 
 function selectCategory(id?: string) {
@@ -564,4 +585,7 @@ onShow(() => {
   font-size: 14px;
   color: #999;
 }
+.shop-list__subcategories { display: flex; flex-wrap: wrap; gap: 16rpx; padding: 16rpx 24rpx; background: #fff; }
+.shop-list__subcategories > view { padding: 12rpx 20rpx; border-radius: 12rpx; background: #f4f6f5; color: #66736c; font-size: 24rpx; }
+.shop-list__subcategories > view.active { background: #e7f6ec; color: #078447; font-weight: 700; }
 </style>

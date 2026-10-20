@@ -10,7 +10,7 @@ export class CartRepository {
       where: { userId },
       include: {
         items: {
-          include: { sku: { include: { product: true } } },
+          include: { sku: { include: { product: { include: { category: { include: { parent: true } } } } } } },
         },
       },
     })
@@ -26,7 +26,7 @@ export class CartRepository {
         },
         include: {
           items: {
-            include: { sku: { include: { product: true } } },
+            include: { sku: { include: { product: { include: { category: { include: { parent: true } } } } } } },
           },
         },
       })
@@ -46,7 +46,7 @@ export class CartRepository {
           skuId,
         },
       },
-      include: { sku: { include: { product: true } } },
+      include: { sku: { include: { product: { include: { category: { include: { parent: true } } } } } } },
     })
   }
 
@@ -61,7 +61,7 @@ export class CartRepository {
         skuId,
         quantity,
       },
-      include: { sku: { include: { product: true } } },
+      include: { sku: { include: { product: { include: { category: { include: { parent: true } } } } } } },
     })
   }
 
@@ -78,7 +78,7 @@ export class CartRepository {
         },
       },
       data: { quantity },
-      include: { sku: { include: { product: true } } },
+      include: { sku: { include: { product: { include: { category: { include: { parent: true } } } } } } },
     })
   }
 
