@@ -62,10 +62,22 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '标签字典', icon: 'CollectionTag' },
       },
       {
+        path: 'products/new',
+        name: 'ProductCreate',
+        component: () => import('@/views/product/workspace.vue'),
+        meta: { title: '新增服务产品', icon: 'Goods' },
+      },
+      {
+        path: 'products/:id/workspace',
+        name: 'ProductWorkspace',
+        component: () => import('@/views/product/workspace.vue'),
+        meta: { title: '产品工作区', icon: 'Goods' },
+      },
+      {
         path: 'products',
         name: 'Products',
         component: () => import('@/views/product/index.vue'),
-        meta: { title: '产品介绍', icon: 'Goods' },
+        meta: { title: '产品管理', icon: 'Goods' },
       },
       {
         path: 'activities',

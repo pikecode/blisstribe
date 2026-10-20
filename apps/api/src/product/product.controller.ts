@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common'
 import { AdminJwtGuard } from '../common/guards/admin-jwt.guard'
 import { JwtAuthGuard } from '../common/guards/jwt.guard'
 import { CurrentAdmin } from '../common/decorators/current-admin.decorator'
@@ -325,6 +325,13 @@ export class ProductAdminController {
       productType,
       keyword,
     })
+  }
+
+  @Get(':id')
+  @UseGuards(AdminJwtGuard)
+  detail(@Param('id') id: string) {
+    if (!/^[1-9]\d*$/.test(id)) throw new BadRequestException('产品编号无效')
+    return this.productService.detailProductAdmin(BigInt(id))
   }
 
   @Post()

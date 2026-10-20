@@ -361,6 +361,9 @@ export const productApi = {
   }): Promise<RecommendationAnalytics> {
     return request.get('/admin/products/analytics', { params })
   },
+  detailProduct(id: number): Promise<Product> {
+    return request.get(`/admin/products/${id}`)
+  },
   createProduct(data: ProductPayload): Promise<Product> {
     return request.post('/admin/products', data)
   },

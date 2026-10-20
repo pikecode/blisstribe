@@ -38,10 +38,7 @@
     </AdminListTable>
 
     <el-dialog v-model="rescheduleVisible" title="提出改约建议" width="520px"><el-alert title="患者接受前保留原预约；候选时段不占用名额。" :closable="false" /><el-select v-model="rescheduleSlotId" placeholder="选择候选时段" style="width:100%;margin:20px 0"><el-option v-for="slot in slots.filter(item => item.enabled && item.available > 0 && new Date(item.startAt).getTime() > Date.now() + 3600000)" :key="slot.id" :label="formatDateTime(slot.startAt)" :value="slot.id" /></el-select><el-input v-model="rescheduleReason" type="textarea" maxlength="300" placeholder="填写改约原因" /><template #footer><el-button @click="rescheduleVisible = false">取消</el-button><el-button type="primary" :loading="submitting" @click="sendReschedule">发送建议</el-button></template></el-dialog>
-    <el-dialog v-model="slotsVisible" title="机构可约时段" width="760px">
-      <el-form label-position="top"><el-form-item label="履约机构"><el-select v-model="slotForm.institutionId" @change="loadSlots"><el-option v-for="item in institutions" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item><el-form-item label="开始与结束时间"><el-date-picker v-model="slotRange" type="datetimerange" value-format="YYYY-MM-DDTHH:mm:ss.SSSZ" /></el-form-item><el-form-item label="接待容量"><el-input-number v-model="slotForm.capacity" :min="1" :max="1000" /></el-form-item><el-button type="primary" :loading="submitting" @click="saveSlot">开放时段</el-button></el-form>
-      <el-table :data="slots" style="margin-top: 20px"><el-table-column label="开始时间"><template #default="{ row }">{{ formatDateTime(row.startAt) }}</template></el-table-column><el-table-column label="结束时间"><template #default="{ row }">{{ formatDateTime(row.endAt) }}</template></el-table-column><el-table-column label="剩余 / 容量"><template #default="{ row }">{{ row.available }} / {{ row.capacity }}</template></el-table-column><el-table-column label="操作"><template #default="{ row }"><el-button v-if="row.enabled" link type="danger" @click="closeSlot(row.id)">关闭</el-button><span v-else>已关闭</span></template></el-table-column></el-table>
-    </el-dialog>
+    <SlotManager v-model="slotsVisible" :institutions="institutions" :institution-id="slotForm.institutionId" />
 
     <el-dialog v-model="confirmVisible" title="确认预约安排" width="520px" destroy-on-close>
       <el-alert title="确认后患者将按此时间到场；如需改期，请先与患者沟通。" type="info" :closable="false" show-icon />
@@ -63,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+import SlotManager from './SlotManager.vue'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -95,16 +93,9 @@ async function sendReschedule() {
 }
 const slotsVisible = ref(false)
 const slotForm = reactive({ institutionId: 0, capacity: 1 })
-const slotRange = ref<string[]>([])
 const slots = ref<Array<{ id: number; startAt: string; endAt: string; capacity: number; available: number; enabled: boolean }>>([])
-function openSlots() { slotForm.institutionId = Number(filters.institutionId) || institutions.value[0]?.id || 0; slotsVisible.value = true; void loadSlots() }
+function openSlots() { slotForm.institutionId = Number(filters.institutionId) || institutions.value[0]?.id || 0; slotsVisible.value = true }
 async function loadSlots() { if (slotForm.institutionId) slots.value = await serviceProgramApi.listSlots(slotForm.institutionId) }
-async function saveSlot() {
-  if (!slotForm.institutionId || slotRange.value.length !== 2) { ElMessage.warning('请选择机构与时段'); return }
-  submitting.value = true
-  try { await serviceProgramApi.createSlot({ ...slotForm, startAt: slotRange.value[0], endAt: slotRange.value[1] }); ElMessage.success('时段已开放'); await loadSlots() } finally { submitting.value = false }
-}
-async function closeSlot(id: number) { await ElMessageBox.confirm('确认关闭该时段？有预约的时段需先协调预约。', '关闭时段'); await serviceProgramApi.closeSlot(id); await loadSlots() }
 
 async function load() { loading.value = true; listError.value = ''; try { appointments.value = await serviceProgramApi.listAppointments(filters) } catch { listError.value = '预约列表加载失败，请重试' } finally { loading.value = false } }
 function receptionDay(offset: number) { const d = new Date(Date.now() + offset * 86400000 + 8 * 3600000); filters.date = d.toISOString().slice(0,10); filters.status = 'confirmed'; void load() }

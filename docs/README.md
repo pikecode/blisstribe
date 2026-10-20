@@ -66,3 +66,6 @@
 - [服务产品交付状态](plans/SERVICE_PROGRAM_DELIVERY_STATUS.md)
 
 - [套餐上架检查与服务工作台](plans/2026-10-15-service-readiness-workbench.md)：检查规则、待办口径及本轮发布验证。
+
+- [产品维护工作区实施计划](plans/2026-10-15-product-workspace.md)：产品介绍、套餐、机构时段与上线检查的统一操作路径。
+- [产品体验评审与优化记录](product/PRODUCT_EXPERIENCE_REVIEW_20261015.md)：跟踪已交付调整与后续产品优先级。

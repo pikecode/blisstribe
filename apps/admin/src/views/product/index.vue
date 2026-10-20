@@ -1,7 +1,7 @@
 <template>
   <div class="product-page">
     <el-alert class="product-entry-guide" type="info" :closable="false" show-icon>
-      <template #title>在这里维护服务介绍，价格、次数和套餐实物在“服务套餐”中配置。</template>
+      <template #title>从产品工作区维护介绍、套餐、履约准备与上线检查。</template>
       <div>单独售卖实物请前往 <el-button link type="primary" @click="router.push('/shop/products')">商城商品</el-button>。历史实物与组合介绍可继续维护。</div>
     </el-alert>
     <el-tabs v-model="activeTab">
@@ -23,7 +23,7 @@
           <div class="toolbar__filters">
             <el-select
               v-model="moduleId"
-              placeholder="全部模块"
+              placeholder="全部分类"
               clearable
               style="width: 160px"
               @change="handleSearch"
@@ -75,7 +75,7 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="模块" width="110">
+            <el-table-column label="分类" width="110">
               <template #default="{ row }">{{ row.module?.name || '-' }}</template>
             </el-table-column>
             <el-table-column label="类型" width="110">
@@ -103,21 +103,21 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="状态" width="100">
+            <el-table-column label="介绍展示" width="110">
               <template #default="{ row }">
-                <el-tag v-if="row.status === 1" type="success" effect="light" round>已上架</el-tag>
-                <el-tag v-else-if="row.status === 2" type="info" effect="light" round>已下架</el-tag>
+                <el-tag v-if="row.status === 1" type="success" effect="light" round>已展示</el-tag>
+                <el-tag v-else-if="row.status === 2" type="info" effect="light" round>已隐藏</el-tag>
                 <el-tag v-else type="warning" effect="light" round>草稿</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="104" fixed="right" align="center">
           <template #default="{ row }">
             <AdminListActions>
-              <AdminListAction label="编辑" icon="Edit" @click="editProduct(row)" />
-              <AdminListAction v-if="row.productType === 'service'" label="管理套餐" icon="DocumentChecked" @click="router.push({ path: '/service-programs', query: { productId: row.id } })" />
+              <AdminListAction label="进入产品工作区" icon="Edit" @click="editProduct(row)" />
+              <AdminListAction v-if="row.productType === 'service'" label="管理套餐" icon="DocumentChecked" @click="router.push({ name: 'ProductWorkspace', params: { id: row.id }, query: { tab: 'packages' } })" />
               <template #more>
-                <el-dropdown-item v-if="row.status !== 1" @click="publishProduct(row)">上架</el-dropdown-item>
-                <el-dropdown-item v-else @click="unpublishProduct(row)">下架</el-dropdown-item>
+                <el-dropdown-item v-if="row.status !== 1" @click="publishProduct(row)">展示介绍</el-dropdown-item>
+                <el-dropdown-item v-else @click="unpublishProduct(row)">隐藏介绍</el-dropdown-item>
               </template>
             </AdminListActions>
           </template>
@@ -136,16 +136,16 @@
         </div>
       </el-tab-pane>
 
-      <!-- 产品模块标签页 -->
-      <el-tab-pane label="产品模块" name="modules">
+      <!-- 产品分类标签页 -->
+      <el-tab-pane label="产品分类" name="modules">
         <div class="page-head">
-          <h2 class="page-head__title">产品模块</h2>
-          <el-button type="primary" @click="openModuleDialog()">新增模块</el-button>
+          <h2 class="page-head__title">产品分类</h2>
+          <el-button type="primary" @click="openModuleDialog()">新增分类</el-button>
         </div>
 
         <div class="table-wrapper">
           <AdminListTable :data="modules" style="width: 100%" :loading="moduleLoading" :error="moduleError" @retry="loadModules">
-            <el-table-column prop="name" label="模块名称" width="160" />
+            <el-table-column prop="name" label="分类名称" width="160" />
             <el-table-column prop="code" label="编码" width="120" show-overflow-tooltip />
             <el-table-column prop="icon" label="图标文案" width="100" />
             <el-table-column prop="description" label="说明" min-width="200" show-overflow-tooltip />
@@ -163,14 +163,14 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="模块状态" width="100"><template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag></template></el-table-column>
+            <el-table-column label="分类状态" width="100"><template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag></template></el-table-column>
             <el-table-column prop="sortOrder" label="排序" width="80" />
             <el-table-column label="操作" width="88" fixed="right" align="center">
           <template #default="{ row }">
             <AdminListActions>
               <AdminListAction label="编辑" icon="Edit" @click="openModuleDialog(row)" />
               <template #more>
-                <el-dropdown-item @click="toggleModuleStatus(row)">{{ row.status === 1 ? '停用模块' : '启用模块' }}</el-dropdown-item>
+                <el-dropdown-item @click="toggleModuleStatus(row)">{{ row.status === 1 ? '停用分类' : '启用分类' }}</el-dropdown-item>
               </template>
             </AdminListActions>
           </template>
@@ -180,154 +180,7 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="productDialogVisible" :title="editingProductId ? '编辑产品介绍' : '新增服务产品'" width="800px" :close-on-click-modal="false">
-      <el-form ref="productFormRef" :model="productForm" :rules="productRules" label-width="100px">
-        <el-tabs v-model="activeProductFormTab">
-          <!-- 基础信息 -->
-          <el-tab-pane label="基础信息" name="basic">
-            <el-form-item label="所属模块" prop="moduleId">
-              <el-select v-model="productForm.moduleId" placeholder="请选择模块" style="width: 100%">
-                <el-option v-for="item in activeModules" :key="item.id" :label="item.name" :value="item.id" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="产品类型">
-              <div class="product-type-guide">
-                <el-tag :type="productTypeTagType(productForm.productType)">{{ productTypeText(productForm.productType) }}</el-tag>
-                <span v-if="productForm.productType === 'service'">保存后可通过“管理套餐”配置购买方案，支持服务及配套实物。</span>
-                <span v-else>历史介绍仅用于展示和咨询，可继续修改内容。需要售卖服务请新增服务产品，单独售卖实物请使用商城商品。</span>
-              </div>
-            </el-form-item>
-            <el-form-item label="标题" prop="title">
-              <el-input v-model="productForm.title" />
-            </el-form-item>
-            <el-form-item label="副标题">
-              <el-input v-model="productForm.subtitle" />
-            </el-form-item>
-            <el-form-item label="产品封面">
-              <AdminCoverUpload v-model="productForm.coverUrl" tip="支持 jpg/png/webp，建议使用产品实拍或服务场景横图，文件不超过 5MB" />
-            </el-form-item>
-            <el-form-item label="价格文案">
-              <el-input v-model="productForm.priceText" placeholder="展示用，例如199元起；实际成交价在服务套餐中维护" />
-            </el-form-item>
-            <el-form-item label="优先级/排序">
-              <div style="display: flex; gap: 12px">
-                <el-input-number v-model="productForm.priority" :min="0" placeholder="优先级" />
-                <el-input-number v-model="productForm.sortOrder" :min="0" placeholder="排序" />
-              </div>
-            </el-form-item>
-          </el-tab-pane>
-
-          <!-- 标签规则 -->
-          <el-tab-pane label="标签规则" name="tags">
-            <div class="tag-rule-desc">根据用户标签推荐优先级配置。强相关标签优先推荐，排除标签会完全屏蔽该产品。</div>
-            <el-form-item label="推荐标签" prop="tagIds">
-              <el-select
-                v-model="productForm.tagIds"
-                multiple
-                filterable
-                placeholder="通用推荐标签"
-                style="width: 100%"
-              >
-                <el-option-group v-for="group in groupedSelectableTags" :key="group.label" :label="group.label">
-                  <el-option v-for="tag in group.options" :key="tag.id" :label="tagOptionLabel(tag)" :value="tag.id" />
-                </el-option-group>
-              </el-select>
-            </el-form-item>
-            <el-form-item label="强相关标签">
-              <el-select v-model="productForm.primaryTagIds" multiple filterable placeholder="核心命中标签" style="width: 100%">
-                <el-option-group v-for="group in groupedSelectableTags" :key="group.label" :label="group.label">
-                  <el-option v-for="tag in group.options" :key="tag.id" :label="tagOptionLabel(tag)" :value="tag.id" />
-                </el-option-group>
-              </el-select>
-              <div style="font-size: 12px; color: #999; margin-top: 4px">用户命中这些标签时优先推荐此产品</div>
-            </el-form-item>
-            <el-form-item label="弱相关标签">
-              <el-select v-model="productForm.secondaryTagIds" multiple filterable placeholder="可覆盖但非核心标签" style="width: 100%">
-                <el-option-group v-for="group in groupedSelectableTags" :key="group.label" :label="group.label">
-                  <el-option v-for="tag in group.options" :key="tag.id" :label="tagOptionLabel(tag)" :value="tag.id" />
-                </el-option-group>
-              </el-select>
-              <div style="font-size: 12px; color: #999; margin-top: 4px">用户命中这些标签时可推荐，但优先级较低</div>
-            </el-form-item>
-            <el-form-item label="排除标签">
-              <el-select v-model="productForm.excludeTagIds" multiple filterable placeholder="命中则不推荐" style="width: 100%">
-                <el-option-group v-for="group in groupedSelectableTags" :key="group.label" :label="group.label">
-                  <el-option v-for="tag in group.options" :key="tag.id" :label="tagOptionLabel(tag)" :value="tag.id" />
-                </el-option-group>
-              </el-select>
-              <div style="font-size: 12px; color: #999; margin-top: 4px">用户命中这些标签时不推荐此产品</div>
-            </el-form-item>
-          </el-tab-pane>
-
-          <!-- 类型详情 -->
-          <el-tab-pane label="类型详情" name="details">
-            <template v-if="showServiceFields">
-              <el-divider content-position="left">服务信息</el-divider>
-              <el-form-item label="服务方式">
-                <el-select v-model="productForm.serviceMode" placeholder="请选择服务方式" clearable style="width: 100%">
-                  <el-option label="线上服务" value="online" />
-                  <el-option label="到店服务" value="offline" />
-                  <el-option label="线上 + 到店" value="mixed" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="服务周期">
-                <el-input v-model="productForm.serviceDuration" placeholder="例如：1次咨询 / 7天跟进 / 30天方案" />
-              </el-form-item>
-              <el-form-item label="是否预约">
-                <el-switch v-model="productForm.appointmentRequired" active-text="需要" inactive-text="不需要" />
-              </el-form-item>
-              <el-form-item label="服务流程">
-                <el-input v-model="productForm.serviceProcess" type="textarea" :rows="2" />
-              </el-form-item>
-            </template>
-            <template v-if="showPhysicalFields">
-              <el-divider :content-position="showServiceFields ? 'left' : 'center'">实物信息</el-divider>
-              <el-form-item label="规格说明">
-                <el-input v-model="productForm.specText" type="textarea" :rows="2" placeholder="例如：30包/盒，适合日常补充" />
-              </el-form-item>
-              <el-form-item label="配送说明">
-                <el-input v-model="productForm.deliveryText" type="textarea" :rows="2" placeholder="例如：下单后由顾问确认配送方式" />
-              </el-form-item>
-              <el-form-item label="售后说明">
-                <el-input v-model="productForm.afterSaleText" type="textarea" :rows="2" placeholder="例如：未拆封可沟通售后处理" />
-              </el-form-item>
-              <el-form-item label="库存状态">
-                <el-select v-model="productForm.stockStatus" style="width: 100%">
-                  <el-option label="正常供应" value="available" />
-                  <el-option label="库存紧张" value="limited" />
-                  <el-option label="暂不可售" value="sold_out" />
-                </el-select>
-              </el-form-item>
-            </template>
-            <div v-if="!showServiceFields && !showPhysicalFields" style="padding: 40px; text-align: center; color: #999">
-              请先在"基础信息"中选择产品类型
-            </div>
-          </el-tab-pane>
-
-          <!-- 描述内容 -->
-          <el-tab-pane label="描述内容" name="content">
-            <el-form-item label="简介">
-              <el-input v-model="productForm.summary" type="textarea" :rows="3" placeholder="产品简介，会在列表中展示" />
-            </el-form-item>
-            <el-form-item label="适合人群">
-              <el-input v-model="productForm.targetUserText" type="textarea" :rows="2" placeholder="描述最适合的使用人群" />
-            </el-form-item>
-            <el-form-item label="解决痛点">
-              <el-input v-model="productForm.painPointText" type="textarea" :rows="2" placeholder="该产品解决的具体痛点" />
-            </el-form-item>
-            <el-form-item label="详情">
-              <el-input v-model="productForm.detail" type="textarea" :rows="5" placeholder="产品详细描述和使用说明" />
-            </el-form-item>
-          </el-tab-pane>
-        </el-tabs>
-      </el-form>
-      <template #footer>
-        <el-button @click="productDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submitProduct">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="moduleDialogVisible" :title="editingModuleId ? '编辑模块' : '新增模块'" width="620px">
+    <el-dialog v-model="moduleDialogVisible" :title="editingModuleId ? '编辑产品分类' : '新增产品分类'" width="620px">
       <el-form :model="moduleForm" label-width="90px">
         <el-form-item label="编码">
           <el-input v-model="moduleForm.code" placeholder="如 health" :disabled="!!editingModuleId" />
@@ -338,7 +191,7 @@
         <el-form-item label="图标文案">
           <el-input v-model="moduleForm.icon" maxlength="20" placeholder="如 健康 / 美学 / 亲子" />
         </el-form-item>
-        <el-form-item label="模块封面">
+        <el-form-item label="分类封面">
           <AdminCoverUpload v-model="moduleForm.coverUrl" tip="支持 jpg/png/webp，建议使用能代表模块主题的横图，文件不超过 5MB" />
         </el-form-item>
         <el-form-item label="说明">
@@ -383,23 +236,22 @@ import AdminListTable from '@/components/AdminListTable.vue'
 import AdminListToolbar from '@/components/AdminListToolbar.vue'
 import AdminListPagination from '@/components/AdminListPagination.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
-import { productApi, type Product, type ProductModule, type ProductModulePayload, type ProductPayload, type ProductType, type TagDictionary } from '@/api/product'
-import { buildTagOptionGroups, mapTagNamesToIds, tagOptionLabel } from '@/utils/tags'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { productApi, type Product, type ProductModule, type ProductModulePayload, type ProductType } from '@/api/product'
 import AdminCoverUpload from '@/components/AdminCoverUpload.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 const moduleError = ref('')
 const moduleLoading = ref(false)
 const listError = ref('')
 
 
-const activeTab = ref('products')
+const activeTab = ref(route.query.tab === 'modules' ? 'modules' : 'products')
 const modules = ref<ProductModule[]>([])
 const products = ref<Product[]>([])
-const tags = ref<TagDictionary[]>([])
 const loading = ref(false)
 const submitting = ref(false)
 const page = ref(1)
@@ -409,43 +261,10 @@ const keyword = ref('')
 const moduleId = ref<number | ''>('')
 const status = ref<number | ''>('')
 const productType = ref<ProductType | ''>('')
-const showFilters = ref(false)
 
-const productDialogVisible = ref(false)
 const moduleDialogVisible = ref(false)
-const editingProductId = ref<number | null>(null)
 const editingModuleId = ref<number | null>(null)
-const activeProductFormTab = ref('basic')
-const productFormRef = ref<FormInstance>()
 
-const defaultProductForm = (): ProductPayload => ({
-  moduleId: modules.value[0]?.id ?? 0,
-  productType: 'service',
-  title: '',
-  subtitle: '',
-  coverUrl: '',
-  priceText: '',
-  summary: '',
-  detail: '',
-  targetUserText: '',
-  painPointText: '',
-  serviceProcess: '',
-  serviceMode: '',
-  serviceDuration: '',
-  appointmentRequired: false,
-  specText: '',
-  deliveryText: '',
-  afterSaleText: '',
-  stockStatus: 'available',
-  tags: [],
-  tagIds: [],
-  primaryTagIds: [],
-  secondaryTagIds: [],
-  excludeTagIds: [],
-  priority: 0,
-  sortOrder: 0,
-})
-const productForm = reactive<ProductPayload>(defaultProductForm())
 const defaultModuleForm = (): ProductModulePayload => ({
   code: '',
   name: '',
@@ -460,37 +279,12 @@ const defaultModuleForm = (): ProductModulePayload => ({
 })
 const moduleForm = reactive<ProductModulePayload>(defaultModuleForm())
 
-const productRules = {
-  moduleId: [{ required: true, message: '请选择模块', trigger: 'change' }],
-  productType: [{ required: true, message: '请选择产品类型', trigger: 'change' }],
-  title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
-}
-
 const productTypeOptions: Array<{ label: string; value: ProductType }> = [
   { label: '服务产品', value: 'service' },
   { label: '实物介绍（历史）', value: 'physical' },
   { label: '组合介绍（历史）', value: 'package' },
 ]
 
-const activeModules = computed(() => modules.value.filter((item) => item.status === 1))
-const showServiceFields = computed(() => productForm.productType === 'service' || productForm.productType === 'package')
-const showPhysicalFields = computed(() => productForm.productType === 'physical' || productForm.productType === 'package')
-const selectableTags = computed(() => tags.value.filter((item) => (
-  item.status === 1 && (!item.moduleId || item.moduleId === productForm.moduleId)
-)))
-const groupedSelectableTags = computed(() => buildTagOptionGroups(selectableTags.value))
-
-function cleanTags(values: string[] = []) {
-  return [...new Set(values.map((item) => item.trim()).filter(Boolean))].slice(0, 20)
-}
-
-function productStatusText(value: number) {
-  return value === 1 ? '上架' : value === 2 ? '下架' : '草稿'
-}
-
-function productStatusType(value: number) {
-  return value === 1 ? 'success' : value === 2 ? 'warning' : 'info'
-}
 
 function productTypeText(value?: string) {
   return productTypeOptions.find((item) => item.value === value)?.label || '服务产品'
@@ -512,10 +306,6 @@ async function loadModules() {
   } finally {
     moduleLoading.value = false
   }
-}
-
-async function loadTags() {
-  tags.value = await productApi.listTags({ status: 1 })
 }
 
 async function loadProducts() {
@@ -552,77 +342,8 @@ function resetSearch() {
   handleSearch()
 }
 
-function handleAction(row: Product, command: string) {
-  switch (command) {
-    case 'edit':
-      openProductDialog(row)
-      break
-    case 'publish':
-      publish(row)
-      break
-    case 'unpublish':
-      unpublish(row)
-      break
-  }
-}
-
-function assignProductForm(data: ProductPayload) {
-  Object.assign(productForm, data)
-}
-
 function openProductDialog(row?: Product) {
-  editingProductId.value = row?.id ?? null
-  activeProductFormTab.value = 'basic'
-  assignProductForm(row
-    ? {
-        moduleId: row.module.id,
-        productType: row.productType || 'service',
-        title: row.title,
-        subtitle: row.subtitle,
-        coverUrl: row.coverUrl,
-        priceText: row.priceText,
-        summary: row.summary,
-        detail: row.detail,
-        targetUserText: row.targetUserText,
-        painPointText: row.painPointText,
-        serviceProcess: row.serviceProcess,
-        serviceMode: row.serviceMode || '',
-        serviceDuration: row.serviceDuration || '',
-        appointmentRequired: row.appointmentRequired || false,
-        specText: row.specText || '',
-        deliveryText: row.deliveryText || '',
-        afterSaleText: row.afterSaleText || '',
-        stockStatus: row.stockStatus || 'available',
-        tags: row.tags,
-        tagIds: row.tagIds?.length ? row.tagIds : mapTagNamesToIds(row.tags, tags.value),
-        primaryTagIds: row.primaryTagIds?.length ? row.primaryTagIds : (row.tagIds?.length ? row.tagIds : mapTagNamesToIds(row.tags, tags.value)),
-        secondaryTagIds: row.secondaryTagIds || [],
-        excludeTagIds: row.excludeTagIds || [],
-        priority: row.priority,
-        sortOrder: row.sortOrder,
-      }
-    : defaultProductForm())
-  productDialogVisible.value = true
-  productFormRef.value?.clearValidate()
-}
-
-async function submitProduct() {
-  await productFormRef.value?.validate()
-  submitting.value = true
-  try {
-    const data = { ...productForm, productType: editingProductId.value ? productForm.productType : 'service' as ProductType, tags: cleanTags(productForm.tags), tagIds: productForm.tagIds }
-    if (editingProductId.value) {
-      await productApi.updateProduct(editingProductId.value, data)
-      ElMessage.success('产品已更新')
-    } else {
-      await productApi.createProduct(data)
-      ElMessage.success('产品已创建')
-    }
-    productDialogVisible.value = false
-    await loadProducts()
-  } finally {
-    submitting.value = false
-  }
+  void router.push(row ? { name:'ProductWorkspace', params:{ id:row.id } } : { name:'ProductCreate' })
 }
 
 function openModuleDialog(row?: ProductModule) {
@@ -646,7 +367,7 @@ function openModuleDialog(row?: ProductModule) {
 
 async function submitModule() {
   if (!moduleForm.code || !moduleForm.name) {
-    ElMessage.error('请填写模块编码和名称')
+    ElMessage.error('请填写分类编码和名称')
     return
   }
   const data = {
@@ -655,10 +376,10 @@ async function submitModule() {
   }
   if (editingModuleId.value) {
     await productApi.updateModule(editingModuleId.value, data)
-    ElMessage.success('模块已更新')
+    ElMessage.success('分类已更新')
   } else {
     await productApi.createModule(data)
-    ElMessage.success('模块已创建')
+    ElMessage.success('分类已创建')
   }
   Object.assign(moduleForm, defaultModuleForm())
   editingModuleId.value = null
@@ -668,19 +389,19 @@ async function submitModule() {
 
 async function toggleModule(row: ProductModule) {
   await productApi.updateModule(row.id, { status: row.status === 1 ? 0 : 1 })
-  ElMessage.success(row.status === 1 ? '模块已停用' : '模块已启用')
+  ElMessage.success(row.status === 1 ? '分类已停用' : '分类已启用')
   await loadModules()
 }
 
 async function publish(row: Product) {
   await productApi.publishProduct(row.id)
-  ElMessage.success('产品已上架')
+  ElMessage.success('介绍已展示')
   await loadProducts()
 }
 
 async function unpublish(row: Product) {
   await productApi.unpublishProduct(row.id)
-  ElMessage.success('产品已下架')
+  ElMessage.success('介绍已隐藏')
   await loadProducts()
 }
 
@@ -701,19 +422,18 @@ async function toggleModuleStatus(row: ProductModule) {
   if (moduleStatusSaving.value) return
   const enabled = row.status !== 1
   try {
-    await ElMessageBox.confirm(enabled ? `启用“${row.name}”后，已上架产品可恢复展示。` : `停用“${row.name}”后，该模块及其产品将从公开浏览入口隐藏，已有订单仍保留。`, enabled ? '启用模块' : '停用模块', { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' })
+    await ElMessageBox.confirm(enabled ? `启用“${row.name}”后，已上架产品可恢复展示。` : `停用“${row.name}”后，该分类及其产品将从公开浏览入口隐藏，已有订单仍保留。`, enabled ? '启用分类' : '停用分类', { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' })
   } catch { return }
   moduleStatusSaving.value = true
   try {
     await productApi.updateModule(row.id, { status: enabled ? 1 : 0 })
-    ElMessage.success(enabled ? '模块已启用' : '模块已停用')
+    ElMessage.success(enabled ? '分类已启用' : '分类已停用')
     await loadModules()
   } finally { moduleStatusSaving.value = false }
 }
 
 onMounted(async () => {
   await loadModules()
-  await loadTags()
   await loadProducts()
 })
 </script>

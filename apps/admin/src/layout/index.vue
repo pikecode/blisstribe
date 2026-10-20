@@ -201,7 +201,7 @@ const menuSections: MenuSection[] = [
   {
     title: '服务经营',
     items: [
-      { path: '/products', title: '产品介绍', icon: Goods, desc: '维护产品介绍、展示模块与上下架，关联可售服务套餐' },
+      { path: '/products', title: '产品管理', icon: Goods, desc: '在产品工作区维护介绍、服务套餐、履约准备与上线检查' },
       { path: '/service-programs', title: '服务套餐', icon: DocumentChecked, desc: '维护履约机构、可售方案、价格与服务规则' },
       { path: '/service-orders', title: '服务订单', icon: Tickets, desc: '查看服务支付、权益、预约与退款全貌' },
       { path: '/service-appointments', title: '预约与核销', icon: Calendar, desc: '确认预约、登记到场并完成服务核销' },

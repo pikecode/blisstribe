@@ -730,6 +730,12 @@ export class ProductService {
     return { list: rows.map((p) => this.toAdminProductVO(p)), total, page: params.page, pageSize: params.pageSize }
   }
 
+  async detailProductAdmin(id: bigint) {
+    const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null }, include: { module: true } })
+    if (!product) throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, '产品不存在或已删除')
+    return this.toAdminProductVO(product)
+  }
+
   async createProduct(dto: CreateProductDto) {
     const moduleId = BigInt(dto.moduleId)
     await this.ensureModule(moduleId)
